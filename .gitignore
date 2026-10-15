@@ -1,0 +1,46 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+coverage/
+.output/
+.nuxt/
+.next/
+build/
+
+# Logs and runtime
+logs/
+*.log
+*.pid
+*.seed
+
+# Local databases and uploads
+*.sqlite
+*.sqlite3
+data/
+uploads/
+
+# Browser and automation
+.edge-*
+playwright-report/
+test-results/
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local-only reference material
+research/raw/
+research/session/
