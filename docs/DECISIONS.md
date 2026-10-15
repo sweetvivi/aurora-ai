@@ -38,6 +38,13 @@
 - 作用范围：仅 `project2` 本地仓库，不修改其他仓库
 - 凭据用户名：`sweetvivi`
 
+### D-006 远端认证
+
+- 状态：Accepted
+- 决策：远端认证使用 Gitea Token，并通过 Windows Credential Manager 保存
+- 作用范围：`http://182.92.154.206:3000`
+- 安全要求：Token 不写入仓库、文档、提交记录或普通配置文件
+
 ## Proposed
 
 ### P-001 前端技术栈
