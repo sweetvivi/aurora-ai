@@ -37,6 +37,7 @@
 
 - 明确禁止将 API Key、Token、Cookie、账号密码和支付信息写入仓库。
 - 初始提交 `5a087cc` 已创建；推送因远端要求认证且当前没有可用凭据而暂停，未保存任何密码或 Token。
+- 2026-10-15：HTTP 账号密码认证被远端拒绝并返回 `Unauthorized`，已从 Windows Credential Manager 删除该无效凭据。后续需要有效 Gitea Token，或确认账号激活和登录策略。
 
 ## 记录规则
 
