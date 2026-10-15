@@ -60,7 +60,7 @@
 ## 仓库与协作
 
 - 远端仓库使用哪个账号推送？
-- 是否使用 HTTP Token、SSH，还是本地证书？
+- 当前 HTTP 推送需要 Gitea 密码或访问 Token；采用 Git Credential Manager 登录，还是配置 SSH？
 - 分支策略使用 `main` 直推，还是功能分支加合并请求？
 - 是否需要提交钩子和 CI？
 - 仓库采用什么许可证？
