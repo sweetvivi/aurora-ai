@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from './auth/auth.module';
 import { RequestIdMiddleware } from './common/http/request-id.middleware';
 import { validateEnvironment } from './config/env';
 import { HealthModule } from './health/health.module';
@@ -19,6 +20,7 @@ import { ProvidersModule } from './providers/providers.module';
     RedisModule,
     ModelsModule,
     ProvidersModule,
+    AuthModule,
     HealthModule,
   ],
 })

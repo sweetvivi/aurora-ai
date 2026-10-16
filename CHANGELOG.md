@@ -59,12 +59,18 @@
   - 验证：桌面端与 390px 移动端 Edge 截图检查无整页横向溢出；`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm test` 全部通过
   - 遗留：当前改动尚未提交或推送；`outputs/` 中的截图仅作本地验收，不进入 Git
 - 2026-10-16：将首页视频模型横幅和绘画工作区视频入口统一指向 `/video`，避免不同侧栏入口共用 `/studio` 造成多重高亮。
+- 2026-10-16：提交 M0 本地重构基线 `05b9235` 并推送到 `feature/m0-foundation`；从该基线建立 `feature/m1-vertical-slice` 分支。
+- 2026-10-16：新增 [`docs/M1_WORKLOG.md`](docs/M1_WORKLOG.md)，记录 M1 批次、固定环境、密钥边界和中断恢复步骤。
+- 2026-10-16：完成 M1-1 数据模型，新增用户、刷新会话、积分账本、冻结记录、会话、消息、聊天请求、文件资产和图片任务模型及迁移。
+- 2026-10-16：完成 M1-2 认证主链路，支持开发登录、邮箱注册/登录、Access Token、Refresh Token 轮换、退出和受保护路由用户上下文；注册默认赠送 100 积分并写入账本。
+- 2026-10-16：新增认证端到端测试和 Token 单元测试，覆盖注册赠分、重复邮箱、错误密码、鉴权、刷新令牌轮换、开发登录和过期 Token。
 
 ### Fixed
 
 - 2026-10-16：空字符串 `LLM_API_KEY` 按未配置处理，复制 `.env.example` 后不会因占位空值阻止应用启动。
 - 2026-10-16：补齐 Nest `ValidationPipe` 所需的 `class-validator` 和 `class-transformer` 运行时依赖。
 - 2026-10-16：修正前端路由 meta 类型声明和绘画比例字段类型，使 Vue TypeScript 构建稳定通过。
+- 2026-10-16：修正认证控制器未注入 Express 请求导致注册和登录返回 500 的问题；新增独立 `LogoutDto`，避免退出接口绕过白名单验证。
 
 ### Removed
 

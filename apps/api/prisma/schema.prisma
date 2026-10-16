@@ -17,35 +17,275 @@ enum ModelCapability {
   EMBEDDING
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum MessageRole {
+  SYSTEM
+  USER
+  ASSISTANT
+}
+
+enum MessageStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum PointsEntryType {
+  GRANT
+  HOLD
+  SETTLE
+  REFUND
+  ADJUSTMENT
+}
+
+enum PointsReservationStatus {
+  RESERVED
+  SETTLED
+  REFUNDED
+}
+
+enum ChatRequestStatus {
+  PENDING
+  STREAMING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum FileAssetStatus {
+  READY
+  DELETED
+}
+
+enum ImageTaskStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
 model ProviderConfig {
-  id          String          @id @default(cuid())
-  code        String          @unique
+  id          String        @id @default(cuid())
+  code        String        @unique
   displayName String
-  kind        ProviderKind    @default(OPENAI_COMPATIBLE)
+  kind        ProviderKind  @default(OPENAI_COMPATIBLE)
   baseUrl     String
   keyRef      String
-  priority    Int             @default(100)
-  enabled     Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  priority    Int           @default(100)
+  enabled     Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   models      ModelConfig[]
 
   @@map("provider_configs")
 }
 
 model ModelConfig {
-  id           String            @id @default(cuid())
-  alias        String            @unique
+  id            String            @id @default(cuid())
+  alias         String            @unique
   providerModel String
-  displayName  String
-  capabilities ModelCapability[]
+  displayName   String
+  capabilities  ModelCapability[]
   contextWindow Int?
-  enabled      Boolean           @default(true)
-  providerId   String
-  provider     ProviderConfig    @relation(fields: [providerId], references: [id])
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  enabled       Boolean           @default(true)
+  providerId    String
+  provider      ProviderConfig    @relation(fields: [providerId], references: [id])
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   @@index([providerId])
   @@map("model_configs")
+}
+
+model User {
+  id              String              @id @default(cuid())
+  email           String?             @unique
+  displayName     String
+  passwordHash    String?
+  role            UserRole            @default(USER)
+  status          UserStatus          @default(ACTIVE)
+  pointsBalance   Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  refreshSessions RefreshSession[]
+  pointsEntries   PointsLedgerEntry[]
+  reservations    PointsReservation[]
+  conversations   Conversation[]
+  messages        Message[]
+  chatRequests    ChatRequest[]
+  fileAssets      FileAsset[]
+  imageTasks      ImageTask[]
+
+  @@index([createdAt])
+  @@map("users")
+}
+
+model RefreshSession {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  userAgent  String?
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@map("refresh_sessions")
+}
+
+model PointsLedgerEntry {
+  id             String          @id @default(cuid())
+  userId         String
+  type           PointsEntryType
+  delta          Int
+  balanceAfter   Int
+  idempotencyKey String          @unique
+  referenceType  String?
+  referenceId    String?
+  metadata       Json?
+  createdAt      DateTime        @default(now())
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([referenceType, referenceId])
+  @@map("points_ledger_entries")
+}
+
+model PointsReservation {
+  id             String                  @id @default(cuid())
+  userId         String
+  amount         Int
+  status         PointsReservationStatus @default(RESERVED)
+  idempotencyKey String                  @unique
+  referenceType  String
+  referenceId    String
+  expiresAt      DateTime
+  settledAt      DateTime?
+  refundedAt     DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([referenceType, referenceId])
+  @@map("points_reservations")
+}
+
+model Conversation {
+  id            String             @id @default(cuid())
+  userId        String
+  title         String             @default("新对话")
+  modelAlias    String
+  status        ConversationStatus @default(ACTIVE)
+  lastMessageAt DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      Message[]
+  chatRequests  ChatRequest[]
+
+  @@index([userId, updatedAt])
+  @@map("conversations")
+}
+
+model Message {
+  id             String        @id @default(cuid())
+  conversationId String
+  userId         String
+  role           MessageRole
+  content        String        @db.Text
+  status         MessageStatus @default(COMPLETED)
+  requestId      String?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("messages")
+}
+
+model ChatRequest {
+  id                 String            @id @default(cuid())
+  userId             String
+  conversationId     String
+  userMessageId      String
+  assistantMessageId String?
+  modelAlias         String
+  idempotencyKey     String            @unique
+  pointsCost         Int
+  status             ChatRequestStatus @default(PENDING)
+  errorCode          String?
+  errorMessage       String?
+  createdAt          DateTime          @default(now())
+  startedAt          DateTime?
+  completedAt        DateTime?
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation       Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([conversationId, createdAt])
+  @@map("chat_requests")
+}
+
+model FileAsset {
+  id               String          @id @default(cuid())
+  userId           String
+  storageKey       String          @unique
+  originalName     String
+  mimeType         String
+  size             Int
+  checksum         String
+  status           FileAssetStatus @default(READY)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceImageTasks ImageTask[]     @relation("ImageTaskSource")
+  resultImageTasks ImageTask[]     @relation("ImageTaskResult")
+
+  @@index([userId, createdAt])
+  @@map("file_assets")
+}
+
+model ImageTask {
+  id             String          @id @default(cuid())
+  userId         String
+  sourceFileId   String?
+  resultFileId   String?
+  modelAlias     String
+  prompt         String          @db.Text
+  parameters     Json?
+  status         ImageTaskStatus @default(QUEUED)
+  idempotencyKey String          @unique
+  errorCode      String?
+  errorMessage   String?
+  createdAt      DateTime        @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceFile     FileAsset?      @relation("ImageTaskSource", fields: [sourceFileId], references: [id], onDelete: SetNull)
+  resultFile     FileAsset?      @relation("ImageTaskResult", fields: [resultFileId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("image_tasks")
 }
