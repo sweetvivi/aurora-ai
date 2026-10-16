@@ -22,8 +22,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const request = http.getRequest<Request>();
     const response = http.getResponse<Response>();
-    const status =
-      exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+    const status = this.resolveStatus(exception);
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
@@ -40,6 +39,22 @@ export class ApiExceptionFilter implements ExceptionFilter {
   }
 
   private toErrorPayload(exception: unknown, status: number): ErrorPayload {
+    if (status === HttpStatus.PAYLOAD_TOO_LARGE) {
+      return {
+        code: 'FILE_TOO_LARGE',
+        message: '文件超过允许的大小限制',
+      };
+    }
+
+    const uploadErrorCode = this.uploadErrorCode(exception);
+
+    if (uploadErrorCode) {
+      return {
+        code: uploadErrorCode.code,
+        message: uploadErrorCode.message,
+      };
+    }
+
     if (!(exception instanceof HttpException)) {
       return {
         code: 'INTERNAL_SERVER_ERROR',
@@ -80,5 +95,50 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
   private statusCode(status: number): string {
     return HttpStatus[status] ?? `HTTP_${status}`;
+  }
+
+  private resolveStatus(exception: unknown): number {
+    if (exception instanceof HttpException) {
+      return exception.getStatus();
+    }
+
+    if (this.uploadErrorCode(exception)?.code === 'FILE_TOO_LARGE') {
+      return HttpStatus.PAYLOAD_TOO_LARGE;
+    }
+
+    if (this.uploadErrorCode(exception)) {
+      return HttpStatus.BAD_REQUEST;
+    }
+
+    return HttpStatus.INTERNAL_SERVER_ERROR;
+  }
+
+  private uploadErrorCode(exception: unknown): { code: string; message: string } | null {
+    if (
+      typeof exception !== 'object' ||
+      exception === null ||
+      !('code' in exception) ||
+      typeof (exception as { code?: unknown }).code !== 'string'
+    ) {
+      return null;
+    }
+
+    const code = (exception as { code: string }).code;
+
+    if (code === 'LIMIT_FILE_SIZE') {
+      return {
+        code: 'FILE_TOO_LARGE',
+        message: '文件超过允许的大小限制',
+      };
+    }
+
+    if (code.startsWith('LIMIT_')) {
+      return {
+        code: 'FILE_UPLOAD_INVALID',
+        message: '文件上传参数不符合要求',
+      };
+    }
+
+    return null;
   }
 }

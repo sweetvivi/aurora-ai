@@ -6,11 +6,14 @@ import { ConversationsModule } from './conversations/conversations.module';
 import { RequestIdMiddleware } from './common/http/request-id.middleware';
 import { validateEnvironment } from './config/env';
 import { HealthModule } from './health/health.module';
+import { FilesModule } from './files/files.module';
+import { ImageTasksModule } from './image-tasks/image-tasks.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { ModelsModule } from './models/models.module';
 import { PointsModule } from './points/points.module';
 import { ProvidersModule } from './providers/providers.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -21,10 +24,13 @@ import { ProvidersModule } from './providers/providers.module';
     }),
     PrismaModule,
     RedisModule,
+    StorageModule,
     ModelsModule,
     PointsModule,
     ConversationsModule,
     ChatModule,
+    FilesModule,
+    ImageTasksModule,
     ProvidersModule,
     AuthModule,
     HealthModule,

@@ -19,6 +19,13 @@ const DEFAULT_MODELS: RegisteredModel[] = [
     providerCode: 'jiguang',
     providerModel: 'gpt-6-astra',
   },
+  {
+    alias: 'volc-seedream-5',
+    capabilities: ['image'],
+    displayName: 'Seedream 5',
+    providerCode: 'mock',
+    providerModel: 'mock-seedream-5',
+  },
 ];
 
 @Injectable()
@@ -46,5 +53,9 @@ export class ModelRegistryService {
     return this.getByAlias(
       this.configService.get<string>('LLM_DEFAULT_MODEL', 'openai-gpt-6-astra'),
     );
+  }
+
+  getDefaultImageModel(): RegisteredModel {
+    return this.getByAlias('volc-seedream-5');
   }
 }

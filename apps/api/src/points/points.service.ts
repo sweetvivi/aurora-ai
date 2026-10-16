@@ -132,11 +132,29 @@ export class PointsService {
   }
 
   async settle(reservationId: string): Promise<PointsReservationResult> {
-    return this.finalizeReservation(reservationId, 'SETTLED');
+    return this.prismaService.$transaction((transaction) =>
+      this.finalizeReservation(transaction, reservationId, 'SETTLED'),
+    );
   }
 
   async refund(reservationId: string): Promise<PointsReservationResult> {
-    return this.finalizeReservation(reservationId, 'REFUNDED');
+    return this.prismaService.$transaction((transaction) =>
+      this.finalizeReservation(transaction, reservationId, 'REFUNDED'),
+    );
+  }
+
+  async settleInTransaction(
+    transaction: Prisma.TransactionClient,
+    reservationId: string,
+  ): Promise<PointsReservationResult> {
+    return this.finalizeReservation(transaction, reservationId, 'SETTLED');
+  }
+
+  async refundInTransaction(
+    transaction: Prisma.TransactionClient,
+    reservationId: string,
+  ): Promise<PointsReservationResult> {
+    return this.finalizeReservation(transaction, reservationId, 'REFUNDED');
   }
 
   async getBalance(userId: string): Promise<number> {
@@ -156,107 +174,106 @@ export class PointsService {
   }
 
   private async finalizeReservation(
+    transaction: Prisma.TransactionClient,
     reservationId: string,
     targetStatus: 'SETTLED' | 'REFUNDED',
   ): Promise<PointsReservationResult> {
-    return this.prismaService.$transaction(async (transaction) => {
-      const reservation = await transaction.pointsReservation.findUnique({
+    const reservation = await transaction.pointsReservation.findUnique({
+      where: { id: reservationId },
+    });
+
+    if (!reservation) {
+      throw new NotFoundException({
+        code: 'POINTS_RESERVATION_NOT_FOUND',
+        message: '积分冻结记录不存在',
+      });
+    }
+
+    if (reservation.status === targetStatus) {
+      const user = await transaction.user.findUniqueOrThrow({
+        select: { pointsBalance: true },
+        where: { id: reservation.userId },
+      });
+
+      return this.toReservationResult(reservation, user.pointsBalance);
+    }
+
+    if (reservation.status !== 'RESERVED') {
+      throw new ConflictException({
+        code: 'POINTS_RESERVATION_ALREADY_FINALIZED',
+        message:
+          targetStatus === 'SETTLED'
+            ? '该积分冻结记录已退回，不能重复结算'
+            : '该积分冻结记录已结算，不能重复退回',
+      });
+    }
+
+    const completedAt = new Date();
+    const updated = await transaction.pointsReservation.updateMany({
+      data:
+        targetStatus === 'SETTLED'
+          ? {
+              settledAt: completedAt,
+              status: 'SETTLED',
+            }
+          : {
+              refundedAt: completedAt,
+              status: 'REFUNDED',
+            },
+      where: {
+        id: reservationId,
+        status: 'RESERVED',
+      },
+    });
+
+    if (updated.count !== 1) {
+      const current = await transaction.pointsReservation.findUniqueOrThrow({
         where: { id: reservationId },
       });
 
-      if (!reservation) {
-        throw new NotFoundException({
-          code: 'POINTS_RESERVATION_NOT_FOUND',
-          message: '积分冻结记录不存在',
-        });
-      }
-
-      if (reservation.status === targetStatus) {
+      if (current.status === targetStatus) {
         const user = await transaction.user.findUniqueOrThrow({
           select: { pointsBalance: true },
-          where: { id: reservation.userId },
+          where: { id: current.userId },
         });
 
-        return this.toReservationResult(reservation, user.pointsBalance);
+        return this.toReservationResult(current, user.pointsBalance);
       }
 
-      if (reservation.status !== 'RESERVED') {
-        throw new ConflictException({
-          code: 'POINTS_RESERVATION_ALREADY_FINALIZED',
-          message:
-            targetStatus === 'SETTLED'
-              ? '该积分冻结记录已退回，不能重复结算'
-              : '该积分冻结记录已结算，不能重复退回',
-        });
-      }
-
-      const completedAt = new Date();
-      const updated = await transaction.pointsReservation.updateMany({
-        data:
-          targetStatus === 'SETTLED'
-            ? {
-                settledAt: completedAt,
-                status: 'SETTLED',
-              }
-            : {
-                refundedAt: completedAt,
-                status: 'REFUNDED',
-              },
-        where: {
-          id: reservationId,
-          status: 'RESERVED',
-        },
+      throw new ConflictException({
+        code: 'POINTS_RESERVATION_CONFLICT',
+        message: '积分冻结记录状态已发生变化，请刷新后重试',
       });
+    }
 
-      if (updated.count !== 1) {
-        const current = await transaction.pointsReservation.findUniqueOrThrow({
-          where: { id: reservationId },
-        });
+    const balanceAfter =
+      targetStatus === 'SETTLED'
+        ? (
+            await transaction.user.findUniqueOrThrow({
+              select: { pointsBalance: true },
+              where: { id: reservation.userId },
+            })
+          ).pointsBalance
+        : await this.incrementBalance(transaction, reservation.userId, reservation.amount);
 
-        if (current.status === targetStatus) {
-          const user = await transaction.user.findUniqueOrThrow({
-            select: { pointsBalance: true },
-            where: { id: current.userId },
-          });
-
-          return this.toReservationResult(current, user.pointsBalance);
-        }
-
-        throw new ConflictException({
-          code: 'POINTS_RESERVATION_CONFLICT',
-          message: '积分冻结记录状态已发生变化，请刷新后重试',
-        });
-      }
-
-      const balanceAfter =
-        targetStatus === 'SETTLED'
-          ? (
-              await transaction.user.findUniqueOrThrow({
-                select: { pointsBalance: true },
-                where: { id: reservation.userId },
-              })
-            ).pointsBalance
-          : await this.incrementBalance(transaction, reservation.userId, reservation.amount);
-
-      await transaction.pointsLedgerEntry.create({
-        data: {
-          balanceAfter,
-          delta: targetStatus === 'SETTLED' ? 0 : reservation.amount,
-          idempotencyKey:
-            targetStatus === 'SETTLED' ? `settle:${reservation.id}` : `refund:${reservation.id}`,
-          referenceId: reservation.id,
-          referenceType: 'points_reservation',
-          type: targetStatus === 'SETTLED' ? 'SETTLE' : 'REFUND',
-          userId: reservation.userId,
-        },
-      });
-
-      const finalized = await transaction.pointsReservation.findUniqueOrThrow({
-        where: { id: reservationId },
-      });
-
-      return this.toReservationResult(finalized, balanceAfter);
+    await transaction.pointsLedgerEntry.create({
+      data: {
+        balanceAfter,
+        delta: targetStatus === 'SETTLED' ? 0 : reservation.amount,
+        idempotencyKey:
+          targetStatus === 'SETTLED' ? `settle:${reservation.id}` : `refund:${reservation.id}`,
+        referenceId: reservation.id,
+        referenceType: 'points_reservation',
+        type: targetStatus === 'SETTLED' ? 'SETTLE' : 'REFUND',
+        userId: reservation.userId,
+      },
     });
+
+    const finalized = await transaction.pointsReservation.findUniqueOrThrow({
+      where: { id: reservationId },
+    });
+
+    return this.toReservationResult(finalized, balanceAfter);
   }
 
   private async incrementBalance(

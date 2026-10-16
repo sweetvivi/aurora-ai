@@ -1,0 +1,133 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
+import type { FileAsset } from '@prisma/client';
+import { PrismaService } from '../infrastructure/prisma/prisma.service';
+import { STORAGE_ADAPTER, type StorageAdapter } from '../storage/storage.types';
+import {
+  normalizeMimeType,
+  type UploadedImageFile,
+  validateImageUpload,
+} from './image-file.validator';
+
+@Injectable()
+export class FilesService {
+  constructor(
+    @Inject(STORAGE_ADAPTER) private readonly storageAdapter: StorageAdapter,
+    private readonly prismaService: PrismaService,
+  ) {}
+
+  async upload(userId: string, file: UploadedImageFile | undefined) {
+    validateImageUpload(file);
+    const uploadedFile = file as UploadedImageFile;
+    const mimeType = normalizeMimeType(uploadedFile.mimetype);
+    const stored = await this.storageAdapter.save({
+      buffer: uploadedFile.buffer,
+      extension: extensionFromMimeType(mimeType),
+      mimeType,
+      originalName: sanitizeOriginalName(uploadedFile.originalname),
+      userId,
+    });
+
+    try {
+      const asset = await this.prismaService.fileAsset.create({
+        data: {
+          checksum: stored.checksum,
+          mimeType,
+          originalName: sanitizeOriginalName(uploadedFile.originalname),
+          size: stored.size,
+          storageKey: stored.storageKey,
+          userId,
+        },
+      });
+
+      return this.toFileDto(asset);
+    } catch (error) {
+      await this.storageAdapter.delete(stored.storageKey);
+      throw error;
+    }
+  }
+
+  async list(userId: string, limit: number) {
+    const assets = await this.prismaService.fileAsset.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      where: {
+        status: 'READY',
+        userId,
+      },
+    });
+
+    return { items: assets.map((asset) => this.toFileDto(asset)) };
+  }
+
+  async getOwnedAsset(userId: string, fileId: string): Promise<FileAsset> {
+    const asset = await this.prismaService.fileAsset.findFirst({
+      where: {
+        id: fileId,
+        status: 'READY',
+        userId,
+      },
+    });
+
+    if (!asset) {
+      throw new NotFoundException({
+        code: 'FILE_NOT_FOUND',
+        message: '文件不存在或无权访问',
+      });
+    }
+
+    return asset;
+  }
+
+  async getMetadata(userId: string, fileId: string) {
+    return this.toFileDto(await this.getOwnedAsset(userId, fileId));
+  }
+
+  async readContent(userId: string, fileId: string) {
+    const asset = await this.getOwnedAsset(userId, fileId);
+
+    return {
+      asset,
+      buffer: await this.storageAdapter.read(asset.storageKey),
+    };
+  }
+
+  async readAssetContent(asset: FileAsset): Promise<Buffer> {
+    return this.storageAdapter.read(asset.storageKey);
+  }
+
+  private toFileDto(asset: FileAsset) {
+    return {
+      checksum: asset.checksum,
+      createdAt: asset.createdAt,
+      id: asset.id,
+      mimeType: asset.mimeType,
+      originalName: asset.originalName,
+      size: asset.size,
+    };
+  }
+}
+
+function extensionFromMimeType(mimeType: string): string {
+  const extensionByMimeType: Record<string, string> = {
+    'image/gif': 'gif',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+  };
+
+  return extensionByMimeType[mimeType] ?? 'bin';
+}
+
+function sanitizeOriginalName(value: string): string {
+  const normalized = Array.from(value)
+    .filter((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+
+      return codePoint >= 32 && codePoint !== 127;
+    })
+    .join('')
+    .trim();
+
+  return normalized.slice(0, 255) || 'image';
+}
