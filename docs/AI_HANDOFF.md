@@ -7,7 +7,7 @@
 - 项目：极光AI，参考 `https://参考产品/` 的产品结构和交互重新实现。
 - 本地目录：`C:\Users\Administrator\Desktop\project2`
 - GitHub 远端：[https://github.com/sweetvivi/web-ai-design-clone-b](https://github.com/sweetvivi/web-ai-design-clone-b)（Private）
-- 当前阶段：M0 已启动，正在建立工程基础和文档基线。
+- 当前阶段：M0 已启动；workspace 与后端基础已完成并通过类型检查、测试、构建和 lint，正在进入前端基础。
 - 实现边界：按 D-011 修订后的策略，界面结构、视觉和交互尽可能接近参考产品；品牌与受保护内容必须替换，原页面打包资源不得复用。
 - 主开发工具：按 D-033，Codex 作为主要开发工具；除非用户明确决定切换，否则不再按换模型流程重置方向。
 
@@ -30,9 +30,9 @@
 
 ## 当前进度
 
-- 已完成：研究和文档阶段；GitHub 远端已设置；M0 实施计划和 D-033 已落档；本地功能分支已建立。
-- 进行中：M0 工程基础，先完成 workspace、后端和前端骨架。
-- 下一步：按 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) 执行 M0-1 至 M0-4，不提前实现 M1 业务功能。
+- 已完成：研究和文档阶段；GitHub 远端已设置；M0 实施计划和 D-033 已落档；本地功能分支已建立；workspace 骨架和 M0-2 后端基础已实现并验证。
+- 进行中：M0 工程基础，准备实现 Vue 3 前端骨架。
+- 下一步：按 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) 执行 M0-3 和 M0-4，不提前实现 M1 业务功能。
 - Git 续接：从 `main` 的 `7a75622` 建立 `feature/m0-foundation` 分支。每次接手用 `git status --short --branch` 和 `git log --oneline -5` 核验最新状态。
 
 ## 本轮新增注意事项

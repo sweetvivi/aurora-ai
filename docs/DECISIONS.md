@@ -227,6 +227,14 @@
 - 约束：普通推送也必须先说明远端、分支和提交范围
 - 约束：该规则是行为约束，不替代操作系统权限和安全隔离
 
+### D-034 TypeScript 构建工具版本
+
+- 状态：Accepted
+- 决策：M0 起全 workspace 使用 TypeScript `5.9.3`
+- 原因：Nest CLI 12 构建依赖 TypeScript programmatic compiler API，TypeScript 7.0.2 当前不提供该 API，且 TypeScript 6 尚无稳定版
+- 约束：不使用 TypeScript 6 beta 作为基础工程依赖
+- 复核：NestJS 或 TypeScript 发布兼容稳定版本后，再单独评估升级影响
+
 ## Proposed
 
 ### P-001 前端技术栈

@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProviderKind {
+  OPENAI_COMPATIBLE
+}
+
+enum ModelCapability {
+  CHAT
+  IMAGE
+  VIDEO
+  EMBEDDING
+}
+
+model ProviderConfig {
+  id          String          @id @default(cuid())
+  code        String          @unique
+  displayName String
+  kind        ProviderKind    @default(OPENAI_COMPATIBLE)
+  baseUrl     String
+  keyRef      String
+  priority    Int             @default(100)
+  enabled     Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  models      ModelConfig[]
+
+  @@map("provider_configs")
+}
+
+model ModelConfig {
+  id           String            @id @default(cuid())
+  alias        String            @unique
+  providerModel String
+  displayName  String
+  capabilities ModelCapability[]
+  contextWindow Int?
+  enabled      Boolean           @default(true)
+  providerId   String
+  provider     ProviderConfig    @relation(fields: [providerId], references: [id])
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([providerId])
+  @@map("model_configs")
+}

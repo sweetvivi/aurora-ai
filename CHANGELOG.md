@@ -20,6 +20,8 @@
 - 2026-10-16：从 `main` 建立本地分支 `feature/m0-foundation`，开始 M0 工程基础。
 - 2026-10-16：新增 `docs/SESSION_HANDOFF_2026-10-16-v2.md`，记录切换到 `deepseek-4.1-flash-260910` 前的阶段、决策、问题、Git 状态和下一模型首要动作。
 - 2026-10-16：新增 `docs/AI_HANDOFF.md`，集中记录对话助手续接所需的用户协作偏好、分工和项目进度，并指向决策与待确认问题文档。
+- 2026-10-16：完成 M0-2 后端基础，包括 NestJS 引导、Zod 环境校验、请求 ID、统一响应与异常结构、健康检查、Prisma 与 Redis 生命周期封装、模型注册表和 OpenAI 兼容 provider 骨架。
+- 2026-10-16：新增后端配置模板、Prisma schema、Vitest 配置，以及环境、SSE 解析和健康检查测试。
 - 初始化 `project2` 本地 Git 仓库，默认分支为 `main`。
 - 添加项目总览、研究基线、模型续接、决策记录和待确认问题文档。
 - 添加变更日志和基础 `.gitignore`。
@@ -40,10 +42,13 @@
 - 2026-10-16：根据用户确认，将项目状态更新为演示优先、未来商用可升级；首批模型使用公司 Key；支付采用沙箱订单。
 - 2026-10-16：最终确认 Vue 3 前端、独立 NestJS 后端、环境变量注入公司 Key、首批 `gpt-6-astra`、支付沙箱、简单分支和 GitHub Actions。
 - 2026-10-16：远端从原 Gitea 仓库切换到 private GitHub 仓库 `https://github.com/sweetvivi/web-ai-design-clone-b`。
+- 2026-10-16：全 workspace 将 TypeScript 固定为 `5.9.3`，避让 Nest CLI 12 尚不支持的 TypeScript 7 programmatic compiler API。
+- 2026-10-16：Vitest 后端配置改用 `.mts`，消除 CommonJS 包加载 ESM 配置时的告警。
 
 ### Fixed
 
-- 无。
+- 2026-10-16：空字符串 `LLM_API_KEY` 按未配置处理，复制 `.env.example` 后不会因占位空值阻止应用启动。
+- 2026-10-16：补齐 Nest `ValidationPipe` 所需的 `class-validator` 和 `class-transformer` 运行时依赖。
 
 ### Removed
 
