@@ -18,13 +18,14 @@
 
 ## 当前状态
 
-项目目前处于研究和架构评审阶段，尚未开始正式业务开发。
+项目目前进入 M0 工程基础阶段，尚未开始 M1 业务闭环开发。
 
 已完成：
 
 - 参考产品公开路由和登录后页面巡检
 - 桌面端 72 个代表路由、移动端 6 个代表页面分析
 - 页面壳层、核心工作台、接口和商业化结构梳理
+- M0 实施范围、批次和验收标准
 
 尚未确定：
 
@@ -43,6 +44,7 @@
 4. `docs/MODEL_CONTINUITY.md`
 5. `docs/DECISIONS.md`
 6. `docs/OPEN_QUESTIONS.md`
+7. `docs/IMPLEMENTATION_PLAN.md`
 
 任何模型或开发者继续接管前，都必须先阅读以上文档，不得根据旧对话自行重置产品方向。
 
@@ -54,6 +56,7 @@
 - `docs/MODEL_CONTINUITY.md`：换模型后的续接和防止思路漂移规则
 - `docs/DECISIONS.md`：已确认和待确认的技术决策
 - `docs/OPEN_QUESTIONS.md`：等待用户回答的问题
+- `docs/IMPLEMENTATION_PLAN.md`：M0-M7 实施方向、批次和验收标准
 - `CHANGELOG.md`：所有有效改动的持续记录
 
 ## 工作规则

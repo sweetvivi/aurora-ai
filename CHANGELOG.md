@@ -14,6 +14,8 @@
 
 ### Added
 
+- 2026-10-16：新增 `docs/IMPLEMENTATION_PLAN.md`，固化 M0-M7 方向、三档执行规则、实施批次和验收标准。
+- 2026-10-16：从 `main` 建立本地分支 `feature/m0-foundation`，开始 M0 工程基础。
 - 2026-10-16：新增 `docs/SESSION_HANDOFF_2026-10-16-v2.md`，记录切换到 `deepseek-4.1-flash-260910` 前的阶段、决策、问题、Git 状态和下一模型首要动作。
 - 2026-10-16：新增 `docs/AI_HANDOFF.md`，集中记录对话助手续接所需的用户协作偏好、分工和项目进度，并指向决策与待确认问题文档。
 - 初始化 `project2` 本地 Git 仓库，默认分支为 `main`。
@@ -24,6 +26,8 @@
 
 ### Changed
 
+- 2026-10-16：新增 D-033，确认 Codex 为主要开发工具，并固化自动执行、先说明再做、单独确认三档操作规则。
+- 2026-10-16：更新 `README.md`、`docs/PROJECT_CONTEXT.md`、`docs/AI_HANDOFF.md`、`docs/MODEL_CONTINUITY.md`，并将 `docs/SESSION_HANDOFF_2026-10-16-v2.md` 标记为历史交接，统一切换到 M0 工程基础阶段。
 - 2026-10-16：更新 `docs/AI_HANDOFF.md` 的提交后进度，修正遗留的差异化视觉描述；记录已完成推送并要求续接时实时核验 Git 状态，补充目录边界和 Gitea 归档待确认状态。
 - 2026-10-16：修订 D-011 视觉策略，新增 D-020 模型别名规范和 D-021 Gitea 归档策略；补充原页面公开会员脚本字段及截图确认边界，并同步更新 `docs/AI_HANDOFF.md`。
 - 将 `origin` 设置为 `http://182.92.154.206:3000/sweetvivi/web-ai-design-clone.git`。

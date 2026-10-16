@@ -2,6 +2,8 @@
 
 日期：2026-10-16
 
+> 历史状态说明：本文记录当时的模型切换交接，其中“M0 未开始”和目标模型 `deepseek-4.1-flash-260910` 已不再是当前事实。当前主开发工具、项目和实施状态以 [`AI_HANDOFF.md`](AI_HANDOFF.md)、[`DECISIONS.md`](DECISIONS.md) 和 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) 为准。
+
 ## 1. 当前阶段
 
 - M0 未开始。
