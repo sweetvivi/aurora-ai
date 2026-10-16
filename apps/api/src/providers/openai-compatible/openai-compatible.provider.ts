@@ -16,6 +16,11 @@ export class OpenAiCompatibleProvider implements LlmProvider {
   constructor(private readonly configService: ConfigService) {}
 
   async *streamChat(request: StreamChatRequest): AsyncGenerator<StreamChatEvent> {
+    if (this.configService.get<boolean>('LLM_MOCK_MODE', false)) {
+      yield* this.streamMock(request);
+      return;
+    }
+
     const apiKey = this.configService.get<string>('LLM_API_KEY');
 
     if (!apiKey) {
@@ -25,48 +30,83 @@ export class OpenAiCompatibleProvider implements LlmProvider {
       });
     }
 
-    const baseUrl = this.configService.getOrThrow<string>('LLM_BASE_URL').replace(/\/+$/, '');
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      body: JSON.stringify({
-        messages: request.messages,
-        model: request.model,
-        stream: true,
-        temperature: request.temperature,
-      }),
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        'content-type': 'application/json',
-      },
-      method: 'POST',
-      signal: request.signal,
-    });
+    const timeoutController = new AbortController();
+    const timeoutMs = this.configService.get<number>('LLM_REQUEST_TIMEOUT_MS', 120_000);
+    const timeout = setTimeout(() => timeoutController.abort(), timeoutMs);
+    const signal = request.signal
+      ? AbortSignal.any([request.signal, timeoutController.signal])
+      : timeoutController.signal;
 
-    if (!response.ok) {
-      throw new ServiceUnavailableException({
-        code: this.providerErrorCode(response.status),
-        message: `LLM provider returned HTTP ${response.status}`,
+    try {
+      const baseUrl = this.configService.getOrThrow<string>('LLM_BASE_URL').replace(/\/+$/, '');
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        body: JSON.stringify({
+          messages: request.messages,
+          model: request.model,
+          stream: true,
+          temperature: request.temperature,
+        }),
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        method: 'POST',
+        signal,
       });
-    }
 
-    if (!response.body) {
-      throw new ServiceUnavailableException({
-        code: 'LLM_EMPTY_RESPONSE',
-        message: 'LLM provider returned an empty stream',
-      });
-    }
-
-    for await (const data of parseServerSentEvents(response.body)) {
-      if (data === '[DONE]') {
-        yield { type: 'done' };
-        return;
+      if (!response.ok) {
+        throw new ServiceUnavailableException({
+          code: this.providerErrorCode(response.status),
+          message: `LLM provider returned HTTP ${response.status}`,
+        });
       }
 
-      const payload = this.parsePayload(data);
-      const content = payload.choices?.[0]?.delta?.content;
-
-      if (content) {
-        yield { content, type: 'delta' };
+      if (!response.body) {
+        throw new ServiceUnavailableException({
+          code: 'LLM_EMPTY_RESPONSE',
+          message: 'LLM provider returned an empty stream',
+        });
       }
+
+      for await (const data of parseServerSentEvents(response.body)) {
+        if (data === '[DONE]') {
+          yield { type: 'done' };
+          return;
+        }
+
+        const payload = this.parsePayload(data);
+        const content = payload.choices?.[0]?.delta?.content;
+
+        if (content) {
+          yield { content, type: 'delta' };
+        }
+      }
+
+      yield { type: 'done' };
+    } catch (error) {
+      if (timeoutController.signal.aborted && !request.signal?.aborted) {
+        throw new ServiceUnavailableException({
+          code: 'LLM_TIMEOUT',
+          message: 'LLM provider request timed out',
+        });
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private async *streamMock(request: StreamChatRequest): AsyncGenerator<StreamChatEvent> {
+    const chunks = ['这是', '本地 Mock ', '模型返回的', '流式响应。'];
+
+    for (const chunk of chunks) {
+      if (request.signal?.aborted) {
+        throw new DOMException('The operation was aborted.', 'AbortError');
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      yield { content: chunk, type: 'delta' };
     }
 
     yield { type: 'done' };
