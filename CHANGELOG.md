@@ -26,6 +26,8 @@
 - 已验证远端可访问且当前没有分支；因本机尚未配置 Git 提交邮箱，暂未创建初始提交。
 - 配置当前仓库的 Git 提交身份为 `sweetvivi <2020532166@qq.com>`，凭据用户名使用 `sweetvivi`。
 - 2026-10-16：根据用户确认，将项目状态更新为演示优先、未来商用可升级；首批模型使用公司 Key；支付采用沙箱订单。
+- 2026-10-16：最终确认 Vue 3 前端、独立 NestJS 后端、环境变量注入公司 Key、首批 `gpt-6-astra`、支付沙箱、简单分支和 GitHub Actions。
+- 2026-10-16：远端从原 Gitea 仓库切换到 private GitHub 仓库 `https://github.com/sweetvivi/web-ai-design-clone-b`。
 
 ### Fixed
 

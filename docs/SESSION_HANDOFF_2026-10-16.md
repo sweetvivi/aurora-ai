@@ -53,7 +53,7 @@
 
 远端仓库：
 
-`http://182.92.154.206:3000/sweetvivi/web-ai-design-clone.git`
+`https://github.com/sweetvivi/web-ai-design-clone-b`（private）
 
 默认分支：
 
@@ -229,12 +229,14 @@ Git 身份：
 - 邮箱：`2020532166@qq.com`
 - 作用范围：仅当前仓库
 
-远端认证：
+远端变更：
 
-- 使用 Gitea Token
-- Token 保存在 Windows Credential Manager
-- Token 值不得写入文档、代码和提交
-- Token 曾在聊天中暴露，后续建议重新生成并替换
+- 原 Gitea 仓库为历史仓库，版本 1.15.9 不支持 Actions
+- 当前远端切换为 GitHub private 仓库
+- GitHub 地址：`https://github.com/sweetvivi/web-ai-design-clone-b`
+- 新推送需要 GitHub 凭据或 SSH Key
+- 历史 Gitea Token 不应继续作为新远端的认证依据
+- 任何 Token 都不得写入文档、代码和提交
 
 当前提交：
 
@@ -273,6 +275,59 @@ Git 身份：
 - 后续可能改成真实支付
 - 订单从第一版就应使用幂等和状态机
 - 前端不能直接把订单标记为已支付
+
+### 6.4 2026-10-16 最终核心决策
+
+前端：
+
+- Vue 3 + TypeScript + Vite
+- Ant Design Vue 5
+- UnoCSS
+- Pinia
+- Vue Router
+- TanStack Query (Vue)
+- 不用 React
+
+后端：
+
+- 不复用 `ai-workbench-api`
+- 旧项目冻结为参考实现
+- 数据结构、数据库和鉴权重新设计
+- PostgreSQL
+- NestJS + Prisma + Redis + BullMQ
+
+模型：
+
+- 后端环境变量注入 Key
+- `LLM_BASE_URL`
+- `LLM_API_KEY`
+- `LLM_DEFAULT_MODEL`
+- Base URL：`https://api.example.com/v1`
+- 默认对话模型：`gpt-6-astra`
+- 只实现一个 OpenAI 兼容适配器
+- 生图先 Mock，M1 尾期接 Seedance
+- 视频先 Mock，M4 接入
+- Embedding 暂不做
+
+支付：
+
+- 一期只定接口和订单状态机
+- `SandboxProvider`
+- 前端没有直接设置已支付接口
+- 注册送 100 积分
+- 后台手动充值
+- 微信、支付宝、Stripe 放到 M7
+
+分支和 CI：
+
+- `main`
+- `feature/xxx`
+- `fix/xxx`
+- 不使用长期 `dev`
+- 不强制 PR
+- 重要节点打 Tag
+- GitHub Actions
+- M0 只写最小 CI
 
 ## 7. DeepSeek 实施方案评审
 
@@ -446,7 +501,7 @@ DeepSeek 给出的方案总体可行，主要方向：
 - 积分冻结
 - Docker Compose
 - Vitest、Jest、Playwright
-- Gitea 远端
+- GitHub private 远端
 
 ## 11. 建议修改后的 M0
 
@@ -465,7 +520,7 @@ M0 只做工程基础，不写业务页面：
 11. 密钥读取抽象
 12. 前端空壳和五套 Shell 路由占位
 13. 测试工具链
-14. Gitea CI 或本地替代方案
+14. GitHub Actions 最小 CI
 
 M0 不接真实模型，但接口必须支持公司 Key。
 
@@ -502,7 +557,7 @@ M1 结束应实现：
 ## 13. 新模型不能擅自做的事情
 
 - 不更换“极光AI”名称
-- 不更换远端仓库
+- 不擅自更换当前 GitHub 远端仓库
 - 不把项目切回 React 或 Vue，除非用户确认
 - 不使用 Mock 替代真实 provider 主流程
 - 不把公司 Key 写入仓库
@@ -517,19 +572,18 @@ M1 结束应实现：
 
 技术：
 
-- 正式采纳 Vue 3 还是 React？
-- 是否从零 NestJS，还是复用 `ai-workbench-api`？
-- 是否使用 pnpm？
+- 是否需要管理后台和运营后台？
 
 模型：
 
-- 公司 Key 用什么方式注入？
-- 首批具体接入哪些 LLM 和图片模型？
-- 是否允许自动回退？
+- 是否要求前后端统一模型别名？
+- 是否允许模型失败时自动回退？
+- 上游报错时前端显示统一提示还是错误分类？
 
 支付：
 
-- 沙箱订单自研还是使用 SDK？
+- 积分、会员和订单是否首发上线？
+- 退款、发票和会员到期规则如何处理？
 - 支付成功后积分和会员由哪个模块幂等发放？
 
 部署：
@@ -540,8 +594,7 @@ M1 结束应实现：
 
 协作：
 
-- 分支策略？
-- 是否启用 Gitea Actions？
+- 是否需要本地提交钩子？
 - 是否使用许可证？
 
 ## 15. 新模型接手提示词

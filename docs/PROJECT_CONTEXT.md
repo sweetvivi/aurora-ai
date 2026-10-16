@@ -23,7 +23,7 @@
 
 - 产品中文名：极光AI
 - 本地目录：`C:\Users\Administrator\Desktop\project2`
-- 远端仓库：`http://182.92.154.206:3000/sweetvivi/web-ai-design-clone.git`
+- 远端仓库：`https://github.com/sweetvivi/web-ai-design-clone-b`（private）
 - 默认分支：`main`
 - 仓库由用户创建，后续代码统一推送到该仓库
 - 参考产品为 `https://参考产品/`
@@ -32,6 +32,11 @@
 - 首批模型供应商使用公司 Key，真实接入 provider
 - 上游模型可能报错，当前阶段接受可恢复错误，不把上游稳定性作为项目阻塞条件
 - 支付先做沙箱订单模拟，后续再替换为真实支付
+- 前端采用 Vue 3 + TypeScript + Vite + Ant Design Vue 5 + UnoCSS + Pinia + Vue Router + TanStack Query
+- 不复用 `ai-workbench-api`，旧项目冻结为参考实现
+- 首批 LLM 统一使用 OpenAI 兼容适配器和公司中转 Base URL
+- 分支使用 `main + feature/xxx + fix/xxx`
+- CI 使用 GitHub Actions
 
 ## 4. 当前阶段
 

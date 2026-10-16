@@ -7,7 +7,7 @@
 ## 仓库信息
 
 - 本地目录：`C:\Users\Administrator\Desktop\project2`
-- 远端仓库：`http://182.92.154.206:3000/sweetvivi/web-ai-design-clone.git`
+- 远端仓库：`https://github.com/sweetvivi/web-ai-design-clone-b`（private）
 - 默认分支：`main`
 
 ## 当前状态
