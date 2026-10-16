@@ -14,6 +14,8 @@
 
 ### Added
 
+- 2026-10-16：建立 pnpm workspace，新增根级脚本、共享 TypeScript 和格式化配置，以及 `apps/web`、`apps/api` 包清单。
+- 2026-10-16：生成 `pnpm-lock.yaml`，固定前端、后端和测试依赖版本。
 - 2026-10-16：新增 `docs/IMPLEMENTATION_PLAN.md`，固化 M0-M7 方向、三档执行规则、实施批次和验收标准。
 - 2026-10-16：从 `main` 建立本地分支 `feature/m0-foundation`，开始 M0 工程基础。
 - 2026-10-16：新增 `docs/SESSION_HANDOFF_2026-10-16-v2.md`，记录切换到 `deepseek-4.1-flash-260910` 前的阶段、决策、问题、Git 状态和下一模型首要动作。
@@ -26,6 +28,8 @@
 
 ### Changed
 
+- 2026-10-16：修正 D-024 的 Ant Design Vue 版本事实，采用发布渠道可用的稳定版 `4.2.6`。
+- 2026-10-16：依赖安装按 pnpm 供应链策略显式允许 Prisma、Vue 兼容层构建脚本，禁用不需要的本机脚本执行。
 - 2026-10-16：新增 D-033，确认 Codex 为主要开发工具，并固化自动执行、先说明再做、单独确认三档操作规则。
 - 2026-10-16：更新 `README.md`、`docs/PROJECT_CONTEXT.md`、`docs/AI_HANDOFF.md`、`docs/MODEL_CONTINUITY.md`，并将 `docs/SESSION_HANDOFF_2026-10-16-v2.md` 标记为历史交接，统一切换到 M0 工程基础阶段。
 - 2026-10-16：更新 `docs/AI_HANDOFF.md` 的提交后进度，修正遗留的差异化视觉描述；记录已完成推送并要求续接时实时核验 Git 状态，补充目录边界和 Gitea 归档待确认状态。

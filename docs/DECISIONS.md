@@ -144,8 +144,10 @@
 ### D-024 前端框架
 
 - 状态：Accepted
-- 决策：Vue 3 + TypeScript + Vite + Ant Design Vue 5 + UnoCSS + Pinia + Vue Router + TanStack Query (Vue)
+- 决策：Vue 3 + TypeScript + Vite + Ant Design Vue + UnoCSS + Pinia + Vue Router + TanStack Query (Vue)
 - 明确：不使用 React
+- 版本修正：2026-10-16 核验 npm 时 Ant Design Vue 没有 5.x 稳定版，当前使用最新稳定版 `4.2.6`
+- 升级约束：后续如果发布 5.x，先单独评估兼容、样式和构建影响，不自动跨大版本升级
 
 ### D-025 不复用旧后端
 

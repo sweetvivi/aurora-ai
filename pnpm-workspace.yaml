@@ -1,0 +1,15 @@
+packages:
+  - apps/*
+allowBuilds:
+  '@prisma/engines': true
+  core-js: false
+  msgpackr-extract: false
+  prisma: true
+  vue-demi: true
+minimumReleaseAgeExclude:
+  - '@tanstack/query-core@5.104.3'
+  - '@tanstack/vue-query@5.104.3'
+  - '@vitest/mocker@5.0.5'
+  - '@vitest/spy@5.0.5'
+  - jsdom@30.1.3
+  - vitest@5.0.5
