@@ -30,6 +30,54 @@ export const appRoutes: RouteRecordRaw[] = [
           title: '模型对话',
         },
       },
+      {
+        path: 'agents',
+        name: 'agents',
+        component: () => import('@/views/AgentsView.vue'),
+        meta: {
+          title: '超级智能体',
+        },
+      },
+      {
+        path: 'agents/create',
+        name: 'agent-create',
+        component: () => import('@/views/AgentCreateView.vue'),
+        meta: {
+          title: '创建智能体',
+        },
+      },
+      {
+        path: 'draw',
+        name: 'draw',
+        component: () => import('@/views/DrawStudioView.vue'),
+        meta: {
+          title: 'AI 绘画',
+        },
+      },
+      {
+        path: 'image-tools',
+        name: 'image-tools',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: '图片处理',
+        },
+      },
+      {
+        path: 'video',
+        name: 'video',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: 'AI 视频',
+        },
+      },
+      {
+        path: 'music',
+        name: 'music',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: 'AI 音乐',
+        },
+      },
     ],
   },
   {
@@ -44,13 +92,13 @@ export const appRoutes: RouteRecordRaw[] = [
         name: 'tool-map',
         component: () => import('@/views/ToolMapView.vue'),
         meta: {
-          title: '工具地图',
+          title: '发现',
         },
       },
     ],
   },
   {
-    path: '/draw',
+    path: '/agents/:id',
     component: MediaStudioShell,
     meta: {
       shell: 'media',
@@ -58,10 +106,10 @@ export const appRoutes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        name: 'draw',
-        component: () => import('@/views/DrawStudioView.vue'),
+        name: 'agent-detail',
+        component: () => import('@/views/AgentDetailView.vue'),
         meta: {
-          title: 'AI 绘画',
+          title: '智能体对话',
         },
       },
     ],

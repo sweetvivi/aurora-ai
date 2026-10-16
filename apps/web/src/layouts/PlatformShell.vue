@@ -1,124 +1,317 @@
 <script setup lang="ts">
+import {
+  AppstoreOutlined,
+  ArrowRightOutlined,
+  AudioOutlined,
+  BgColorsOutlined,
+  CommentOutlined,
+  FileTextOutlined,
+  GiftOutlined,
+  HomeOutlined,
+  PictureOutlined,
+  RobotOutlined,
+  SearchOutlined,
+  SettingOutlined,
+  ThunderboltOutlined,
+  VideoCameraOutlined,
+} from '@ant-design/icons-vue';
+import type { Component } from 'vue';
 import { computed } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
-import AccountPill from '@/components/AccountPill.vue';
-import BrandMark from '@/components/BrandMark.vue';
-import SystemStatus from '@/components/SystemStatus.vue';
-import StatusBadge from '@/components/StatusBadge.vue';
+import GlobalTopbar from '@/components/GlobalTopbar.vue';
+
+interface NavigationItem {
+  badge?: string;
+  icon: Component;
+  label: string;
+  to: string;
+}
+
+interface NavigationGroup {
+  items: NavigationItem[];
+  label?: string;
+}
 
 const route = useRoute();
 
-const navigation = [
-  { glyph: '首', label: '工作台', to: '/' },
-  { glyph: '聊', label: '模型对话', to: '/chat' },
-  { glyph: '图', label: '工具地图', to: '/map' },
-  { glyph: '绘', label: 'AI 绘画', to: '/draw' },
-  { glyph: '媒', label: '媒体工作室', to: '/studio' },
-  { glyph: '文', label: '文档工作台', to: '/workbench' },
+const navigationGroups: NavigationGroup[] = [
+  {
+    items: [
+      { icon: HomeOutlined, label: '首页', to: '/' },
+      { icon: CommentOutlined, label: '模型对话', badge: '100+', to: '/chat' },
+      { icon: PictureOutlined, label: 'AI 绘画', to: '/draw' },
+      { icon: RobotOutlined, label: '超级智能体', badge: '6000+', to: '/agents' },
+      { icon: BgColorsOutlined, label: '图片处理', to: '/image-tools' },
+      { icon: VideoCameraOutlined, label: 'AI 视频', to: '/video' },
+      { icon: AudioOutlined, label: 'AI 音乐', to: '/music' },
+    ],
+  },
+  {
+    label: '创作与办公',
+    items: [
+      { icon: FileTextOutlined, label: '文档处理', to: '/workbench' },
+      { icon: ThunderboltOutlined, label: '工具地图', to: '/map' },
+      { icon: AppstoreOutlined, label: '全部工具', to: '/map' },
+    ],
+  },
 ];
 
-const mobileNavigation = navigation.slice(0, 5);
 const currentTitle = computed(() => String(route.meta.title ?? '工作台'));
+const showCampaign = computed(() => ['/', '/draw', '/agents'].includes(route.path));
+const pageTheme = computed(() => {
+  if (route.path.startsWith('/chat')) {
+    return 'theme-blue';
+  }
+
+  if (route.path.startsWith('/agents')) {
+    return 'theme-green';
+  }
+
+  return 'theme-purple';
+});
+
+function isActivePath(path: string, target: string): boolean {
+  if (target === '/') {
+    return path === '/';
+  }
+
+  return path === target || path.startsWith(`${target}/`);
+}
 </script>
 
 <template>
-  <div class="platform-shell">
-    <aside class="platform-sidebar">
-      <BrandMark />
+  <div class="platform-shell" :class="pageTheme">
+    <section v-if="showCampaign" class="platform-campaign" aria-label="创作活动">
+      <span class="platform-campaign__badge">
+        <GiftOutlined />
+        极光创作季
+      </span>
+      <strong>会员权益限时开放</strong>
+      <p>模型、绘画、文档与智能体工具统一接入</p>
+      <RouterLink to="/map">
+        查看权益
+        <ArrowRightOutlined />
+      </RouterLink>
+      <i class="platform-campaign__shape platform-campaign__shape--left" aria-hidden="true" />
+      <i class="platform-campaign__shape platform-campaign__shape--right" aria-hidden="true" />
+    </section>
 
-      <nav class="platform-sidebar__navigation" aria-label="平台导航">
-        <RouterLink
-          v-for="item in navigation"
-          :key="item.to"
-          :to="item.to"
-          class="platform-sidebar__link"
-          :class="{ 'platform-sidebar__link--active': route.path === item.to }"
-        >
-          <span class="platform-sidebar__glyph" aria-hidden="true">{{ item.glyph }}</span>
-          <span>{{ item.label }}</span>
-        </RouterLink>
-      </nav>
+    <GlobalTopbar dark-brand />
 
-      <div class="platform-sidebar__note">
-        <StatusBadge tone="brand">M0</StatusBadge>
-        <strong>基础工程</strong>
-        <span>页面骨架与接口联调</span>
-      </div>
-    </aside>
+    <div class="platform-shell__body">
+      <aside class="platform-sidebar">
+        <nav class="platform-sidebar__navigation" aria-label="平台导航">
+          <section v-for="group in navigationGroups" :key="group.label ?? 'primary'">
+            <span v-if="group.label" class="platform-sidebar__group-label">
+              {{ group.label }}
+            </span>
+            <RouterLink
+              v-for="item in group.items"
+              :key="`${group.label}-${item.label}`"
+              :to="item.to"
+              class="platform-sidebar__link"
+              :class="{ 'platform-sidebar__link--active': isActivePath(route.path, item.to) }"
+            >
+              <component :is="item.icon" class="platform-sidebar__icon" />
+              <span class="platform-sidebar__label">{{ item.label }}</span>
+              <span v-if="item.badge" class="platform-sidebar__badge">{{ item.badge }}</span>
+            </RouterLink>
+          </section>
+        </nav>
 
-    <div class="platform-frame">
-      <header class="platform-topbar">
-        <div class="platform-topbar__mobile-brand">
-          <BrandMark compact />
+        <div class="platform-sidebar__footer">
+          <button type="button">
+            <SettingOutlined />
+            <span>设置与帮助</span>
+          </button>
         </div>
-
-        <div class="platform-topbar__title">
-          <span class="muted-label">Aurora workspace</span>
-          <strong>{{ currentTitle }}</strong>
-        </div>
-
-        <div class="platform-topbar__actions">
-          <SystemStatus />
-          <AccountPill />
-        </div>
-      </header>
+      </aside>
 
       <main class="platform-content">
+        <div class="platform-content__crumb">
+          <span>{{ currentTitle }}</span>
+          <span class="platform-content__crumb-mark" aria-hidden="true" />
+        </div>
         <RouterView />
       </main>
-
-      <nav class="mobile-navigation" aria-label="移动端主导航">
-        <RouterLink
-          v-for="item in mobileNavigation"
-          :key="item.to"
-          :to="item.to"
-          class="mobile-navigation__link"
-          :class="{ 'mobile-navigation__link--active': route.path === item.to }"
-        >
-          <span aria-hidden="true">{{ item.glyph }}</span>
-          <small>{{ item.label.replace('模型', '').replace('工作室', '') }}</small>
-        </RouterLink>
-      </nav>
     </div>
+
+    <nav class="mobile-navigation" aria-label="移动端主导航">
+      <RouterLink to="/" :class="{ active: route.path === '/' }">
+        <HomeOutlined />
+        <small>首页</small>
+      </RouterLink>
+      <RouterLink to="/chat" :class="{ active: route.path.startsWith('/chat') }">
+        <CommentOutlined />
+        <small>对话</small>
+      </RouterLink>
+      <RouterLink to="/draw" :class="{ active: route.path.startsWith('/draw') }">
+        <PictureOutlined />
+        <small>绘画</small>
+      </RouterLink>
+      <RouterLink to="/agents" :class="{ active: route.path.startsWith('/agents') }">
+        <RobotOutlined />
+        <small>智能体</small>
+      </RouterLink>
+      <RouterLink to="/map" :class="{ active: route.path.startsWith('/map') }">
+        <SearchOutlined />
+        <small>发现</small>
+      </RouterLink>
+    </nav>
   </div>
 </template>
 
 <style scoped>
 .platform-shell {
-  display: grid;
+  --nav-accent: #9a7cff;
+  --nav-active-bg: #25233b;
   min-height: 100vh;
-  grid-template-columns: 232px minmax(0, 1fr);
-  background: var(--surface);
+  background: #fff;
+}
+
+.platform-campaign {
+  position: relative;
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  overflow: hidden;
+  padding: 0 56px;
+  background: #172033;
+  color: #fff;
+}
+
+.platform-campaign__badge {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  height: 25px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: #e95b48;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 820;
+  letter-spacing: 0.04em;
+}
+
+.platform-campaign strong,
+.platform-campaign p,
+.platform-campaign a {
+  position: relative;
+  z-index: 1;
+}
+
+.platform-campaign strong {
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.platform-campaign p {
+  margin: 0;
+  color: #aab4c5;
+  font-size: 10px;
+}
+
+.platform-campaign a {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  gap: 5px;
+  margin-left: 4px;
+  padding: 0 11px;
+  border: 1px solid rgb(255 255 255 / 26%);
+  border-radius: 7px;
+  background: rgb(255 255 255 / 8%);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.platform-campaign__shape {
+  position: absolute;
+  display: block;
+  width: 240px;
+  height: 44px;
+  transform: skewX(-25deg);
+  opacity: 0.95;
+}
+
+.platform-campaign__shape--left {
+  left: -54px;
+  background: #e95b48;
+}
+
+.platform-campaign__shape--right {
+  right: -42px;
+  background: #2e9970;
+}
+
+.platform-shell.theme-blue {
+  --nav-accent: #67a2ff;
+  --nav-active-bg: #202d44;
+}
+
+.platform-shell.theme-green {
+  --nav-accent: #43c98b;
+  --nav-active-bg: #1d332b;
+}
+
+.platform-shell__body {
+  display: grid;
+  min-height: calc(100vh - 56px);
+  grid-template-columns: 240px minmax(0, 1fr);
 }
 
 .platform-sidebar {
   position: sticky;
-  top: 0;
+  top: 56px;
   z-index: 20;
   display: flex;
-  height: 100vh;
+  height: calc(100vh - 56px);
   flex-direction: column;
-  padding: 20px 16px 18px;
-  border-right: 1px solid var(--line);
-  background: #fff;
+  overflow-y: auto;
+  border-right: 1px solid #262c37;
+  background: #141922;
+  scrollbar-width: thin;
 }
 
 .platform-sidebar__navigation {
   display: grid;
+  gap: 18px;
+  padding: 16px 12px;
+}
+
+.platform-sidebar__navigation section {
+  display: grid;
   gap: 4px;
-  margin-top: 28px;
+}
+
+.platform-sidebar__group-label {
+  padding: 0 11px 8px;
+  color: #737d8c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .platform-sidebar__link {
-  display: flex;
+  position: relative;
+  display: grid;
   min-height: 42px;
   align-items: center;
-  gap: 10px;
-  padding: 7px 9px;
-  border-radius: 6px;
-  color: #4b5869;
+  gap: 9px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  padding: 0 11px;
+  border-radius: 8px;
+  color: #aeb7c5;
   font-size: 13px;
-  font-weight: 630;
+  font-weight: 650;
   text-decoration: none;
   transition:
     background-color 160ms ease,
@@ -126,100 +319,118 @@ const currentTitle = computed(() => String(route.meta.title ?? '工作台'));
 }
 
 .platform-sidebar__link:hover {
-  background: #f0f3f5;
-  color: var(--ink);
+  background: #202631;
+  color: #fff;
 }
 
 .platform-sidebar__link--active {
-  background: #e8f3f1;
-  color: #0b685f;
+  background: var(--nav-active-bg);
+  color: #fff;
+  box-shadow: inset 3px 0 0 var(--nav-accent);
 }
 
-.platform-sidebar__glyph {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  place-items: center;
-  border: 1px solid currentColor;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 760;
-  opacity: 0.86;
+.platform-sidebar__link--active :deep(svg) {
+  color: var(--nav-accent);
 }
 
-.platform-sidebar__note {
-  display: grid;
-  gap: 6px;
+.platform-sidebar__icon {
+  width: 17px;
+  height: 17px;
+  color: currentColor;
+}
+
+.platform-sidebar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.platform-sidebar__badge {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #262d39;
+  color: #8b95a5;
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.platform-sidebar__link--active .platform-sidebar__badge {
+  background: rgb(255 255 255 / 12%);
+  color: currentColor;
+}
+
+.platform-sidebar__footer {
   margin-top: auto;
-  padding: 13px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: #f8fafb;
+  padding: 10px;
+  border-top: 1px solid #262c37;
 }
 
-.platform-sidebar__note strong {
-  color: var(--ink);
-  font-size: 12px;
-}
-
-.platform-sidebar__note span {
-  color: var(--muted);
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-.platform-frame {
-  min-width: 0;
-}
-
-.platform-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 15;
+.platform-sidebar__footer button {
   display: flex;
-  min-height: 67px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 12px 24px;
-  border-bottom: 1px solid var(--line);
-  background: rgb(255 255 255 / 92%);
-  backdrop-filter: blur(12px);
-}
-
-.platform-topbar__mobile-brand {
-  display: none;
-}
-
-.platform-topbar__title {
-  display: grid;
-  gap: 3px;
-}
-
-.platform-topbar__title strong {
-  color: var(--ink);
-  font-size: 14px;
-}
-
-.platform-topbar__actions {
-  display: flex;
+  width: 100%;
+  height: 38px;
   align-items: center;
   gap: 9px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #aeb7c5;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.platform-sidebar__footer button:hover {
+  background: #202631;
+  color: #fff;
 }
 
 .platform-content {
-  width: min(100%, 1440px);
-  margin: 0 auto;
-  padding: 28px 24px 36px;
+  min-width: 0;
+  background: #fff;
+}
+
+.platform-content__crumb {
+  display: none;
 }
 
 .mobile-navigation {
   display: none;
 }
 
-@media (max-width: 900px) {
-  .platform-shell {
+@media (max-width: 860px) {
+  .platform-campaign {
+    min-height: 40px;
+    gap: 7px;
+    padding: 0 38px;
+  }
+
+  .platform-campaign__badge {
+    height: 22px;
+    padding: 0 7px;
+    font-size: 8px;
+  }
+
+  .platform-campaign strong {
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .platform-campaign p {
+    display: none;
+  }
+
+  .platform-campaign a {
+    display: none;
+  }
+
+  .platform-campaign__shape {
+    width: 120px;
+  }
+
+  .platform-shell__body {
     display: block;
   }
 
@@ -227,72 +438,69 @@ const currentTitle = computed(() => String(route.meta.title ?? '工作台'));
     display: none;
   }
 
-  .platform-topbar__mobile-brand {
-    display: block;
-  }
-
-  .platform-topbar {
-    padding-right: 14px;
-    padding-left: 14px;
-  }
-
-  .platform-topbar__title {
-    display: none;
-  }
-
   .platform-content {
-    padding: 20px 14px 94px;
+    padding-bottom: 76px;
+  }
+
+  .platform-content__crumb {
+    display: flex;
+    height: 38px;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid var(--line);
+    background: #fff;
+    color: #5d6675;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .platform-content__crumb-mark {
+    width: 5px;
+    height: 5px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background: var(--brand);
   }
 
   .mobile-navigation {
     position: fixed;
-    right: 10px;
-    bottom: 10px;
-    left: 10px;
-    z-index: 25;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 45;
     display: grid;
+    height: 62px;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    padding: 6px;
-    border: 1px solid rgb(220 226 232 / 90%);
-    border-radius: 10px;
-    background: rgb(255 255 255 / 96%);
-    box-shadow: 0 12px 30px rgb(23 32 51 / 12%);
+    padding: 5px 8px 7px;
+    border-top: 1px solid var(--line);
+    background: rgb(255 255 255 / 97%);
+    box-shadow: 0 -8px 24px rgb(24 31 50 / 6%);
     backdrop-filter: blur(16px);
   }
 
-  .mobile-navigation__link {
+  .mobile-navigation a {
     display: grid;
-    min-width: 0;
-    min-height: 50px;
     place-items: center;
-    gap: 2px;
-    border-radius: 7px;
-    color: var(--muted);
+    gap: 3px;
+    border-radius: 8px;
+    color: #8a92a0;
+    font-size: 10px;
     text-decoration: none;
   }
 
-  .mobile-navigation__link > span {
-    display: grid;
-    width: 25px;
-    height: 25px;
-    place-items: center;
-    border: 1px solid currentColor;
-    border-radius: 6px;
-    font-size: 10px;
-    font-weight: 760;
+  .mobile-navigation a.active {
+    color: var(--brand);
   }
 
-  .mobile-navigation__link small {
-    overflow: hidden;
-    max-width: 100%;
-    font-size: 9px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .mobile-navigation a :deep(svg) {
+    width: 18px;
+    height: 18px;
   }
+}
 
-  .mobile-navigation__link--active {
-    background: #e8f3f1;
-    color: #0b685f;
+@media (max-width: 980px) {
+  .platform-shell__body {
+    grid-template-columns: 200px minmax(0, 1fr);
   }
 }
 </style>

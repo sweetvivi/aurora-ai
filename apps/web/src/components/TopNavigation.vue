@@ -1,17 +1,33 @@
 <script setup lang="ts">
+import {
+  AppstoreOutlined,
+  CommentOutlined,
+  DownOutlined,
+  FileTextOutlined,
+  HomeOutlined,
+  PictureOutlined,
+  RobotOutlined,
+  VideoCameraOutlined,
+} from '@ant-design/icons-vue';
+import type { Component } from 'vue';
 import { computed } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 
-const route = useRoute();
+interface NavigationItem {
+  icon: Component;
+  label: string;
+  to: string;
+}
 
-const navItems = [
-  { label: '首页', to: '/' },
-  { label: '对话', to: '/chat' },
-  { label: '工具地图', to: '/map' },
-  { label: '绘画', to: '/draw' },
-  { label: '媒体', to: '/studio' },
-  { label: '文档工作台', to: '/workbench' },
-  { label: '兼容工具', to: '/legacy' },
+const route = useRoute();
+const navItems: NavigationItem[] = [
+  { icon: HomeOutlined, label: '首页', to: '/' },
+  { icon: CommentOutlined, label: '模型对话', to: '/chat' },
+  { icon: PictureOutlined, label: 'AI 绘画', to: '/draw' },
+  { icon: RobotOutlined, label: '超级智能体', to: '/agents' },
+  { icon: VideoCameraOutlined, label: 'AI 视频', to: '/video' },
+  { icon: FileTextOutlined, label: '文档', to: '/workbench' },
+  { icon: AppstoreOutlined, label: '工具地图', to: '/map' },
 ];
 
 const activePath = computed(() => route.path);
@@ -26,7 +42,9 @@ const activePath = computed(() => route.path);
       class="top-navigation__link"
       :class="{ 'top-navigation__link--active': activePath === item.to }"
     >
-      {{ item.label }}
+      <component :is="item.icon" />
+      <span>{{ item.label }}</span>
+      <DownOutlined class="top-navigation__caret" />
     </RouterLink>
   </nav>
 </template>
@@ -34,9 +52,9 @@ const activePath = computed(() => route.path);
 <style scoped>
 .top-navigation {
   display: flex;
-  align-items: center;
-  gap: 2px;
   min-width: 0;
+  align-items: center;
+  gap: 4px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -46,12 +64,16 @@ const activePath = computed(() => route.path);
 }
 
 .top-navigation__link {
+  display: inline-flex;
+  min-height: 34px;
   flex: 0 0 auto;
-  padding: 7px 10px;
-  border-radius: 5px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 620;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border-radius: 8px;
+  color: #5c6574;
+  font-size: 12px;
+  font-weight: 650;
   text-decoration: none;
   transition:
     background-color 160ms ease,
@@ -59,12 +81,23 @@ const activePath = computed(() => route.path);
 }
 
 .top-navigation__link:hover {
-  background: #eef2f4;
+  background: #f4f5f8;
   color: var(--ink);
 }
 
 .top-navigation__link--active {
-  background: var(--ink);
-  color: #fff;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+.top-navigation__link :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
+
+.top-navigation__caret {
+  width: 9px !important;
+  height: 9px !important;
+  opacity: 0.55;
 }
 </style>

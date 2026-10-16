@@ -20,6 +20,8 @@
 - 2026-10-16：从 `main` 建立本地分支 `feature/m0-foundation`，开始 M0 工程基础。
 - 2026-10-16：新增 `docs/SESSION_HANDOFF_2026-10-16-v2.md`，记录切换到 `deepseek-4.1-flash-260910` 前的阶段、决策、问题、Git 状态和下一模型首要动作。
 - 2026-10-16：新增 `docs/AI_HANDOFF.md`，集中记录对话助手续接所需的用户协作偏好、分工和项目进度，并指向决策与待确认问题文档。
+- 2026-10-16：新增智能体列表、智能体详情、智能体创建、原创作品插画和全局顶栏组件，并补充 `/agents` 相关路由。
+- 2026-10-16：完成 AI 绘画工作台主链路，包括创作入口、模型与参数选择、参考图、生成状态、作品记录、收藏、下载和删除；新增 `/image-tools`、`/video`、`/music` 独立占位入口。
 - 2026-10-16：完成 M0-2 后端基础，包括 NestJS 引导、Zod 环境校验、请求 ID、统一响应与异常结构、健康检查、Prisma 与 Redis 生命周期封装、模型注册表和 OpenAI 兼容 provider 骨架。
 - 2026-10-16：新增后端配置模板、Prisma schema、Vitest 配置，以及环境、SSE 解析和健康检查测试。
 - 2026-10-16：新增 M0 本地基础设施建设，包括 PostgreSQL 17、Redis 7.4、健康检查、命名卷、`127.0.0.1` 端口绑定和根级 `infra:*` 脚本。
@@ -52,6 +54,11 @@
 - 2026-10-16：修正 README 和项目上下文中的 Ant Design Vue 版本事实，并同步更新当前 M0 状态、本地基础设施命令和风险说明。
 - 2026-10-16：将本地截图目录 `outputs/` 加入忽略规则，避免检查产物进入 Git 提交。
 - 2026-10-16：同步 README、项目上下文和交接文档中的 M0 完成状态、验证结果与下一阶段入口。
+- 2026-10-16：按参考产品信息结构和视觉密度重构首页、工具地图与文档工作台；品牌、模型别名、文案和视觉素材保持原创或替换。
+  - 文件：`apps/web/src/views/HomeView.vue`、`ToolMapView.vue`、`DocumentWorkbenchView.vue`、`apps/web/src/layouts/WorkbenchShell.vue`
+  - 验证：桌面端与 390px 移动端 Edge 截图检查无整页横向溢出；`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm test` 全部通过
+  - 遗留：当前改动尚未提交或推送；`outputs/` 中的截图仅作本地验收，不进入 Git
+- 2026-10-16：将首页视频模型横幅和绘画工作区视频入口统一指向 `/video`，避免不同侧栏入口共用 `/studio` 造成多重高亮。
 
 ### Fixed
 

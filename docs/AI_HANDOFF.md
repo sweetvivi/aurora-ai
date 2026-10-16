@@ -7,7 +7,7 @@
 - 项目：极光AI，参考 `https://参考产品/` 的产品结构和交互重新实现。
 - 本地目录：`C:\Users\Administrator\Desktop\project2`
 - GitHub 远端：[https://github.com/sweetvivi/web-ai-design-clone-b](https://github.com/sweetvivi/web-ai-design-clone-b)（Private）
-- 当前阶段：M0 本地实现和验收已完成，等待用户确认后推送 `feature/m0-foundation`。
+- 当前阶段：M0 本地实现与参考产品 UI 重构已完成，等待用户验收后提交并推送 `feature/m0-foundation`。
 - 实现边界：按 D-011 修订后的策略，界面结构、视觉和交互尽可能接近参考产品；品牌与受保护内容必须替换，原页面打包资源不得复用。
 - 主开发工具：按 D-033，Codex 作为主要开发工具；除非用户明确决定切换，否则不再按换模型流程重置方向。
 
@@ -30,9 +30,9 @@
 
 ## 当前进度
 
-- 已完成：研究和文档阶段；GitHub 远端已设置；M0 实施计划和 D-033 已落档；workspace、NestJS 后端、Vue 3 前端、五套 Shell、本地 PostgreSQL、Redis、Prisma 初始迁移、健康检查和最小 CI 均已实现并完成本地验证。
-- 本地验证：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm test` 全部通过；API 健康接口返回数据库和 Redis 为 `up`；桌面端和移动端五套 Shell 已用无头浏览器检查。
-- 下一步：用户验收 M0 后，先说明远端、分支和提交范围，再等待确认推送；随后进入 M1 首条垂直切片。
+- 已完成：研究和文档阶段；GitHub 远端已设置；M0 实施计划和 D-033 已落档；workspace、NestJS 后端、Vue 3 前端、五套 Shell、本地 PostgreSQL、Redis、Prisma 初始迁移、健康检查和最小 CI 均已实现并完成本地验证；首页、工具地图、智能体相关页面、绘画工作台、图片处理/AI 视频/AI 音乐独立占位入口和文档工作台已按参考产品进行原创化 UI 重构。
+- 本地验证：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm test` 全部通过；API 健康接口返回数据库和 Redis 为 `up`；代表页面已用系统 Edge 完成桌面端与真实 390px 移动端截图检查，未发现整页横向溢出；绘画生成主链路自动验证通过。
+- 下一步：用户验收当前 UI 后，先说明远端、分支和提交范围，再等待确认提交与推送；随后进入 M1 首条垂直切片。
 - Git 续接：从 `main` 的 `7a75622` 建立 `feature/m0-foundation` 分支。每次接手用 `git status --short --branch` 和 `git log --oneline -8` 核验最新状态。
 
 ## 本轮新增注意事项

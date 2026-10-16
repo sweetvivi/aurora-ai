@@ -1,30 +1,41 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router';
-import AccountPill from '@/components/AccountPill.vue';
-import BrandMark from '@/components/BrandMark.vue';
-import StatusBadge from '@/components/StatusBadge.vue';
+import GlobalTopbar from '@/components/GlobalTopbar.vue';
 
-const settings = ['文档类型', '输出语言', '篇幅与结构', '引用来源'];
+const settings = [
+  { label: '文档类型', value: '研究报告' },
+  { label: '输出语言', value: '简体中文' },
+  { label: '篇幅与结构', value: '标准章节' },
+  { label: '引用来源', value: '允许联网' },
+];
 const history = ['季度业务复盘', '产品发布方案', '会议纪要整理'];
 </script>
 
 <template>
   <div class="workbench-shell">
-    <header class="workbench-shell__header">
-      <BrandMark />
-      <div class="workbench-shell__title">
-        <StatusBadge tone="brand">Workbench</StatusBadge>
-        <strong>文档工作台</strong>
-      </div>
-      <AccountPill />
-    </header>
+    <GlobalTopbar />
 
     <div class="workbench-shell__body">
       <aside class="workbench-shell__panel workbench-shell__panel--left">
-        <span class="muted-label">生成设置</span>
-        <div v-for="item in settings" :key="item" class="workbench-shell__setting">
-          <span>{{ item }}</span>
-          <span aria-hidden="true">+</span>
+        <div class="workbench-shell__panel-heading">
+          <span class="muted-label">生成设置</span>
+          <small>自动应用</small>
+        </div>
+        <button
+          v-for="item in settings"
+          :key="item.label"
+          class="workbench-shell__setting"
+          type="button"
+        >
+          <span>
+            <small>{{ item.label }}</small>
+            <strong>{{ item.value }}</strong>
+          </span>
+          <i aria-hidden="true">›</i>
+        </button>
+        <div class="workbench-shell__tip">
+          <strong>写作提示</strong>
+          <p>在正文中粘贴大纲或资料，生成结果会更贴近你的目标。</p>
         </div>
       </aside>
 
@@ -33,15 +44,22 @@ const history = ['季度业务复盘', '产品发布方案', '会议纪要整理
       </main>
 
       <aside class="workbench-shell__panel workbench-shell__panel--right">
-        <span class="muted-label">最近文档</span>
+        <div class="workbench-shell__panel-heading">
+          <span class="muted-label">最近文档</span>
+          <small>{{ history.length }} 篇</small>
+        </div>
         <button
           v-for="item in history"
           :key="item"
           class="workbench-shell__history-item"
           type="button"
         >
-          <span>{{ item }}</span>
-          <small>草稿</small>
+          <span class="workbench-shell__history-mark" aria-hidden="true" />
+          <span>
+            <strong>{{ item }}</strong>
+            <small>刚刚编辑</small>
+          </span>
+          <i aria-hidden="true">›</i>
         </button>
       </aside>
     </div>
@@ -51,35 +69,10 @@ const history = ['季度业务复盘', '产品发布方案', '会议纪要整理
 <style scoped>
 .workbench-shell {
   display: grid;
-  height: 100vh;
-  grid-template-rows: 62px minmax(0, 1fr);
+  min-height: 100vh;
+  grid-template-rows: 56px minmax(0, 1fr);
   overflow: hidden;
-  background: #edf0f2;
-}
-
-.workbench-shell__header {
-  display: grid;
-  align-items: center;
-  gap: 20px;
-  grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--line);
-  background: #fff;
-}
-
-.workbench-shell__title {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.workbench-shell__title strong {
-  color: var(--ink);
-  font-size: 13px;
-}
-
-.workbench-shell__header > :last-child {
-  justify-self: end;
+  background: #f1f3f6;
 }
 
 .workbench-shell__body {
@@ -100,37 +93,126 @@ const history = ['季度业务复盘', '产品发布方案', '会议纪要整理
 .workbench-shell__panel--left {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 7px;
 }
 
-.workbench-shell__setting,
-.workbench-shell__history-item {
+.workbench-shell__panel-heading {
   display: flex;
-  width: 100%;
+  min-height: 28px;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 11px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #fff;
-  color: #465365;
-  font-size: 12px;
-  text-align: left;
 }
 
-.workbench-shell__history-item {
-  margin-top: 8px;
+.workbench-shell__panel-heading small {
+  color: #a1a8b3;
+  font-size: 8px;
+}
+
+.workbench-shell__setting {
+  display: grid;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  text-align: left;
   cursor: pointer;
 }
 
+.workbench-shell__setting:hover,
 .workbench-shell__history-item:hover {
-  border-color: #b8c7ca;
+  border-color: #c8d2d9;
+}
+
+.workbench-shell__setting > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.workbench-shell__setting small {
+  color: #9aa2ad;
+  font-size: 8px;
+}
+
+.workbench-shell__setting strong {
+  overflow: hidden;
+  color: #465365;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbench-shell__setting i,
+.workbench-shell__history-item > i {
+  color: #aeb5bf;
+  font-size: 14px;
+  font-style: normal;
+}
+
+.workbench-shell__tip {
+  margin-top: 9px;
+  padding: 12px;
+  border: 1px solid #e3e5ee;
+  border-radius: 7px;
+  background: #f4f2ff;
+}
+
+.workbench-shell__tip strong {
+  color: #6548c9;
+  font-size: 10px;
+}
+
+.workbench-shell__tip p {
+  margin: 6px 0 0;
+  color: #797d93;
+  font-size: 9px;
+  line-height: 1.65;
+}
+
+.workbench-shell__history-item {
+  display: grid;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-top: 2px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workbench-shell__history-mark {
+  width: 7px;
+  height: 34px;
+  border-radius: 999px;
+  background: #dce5f5;
+}
+
+.workbench-shell__history-item > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.workbench-shell__history-item strong {
+  overflow: hidden;
+  color: #4d5867;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workbench-shell__history-item small {
-  color: #8a96a5;
-  font-size: 9px;
+  color: #9da5b0;
+  font-size: 8px;
 }
 
 .workbench-shell__main {
@@ -141,17 +223,8 @@ const history = ['季度业务复盘', '产品发布方案', '会议纪要整理
 
 @media (max-width: 900px) {
   .workbench-shell {
-    height: auto;
     min-height: 100vh;
     overflow: visible;
-  }
-
-  .workbench-shell__header {
-    grid-template-columns: 1fr auto;
-  }
-
-  .workbench-shell__title {
-    display: none;
   }
 
   .workbench-shell__body {

@@ -1,0 +1,738 @@
+<script setup lang="ts">
+import {
+  ArrowLeftOutlined,
+  ClockCircleOutlined,
+  HistoryOutlined,
+  MessageOutlined,
+  PlusOutlined,
+  SearchOutlined,
+  SendOutlined,
+} from '@ant-design/icons-vue';
+import { computed, nextTick, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { getAgentById } from '@/data/agents';
+import { useAgentWorkspaceStore } from '@/stores/agent-workspace';
+
+const route = useRoute();
+const router = useRouter();
+const workspace = useAgentWorkspaceStore();
+const prompt = ref('');
+const search = ref('');
+const activeSessionId = ref<string | null>(null);
+const conversationArea = ref<HTMLElement | null>(null);
+const consumedRoutePrompt = ref('');
+
+const agent = computed(
+  () =>
+    getAgentById(String(route.params.id)) ??
+    workspace.customAgents.find((item) => item.id === String(route.params.id)) ??
+    getAgentById('code-mentor'),
+);
+
+const sessions = computed(() => {
+  if (!agent.value) {
+    return [];
+  }
+
+  const query = search.value.trim().toLowerCase();
+  const items = workspace.sessionsForAgent(agent.value.id);
+
+  if (!query) {
+    return items;
+  }
+
+  return items.filter((session) => session.title.toLowerCase().includes(query));
+});
+
+const activeSession = computed(
+  () =>
+    sessions.value.find((session) => session.id === activeSessionId.value) ??
+    workspace.sessions.find((session) => session.id === activeSessionId.value),
+);
+
+const messages = computed(() => activeSession.value?.messages ?? []);
+
+function formatTime(timestamp: number): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(timestamp);
+}
+
+async function scrollToLatest(): Promise<void> {
+  await nextTick();
+  conversationArea.value?.scrollTo({
+    behavior: 'smooth',
+    top: conversationArea.value.scrollHeight,
+  });
+}
+
+function selectSession(sessionId: string): void {
+  activeSessionId.value = sessionId;
+  prompt.value = '';
+  void scrollToLatest();
+}
+
+function startNewSession(): void {
+  activeSessionId.value = null;
+  prompt.value = '';
+  void scrollToLatest();
+}
+
+function useStarter(starter: string): void {
+  prompt.value = starter;
+}
+
+function sendMessage(): void {
+  const content = prompt.value.trim();
+
+  if (!content || !agent.value) {
+    return;
+  }
+
+  const session = workspace.sendMessage(agent.value, content, activeSessionId.value ?? undefined);
+
+  activeSessionId.value = session.id;
+  prompt.value = '';
+  void scrollToLatest();
+}
+
+async function consumeRoutePrompt(): Promise<void> {
+  const queryPrompt = route.query.prompt;
+  const routeKey = `${String(route.params.id)}:${String(route.query.start ?? '')}:${String(queryPrompt ?? '')}`;
+
+  if (
+    !agent.value ||
+    typeof queryPrompt !== 'string' ||
+    !queryPrompt.trim() ||
+    consumedRoutePrompt.value === routeKey
+  ) {
+    return;
+  }
+
+  consumedRoutePrompt.value = routeKey;
+  const session = workspace.sendMessage(agent.value, queryPrompt.trim());
+  activeSessionId.value = session.id;
+  prompt.value = '';
+  await scrollToLatest();
+}
+
+watch(
+  () => [route.params.id, route.query.prompt, route.query.start, route.query.session],
+  () => {
+    const sessionId = route.query.session;
+    activeSessionId.value =
+      typeof sessionId === 'string' &&
+      workspace.sessions.some((session) => session.id === sessionId)
+        ? sessionId
+        : null;
+    prompt.value = '';
+    void consumeRoutePrompt();
+  },
+  {
+    immediate: true,
+  },
+);
+
+watch(
+  () => messages.value.length,
+  () => {
+    void scrollToLatest();
+  },
+);
+</script>
+
+<template>
+  <div v-if="agent" class="agent-detail">
+    <aside class="agent-detail__history">
+      <header>
+        <strong>所有会话</strong>
+        <div>
+          <button type="button" @click="startNewSession">
+            <PlusOutlined />
+            新对话
+          </button>
+          <button type="button" aria-label="会话记录">
+            <HistoryOutlined />
+          </button>
+        </div>
+      </header>
+
+      <label>
+        <SearchOutlined />
+        <input v-model="search" placeholder="搜索会话" />
+      </label>
+
+      <div v-if="sessions.length > 0" class="agent-detail__session-list">
+        <button
+          v-for="session in sessions"
+          :key="session.id"
+          type="button"
+          :class="{ active: activeSessionId === session.id }"
+          @click="selectSession(session.id)"
+        >
+          <MessageOutlined />
+          <span>
+            <strong>{{ session.title }}</strong>
+            <small>
+              <ClockCircleOutlined />
+              {{ formatTime(session.updatedAt) }}
+            </small>
+          </span>
+        </button>
+      </div>
+
+      <div v-else class="agent-detail__history-empty">
+        <span>⌛</span>
+        <p>{{ search ? '没有匹配的会话' : 'AI 提升工作效率从第一个对话开始' }}</p>
+        <button type="button" @click="startNewSession">+ 新会话</button>
+      </div>
+    </aside>
+
+    <main class="agent-detail__main">
+      <header class="agent-detail__heading">
+        <button type="button" @click="router.push('/agents')">
+          <ArrowLeftOutlined />
+          返回
+        </button>
+        <span class="agent-detail__avatar" :style="{ background: agent.color }">
+          {{ agent.glyph }}
+        </span>
+        <strong>{{ agent.name }}</strong>
+        <em>{{ agent.tags[0] }}</em>
+      </header>
+
+      <section ref="conversationArea" class="agent-detail__conversation">
+        <div v-if="messages.length === 0" class="agent-detail__welcome">
+          <span class="agent-detail__welcome-mark" :style="{ background: agent.color }">
+            {{ agent.glyph }}
+          </span>
+          <h1>你好，我是{{ agent.name }}</h1>
+          <p>{{ agent.opening }}</p>
+          <div class="agent-detail__welcome-prompts">
+            <button
+              v-for="starter in agent.starterPrompts"
+              :key="starter"
+              type="button"
+              @click="useStarter(starter)"
+            >
+              {{ starter }}
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="agent-detail__messages">
+          <article
+            v-for="message in messages"
+            :key="message.id"
+            class="agent-detail__message"
+            :class="`agent-detail__message--${message.role}`"
+          >
+            <span
+              class="agent-detail__message-avatar"
+              :style="message.role === 'assistant' ? { background: agent.color } : undefined"
+            >
+              {{ message.role === 'assistant' ? agent.glyph : '我' }}
+            </span>
+            <div>
+              <strong>{{ message.role === 'assistant' ? agent.name : '你' }}</strong>
+              <p>{{ message.content }}</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <footer class="agent-detail__composer">
+        <div class="agent-detail__input">
+          <textarea
+            v-model="prompt"
+            rows="2"
+            :placeholder="`请输入问题，例如：${agent.starterPrompts[0]}`"
+            @keydown.enter.exact.prevent="sendMessage"
+          />
+          <div class="agent-detail__input-footer">
+            <div class="agent-detail__starter-list">
+              <button
+                v-for="starter in agent.starterPrompts.slice(0, 2)"
+                :key="starter"
+                type="button"
+                @click="useStarter(starter)"
+              >
+                {{ starter }}
+              </button>
+            </div>
+            <button
+              type="button"
+              :disabled="!prompt.trim()"
+              aria-label="发送消息"
+              @click="sendMessage"
+            >
+              <SendOutlined />
+            </button>
+          </div>
+        </div>
+      </footer>
+    </main>
+  </div>
+</template>
+
+<style scoped>
+.agent-detail {
+  display: grid;
+  min-height: calc(100vh - 56px);
+  grid-template-columns: 260px minmax(0, 1fr);
+  background: #fff;
+}
+
+.agent-detail__history {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border-right: 1px solid #e8ebf0;
+}
+
+.agent-detail__history > header {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 20px;
+}
+
+.agent-detail__history > header strong {
+  font-size: 16px;
+}
+
+.agent-detail__history > header div {
+  display: flex;
+  gap: 7px;
+}
+
+.agent-detail__history > header button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 9px;
+  border: 1px solid #dce6ff;
+  border-radius: 7px;
+  background: #fff;
+  color: #4c84ff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.agent-detail__history > header button:last-child {
+  width: 30px;
+  padding: 0;
+  border-color: #e8ebf0;
+  color: #697283;
+}
+
+.agent-detail__history > label {
+  display: flex;
+  height: 34px;
+  align-items: center;
+  gap: 7px;
+  margin: 0 20px;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: #f3f4f6;
+  color: #a2a9b4;
+}
+
+.agent-detail__history > label input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #3f4653;
+  font-size: 11px;
+}
+
+.agent-detail__session-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  padding: 0 12px 18px;
+}
+
+.agent-detail__session-list > button {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #697283;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-detail__session-list > button:hover,
+.agent-detail__session-list > button.active {
+  border-color: #dce7ff;
+  background: #f4f8ff;
+  color: #3979ed;
+}
+
+.agent-detail__session-list > button > svg {
+  font-size: 14px;
+}
+
+.agent-detail__session-list > button > span {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.agent-detail__session-list strong {
+  overflow: hidden;
+  color: #3f4653;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-detail__session-list small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #9aa2af;
+  font-size: 8px;
+}
+
+.agent-detail__history-empty {
+  display: grid;
+  margin: auto 20px;
+  justify-items: center;
+  text-align: center;
+}
+
+.agent-detail__history-empty > span {
+  color: #d4d8df;
+  font-size: 42px;
+}
+
+.agent-detail__history-empty p {
+  margin: 16px 0;
+  color: #8f97a4;
+  font-size: 11px;
+}
+
+.agent-detail__history-empty button {
+  width: 100%;
+  height: 42px;
+  border: 0;
+  border-radius: 7px;
+  background: #4c84ff;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.agent-detail__main {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.agent-detail__heading {
+  display: flex;
+  height: 68px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 28px;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.agent-detail__heading > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 4px;
+  border: 0;
+  background: transparent;
+  color: #6d7584;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.agent-detail__avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agent-detail__heading strong {
+  font-size: 15px;
+}
+
+.agent-detail__heading em {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #edf3ff;
+  color: #4c84ff;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.agent-detail__conversation {
+  overflow-y: auto;
+  padding: 38px 32px 24px;
+}
+
+.agent-detail__welcome {
+  display: grid;
+  max-width: 920px;
+  width: 100%;
+  justify-items: center;
+  margin: 7vh auto 0;
+  text-align: center;
+}
+
+.agent-detail__welcome-mark {
+  display: grid;
+  width: 50px;
+  height: 50px;
+  place-items: center;
+  border-radius: 14px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 850;
+  box-shadow: 0 12px 26px rgb(42 76 140 / 16%);
+}
+
+.agent-detail__welcome h1 {
+  margin: 18px 0 0;
+  font-size: 22px;
+}
+
+.agent-detail__welcome p {
+  max-width: 650px;
+  margin: 10px 0 0;
+  color: #747d8b;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.agent-detail__welcome-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.agent-detail__welcome-prompts button {
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid #e1e5eb;
+  border-radius: 999px;
+  background: #fff;
+  color: #66707f;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.agent-detail__welcome-prompts button:hover {
+  border-color: #b9cef7;
+  color: #3979ed;
+}
+
+.agent-detail__messages {
+  display: grid;
+  max-width: 920px;
+  gap: 24px;
+  margin: 0 auto;
+}
+
+.agent-detail__message {
+  display: grid;
+  align-items: start;
+  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.agent-detail__message--user {
+  grid-template-columns: minmax(0, 1fr) 34px;
+}
+
+.agent-detail__message--user .agent-detail__message-avatar {
+  grid-column: 2;
+  grid-row: 1;
+  background: #eef0f3;
+  color: #626b79;
+}
+
+.agent-detail__message--user > div {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+}
+
+.agent-detail__message-avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.agent-detail__message > div {
+  max-width: min(720px, 82%);
+}
+
+.agent-detail__message--user > div {
+  text-align: right;
+}
+
+.agent-detail__message strong {
+  color: #89919e;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.agent-detail__message p {
+  margin: 5px 0 0;
+  padding: 12px 14px;
+  border-radius: 4px 12px 12px;
+  background: #f5f7fa;
+  color: #363d48;
+  font-size: 12px;
+  line-height: 1.75;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.agent-detail__message--user p {
+  border-radius: 12px 4px 12px 12px;
+  background: #edf3ff;
+}
+
+.agent-detail__composer {
+  width: min(820px, calc(100% - 48px));
+  justify-self: center;
+  padding-bottom: 24px;
+}
+
+.agent-detail__input {
+  padding: 12px;
+  border: 1px solid #dfe3e9;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgb(34 47 72 / 6%);
+}
+
+.agent-detail__input textarea {
+  width: 100%;
+  min-height: 52px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: #303640;
+  font-size: 12px;
+  line-height: 1.7;
+  resize: none;
+}
+
+.agent-detail__input-footer {
+  display: flex;
+  min-height: 34px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-detail__starter-list {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-detail__starter-list button {
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 5px;
+  background: #f4f6f9;
+  color: #77808f;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.agent-detail__input-footer > button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: #4c84ff;
+  color: #fff;
+  cursor: pointer;
+}
+
+.agent-detail__input-footer > button:disabled {
+  background: #d6dbe3;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .agent-detail {
+    display: block;
+  }
+
+  .agent-detail__history {
+    display: none;
+  }
+
+  .agent-detail__main {
+    min-height: calc(100vh - 118px);
+  }
+
+  .agent-detail__heading {
+    height: 58px;
+    padding: 0 14px;
+  }
+
+  .agent-detail__conversation {
+    padding: 28px 14px 20px;
+  }
+
+  .agent-detail__welcome {
+    margin-top: 3vh;
+  }
+
+  .agent-detail__welcome h1 {
+    font-size: 20px;
+  }
+
+  .agent-detail__message > div {
+    max-width: 88%;
+  }
+
+  .agent-detail__composer {
+    width: calc(100% - 24px);
+  }
+}
+</style>
