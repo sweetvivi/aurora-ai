@@ -44,3 +44,6 @@ Thumbs.db
 # Local-only reference material
 research/raw/
 research/session/
+
+# Generated inspection artifacts
+outputs/

@@ -24,6 +24,9 @@
 - 2026-10-16：新增后端配置模板、Prisma schema、Vitest 配置，以及环境、SSE 解析和健康检查测试。
 - 2026-10-16：新增 M0 本地基础设施建设，包括 PostgreSQL 17、Redis 7.4、健康检查、命名卷、`127.0.0.1` 端口绑定和根级 `infra:*` 脚本。
 - 2026-10-16：新增 Prisma 初始迁移，创建 `provider_configs` 和 `model_configs`，并验证数据库和 Redis 健康状态可由 API 健康接口读取。
+- 2026-10-16：完成 M0-3 前端基础，包括 Vue 3、Vite、TypeScript、Ant Design Vue、UnoCSS、Pinia、Vue Router 和 TanStack Query，以及五套 Shell、基础导航、404 页和 API 健康状态组件。
+- 2026-10-16：新增最小 GitHub Actions CI，执行冻结安装、格式检查、lint、类型检查、构建和测试。
+- 2026-10-16：新增路由注册测试，并完成桌面端与移动端五套 Shell 的无头浏览器截图检查。
 - 初始化 `project2` 本地 Git 仓库，默认分支为 `main`。
 - 添加项目总览、研究基线、模型续接、决策记录和待确认问题文档。
 - 添加变更日志和基础 `.gitignore`。
@@ -47,11 +50,14 @@
 - 2026-10-16：全 workspace 将 TypeScript 固定为 `5.9.3`，避让 Nest CLI 12 尚不支持的 TypeScript 7 programmatic compiler API。
 - 2026-10-16：Vitest 后端配置改用 `.mts`，消除 CommonJS 包加载 ESM 配置时的告警。
 - 2026-10-16：修正 README 和项目上下文中的 Ant Design Vue 版本事实，并同步更新当前 M0 状态、本地基础设施命令和风险说明。
+- 2026-10-16：将本地截图目录 `outputs/` 加入忽略规则，避免检查产物进入 Git 提交。
+- 2026-10-16：同步 README、项目上下文和交接文档中的 M0 完成状态、验证结果与下一阶段入口。
 
 ### Fixed
 
 - 2026-10-16：空字符串 `LLM_API_KEY` 按未配置处理，复制 `.env.example` 后不会因占位空值阻止应用启动。
 - 2026-10-16：补齐 Nest `ValidationPipe` 所需的 `class-validator` 和 `class-transformer` 运行时依赖。
+- 2026-10-16：修正前端路由 meta 类型声明和绘画比例字段类型，使 Vue TypeScript 构建稳定通过。
 
 ### Removed
 

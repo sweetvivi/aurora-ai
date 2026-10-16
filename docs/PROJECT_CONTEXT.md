@@ -51,14 +51,16 @@
 - 38 个独立 API 的归类
 - 技术栈、首发范围、模型接入和支付沙箱等核心决策
 - M0-M7 实施计划和三档协作规则
+- pnpm workspace、NestJS 后端基础、Vue 3 前端基础和五套 Shell
+- PostgreSQL、Redis 本地基础设施、Prisma 初始迁移和健康检查联调
+- 最小 GitHub Actions CI 配置、类型检查、测试、构建和桌面端/移动端页面检查
 
 进行中：
 
-- pnpm workspace、前端和后端工程初始化
-- PostgreSQL、Redis 和队列基础设施
-- 数据模型与 provider adapter 基础
+- M0 本地验收已完成，等待用户确认后推送 `feature/m0-foundation`
+- GitHub Actions 的实际远端执行结果需要推送后才能确认
 
-M0 之后的业务闭环、管理后台、真实支付和公开部署按 `docs/IMPLEMENTATION_PLAN.md` 分批实施。
+M0 之后的业务闭环、管理后台、真实支付和公开部署按 `docs/IMPLEMENTATION_PLAN.md` 分批实施。下一步从 M1 首条垂直切片开始。
 
 ## 5. 产品实现边界
 
