@@ -12,8 +12,8 @@
 
 ## 技术栈
 
-- 前端：Vue 3 + TypeScript + Vite + Ant Design Vue 5 + UnoCSS + Pinia
-- 后端：NestJS + Prisma + PostgreSQL + Redis + BullMQ
+- 前端：Vue 3 + TypeScript + Vite + Ant Design Vue `4.2.6` + UnoCSS + Pinia + Vue Router + TanStack Query
+- 后端：NestJS + Prisma `7.10.0` + PostgreSQL + Redis + BullMQ
 - 远端 GitHub：`https://github.com/sweetvivi/web-ai-design-clone-b`
 
 ## 当前状态
@@ -26,13 +26,29 @@
 - 桌面端 72 个代表路由、移动端 6 个代表页面分析
 - 页面壳层、核心工作台、接口和商业化结构梳理
 - M0 实施范围、批次和验收标准
+- pnpm workspace、NestJS 后端基础和统一响应结构
+- PostgreSQL、Redis 本地基础设施和 Prisma 初始迁移
 
-尚未确定：
+进行中：
 
-- 最终技术栈
-- 后端复用范围
-- 登录、支付、模型和存储方案
-- 首批上线范围和部署方式
+- Vue 3 前端骨架和五套 Shell
+- 最小 CI、前后端联调和桌面端、移动端检查
+
+## 本地基础设施
+
+```powershell
+pnpm infra:up
+pnpm infra:status
+pnpm infra:down
+```
+
+默认只绑定本机回环地址：
+
+- PostgreSQL：`127.0.0.1:5432`
+- Redis：`127.0.0.1:6379`
+- API：`http://127.0.0.1:3001/api/v1/health`
+
+`infra:down` 保留数据卷。不要在未确认数据备份和影响范围前执行 `docker compose down -v`。
 
 ## 开始工作前必须阅读
 

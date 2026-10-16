@@ -7,7 +7,7 @@
 - 项目：极光AI，参考 `https://参考产品/` 的产品结构和交互重新实现。
 - 本地目录：`C:\Users\Administrator\Desktop\project2`
 - GitHub 远端：[https://github.com/sweetvivi/web-ai-design-clone-b](https://github.com/sweetvivi/web-ai-design-clone-b)（Private）
-- 当前阶段：M0 已启动；workspace 与后端基础已完成并通过类型检查、测试、构建和 lint，正在进入前端基础。
+- 当前阶段：M0 已启动；workspace、后端基础和本地 PostgreSQL、Redis 已落地，正在实现前端骨架与集成验收。
 - 实现边界：按 D-011 修订后的策略，界面结构、视觉和交互尽可能接近参考产品；品牌与受保护内容必须替换，原页面打包资源不得复用。
 - 主开发工具：按 D-033，Codex 作为主要开发工具；除非用户明确决定切换，否则不再按换模型流程重置方向。
 
@@ -30,9 +30,9 @@
 
 ## 当前进度
 
-- 已完成：研究和文档阶段；GitHub 远端已设置；M0 实施计划和 D-033 已落档；本地功能分支已建立；workspace 骨架和 M0-2 后端基础已实现并验证。
-- 进行中：M0 工程基础，准备实现 Vue 3 前端骨架。
-- 下一步：按 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) 执行 M0-3 和 M0-4，不提前实现 M1 业务功能。
+- 已完成：研究和文档阶段；GitHub 远端已设置；M0 实施计划和 D-033 已落档；本地功能分支已建立；workspace 骨架、M0-2 后端基础和 M0-4 本地基础设施已实现并验证。
+- 进行中：M0-3 前端骨架，包括 Vue/Vite、五套 Shell、基础路由、Pinia、TanStack Query 和占位页。
+- 下一步：完成前端骨架后执行前后端联调、桌面端和移动端页面检查及最小 GitHub Actions。
 - Git 续接：从 `main` 的 `7a75622` 建立 `feature/m0-foundation` 分支。每次接手用 `git status --short --branch` 和 `git log --oneline -5` 核验最新状态。
 
 ## 本轮新增注意事项
@@ -43,6 +43,7 @@
 - 原页面公开检查发现会员中心路由 `/console/vip` 和部分公开脚本字段。用户虽已在浏览器登录，但当前命令行无法读取浏览器登录 Cookie；未获得截图前，不得把价格单位、完整权益、有效期或档位写成确定事实。详细记录见 `docs/OPEN_QUESTIONS.md`。
 - 后续新增的重要注意事项、决策、待确认问题和协作规则，都要同步更新本文件，并按项目规则更新 `CHANGELOG.md`。
 - M0 执行按 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) 的三档规则进行：自动执行范围内直接做；安装依赖、项目配置、额外服务和本地数据库先说明；删除、密钥、部署、公网暴露和普通推送等红线先确认。
+- 本地 PostgreSQL 和 Redis 虽由 Docker Compose 管理，但当前 `compose.yaml` 使用第三方镜像代理 `dockerproxy.net`。演示阶段可用，正式部署前必须重新评估官方或公司内部镜像源。
 
 ## 待确认问题
 

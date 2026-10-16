@@ -32,7 +32,7 @@
 - 首批模型供应商使用公司 Key，真实接入 provider
 - 上游模型可能报错，当前阶段接受可恢复错误，不把上游稳定性作为项目阻塞条件
 - 支付先做沙箱订单模拟，后续再替换为真实支付
-- 前端采用 Vue 3 + TypeScript + Vite + Ant Design Vue 5 + UnoCSS + Pinia + Vue Router + TanStack Query
+- 前端采用 Vue 3 + TypeScript + Vite + Ant Design Vue `4.2.6` + UnoCSS + Pinia + Vue Router + TanStack Query
 - 不复用 `ai-workbench-api`，旧项目冻结为参考实现
 - 首批 LLM 统一使用 OpenAI 兼容适配器和公司中转 Base URL
 - 分支使用 `main + feature/xxx + fix/xxx`
