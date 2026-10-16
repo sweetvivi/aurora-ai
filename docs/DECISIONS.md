@@ -34,7 +34,7 @@
 
 ### D-006 远端认证
 
-- 状态：Superseded by D-030
+- 状态：Superseded by D-032
 - 原决策：远端认证使用 Gitea Token，并通过 Windows Credential Manager 保存
 - 原作用范围：`http://182.92.154.206:3000`
 - 安全要求仍适用：任何 Token 都不得写入仓库、文档、提交记录或普通配置文件
@@ -61,10 +61,13 @@
 - 状态：Accepted
 - 决策：首发中文优先，仅支持中国中文；其他语言安排在 M5 之后
 
-### D-011 视觉策略
+### D-011 视觉策略（修订）
 
 - 状态：Accepted
-- 决策：整体结构接近参考产品，视觉进行差异化设计，不抄用原页面素材
+- 决策：布局、栅格、间距、组件形态、颜色体系、圆角、阴影、交互流程、动效尽可能接近参考产品
+- 决策：Logo、品牌名、版权图片、素材、用户评价、企业信息、备案号、法律文本全部原创或替换
+- 决策：不使用原页面打包的 CSS、JS、图片资源，全部重新实现
+- 判定标准：用户能用极光AI 完成相同任务，且视觉第一印象接近参考产品
 
 ### D-012 敏感功能
 
@@ -106,34 +109,52 @@
 - 状态：Accepted
 - 决策：仓库保持 Private，暂不添加 LICENSE；确定开源意向后再补充 MIT 许可证
 
-### D-020 首批模型供应商
+### D-020 模型别名规范
+
+- 状态：Accepted
+- 决策：模型别名格式为 `{厂商}-{模型}-{版本}`，全小写，用 `-` 连接
+- 示例：`openai-gpt-6-astra`、`zhipu-glm-4-plus`、`moonshot-kimi-k2`、`volc-seedream-5`
+- 决策：前端只使用模型别名，不识别上游真实模型名
+- 数据库 `model_configs` 表：`alias` 字段存别名，`provider_model` 字段存上游真实名
+- 决策：更换供应商时只修改 `provider_model`，前端零改动
+- M0 首先登记：`openai-gpt-6-astra`
+
+### D-021 旧仓库归档
+
+- 状态：Accepted
+- 决策：Gitea 仓库 `http://182.92.154.206:3000/sweetvivi/web-ai-design-clone` 归档，不删除
+- 决策：归档后只读，不再 push
+- 决策：本地 remote 已切到 GitHub，不会误推
+- 归档操作由用户在 Gitea 网页手动完成，不通过命令
+
+### D-022 首批模型供应商
 
 - 状态：Accepted
 - 决策：首批接入使用公司 Key 的真实模型供应商
 - 决策：Mock provider 只用于测试和受控兜底，不作为唯一主流程
 - 当前容忍项：上游模型可能报错；应记录错误、保护积分并给用户可重试反馈，不因上游不稳定阻塞开发
 
-### D-021 支付沙箱
+### D-023 支付沙箱
 
 - 状态：Accepted
 - 决策：当前支付采用沙箱订单模拟，未来可以替换为真实支付
 - 约束：订单状态、签名、幂等和结果查询从一开始就按真实支付结构设计
 - 禁止：前端不能直接调用“设为已支付”或自行修改订单金额和状态
 
-### D-022 前端框架
+### D-024 前端框架
 
 - 状态：Accepted
 - 决策：Vue 3 + TypeScript + Vite + Ant Design Vue 5 + UnoCSS + Pinia + Vue Router + TanStack Query (Vue)
 - 明确：不使用 React
 
-### D-023 不复用旧后端
+### D-025 不复用旧后端
 
 - 状态：Accepted
 - 决策：不复用 `Desktop/project/ai-workbench-api`
 - 决策：旧项目冻结，仅作为逻辑和实现参考，不搬运代码
 - 原因：路由数量、数据库和鉴权契约都需要重新设计
 
-### D-024 模型 Key 注入
+### D-026 模型 Key 注入
 
 - 状态：Accepted
 - 决策：后端通过环境变量注入模型 Key，不把明文写入数据库或仓库
@@ -142,7 +163,7 @@
 - 生产：使用 Docker Secret 或 Kubernetes Secret
 - 隔离：Codex 使用的 Key 与后端使用的 Key 分开，便于独立限额
 
-### D-025 首批模型
+### D-027 首批模型
 
 - 状态：Accepted
 - 决策：首批统一使用极光 GPT Key 中转站和 OpenAI 兼容适配器
@@ -153,7 +174,7 @@
 - Embedding：暂不做
 - 后续备用模型：GLM、Kimi、DeepSeek
 
-### D-026 支付沙箱
+### D-028 支付沙箱
 
 - 状态：Accepted
 - 决策：一期不接真实支付，只实现接口、订单表和状态机
@@ -164,14 +185,14 @@
 - 充值：注册送 100 积分，后台支持手动充值
 - 真实通道：微信、支付宝、Stripe 放到 M7
 
-### D-027 分支策略
+### D-029 分支策略
 
 - 状态：Accepted
 - 决策：一个人开发，使用 `main + feature/xxx + fix/xxx`
 - 约束：不使用长期 `dev` 分支，不强制 PR 流程
 - 发布：重要节点打 Tag，例如 `v0.1.0`
 
-### D-028 CI
+### D-030 CI
 
 - 状态：Accepted
 - 决策：Gitea 1.15.9 不支持 Actions，CI 切换到 GitHub Actions
@@ -181,14 +202,14 @@
 - Runner：GitHub Hosted Runner
 - M0：只写最小 CI，不写部署流水线
 
-### D-029 DeepSeek 方案基线
+### D-031 DeepSeek 方案基线
 
 - 状态：Accepted
 - 决策：采纳 DeepSeek 方案的总体方向
 - 约束：执行时必须采用 `SESSION_HANDOFF_2026-10-16.md` 中的修正项
 - 重点修正：真实 provider 优先、密钥不落库明文、鉴权头收敛、不同能力使用不同超时和重试策略、支付订单早期抽象
 
-### D-030 GitHub 远端仓库
+### D-032 GitHub 远端仓库
 
 - 状态：Accepted
 - 决策：代码统一推送到 `https://github.com/sweetvivi/web-ai-design-clone-b`（private）
@@ -199,22 +220,22 @@
 
 ### P-001 前端技术栈
 
-- 状态：Superseded by D-022
+- 状态：Superseded by D-024
 - 建议：React 19、TypeScript、Vite、React Router、Ant Design 5、Tailwind CSS、Zustand、TanStack Query
 - 待确认：如果团队更希望复用现有 Vue 代码，可改为 Vue 3、Pinia、Vue Router、UnoCSS
-- 状态说明：已被 D-022 替代
+- 状态说明：已被 D-024 替代
 
 ### P-002 后端技术栈
 
-- 状态：Superseded by D-023
+- 状态：Superseded by D-025
 - 建议：NestJS、Prisma、PostgreSQL、Redis、BullMQ
 - 备选：复用现有 `ai-workbench-api`
 - 待确认：是否从零实现，是否保留现有 Prisma 模型
-- 状态说明：已被 D-023 替代
+- 状态说明：已被 D-025 替代
 
 ### P-003 页面架构
 
-- 状态：Superseded by D-029
+- 状态：Superseded by D-031
 - 建议：五套壳层加工具注册表和工作台引擎
 - 原因：参考产品页面数量大，逐页独立开发不可控
 
@@ -241,16 +262,16 @@
 
 ### P-008 DeepSeek 实施方案
 
-- 状态：Superseded by D-029
+- 状态：Superseded by D-031
 - 建议：将 DeepSeek 方案的总体方向作为 M0/M1 基线，但采用 `SESSION_HANDOFF_2026-10-16.md` 中的修正项
 - 主要修正：真实 provider 优先、密钥不落库明文、鉴权头收敛、不同能力使用不同超时和重试策略、支付订单早期抽象
-- 状态说明：已升级为 D-029
+- 状态说明：已升级为 D-031
 
 ## Superseded
 
 ### D-002 原 Gitea 远端仓库
 
-- 状态：Superseded by D-030
+- 状态：Superseded by D-032
 - 原决策：代码统一推送到 `http://182.92.154.206:3000/sweetvivi/web-ai-design-clone.git`
 - 原因：Gitea 1.15.9 不支持 Actions，改用私有 GitHub 仓库
 
