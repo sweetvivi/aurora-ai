@@ -11,9 +11,10 @@
 1. `README.md`
 2. `docs/PROJECT_CONTEXT.md`
 3. `docs/RESEARCH_BASELINE.md`
-4. `docs/DECISIONS.md`
-5. `docs/OPEN_QUESTIONS.md`
-6. `CHANGELOG.md`
+4. `docs/SESSION_HANDOFF_2026-10-16.md`
+5. `docs/DECISIONS.md`
+6. `docs/OPEN_QUESTIONS.md`
+7. `CHANGELOG.md`
 
 阅读后先输出：
 

@@ -12,7 +12,7 @@
 
 ## 当前状态
 
-项目目前处于研究和架构阶段，尚未开始正式业务开发。
+项目目前处于研究和架构评审阶段，尚未开始正式业务开发。
 
 已完成：
 
@@ -33,9 +33,10 @@
 
 1. `docs/PROJECT_CONTEXT.md`
 2. `docs/RESEARCH_BASELINE.md`
-3. `docs/MODEL_CONTINUITY.md`
-4. `docs/DECISIONS.md`
-5. `docs/OPEN_QUESTIONS.md`
+3. `docs/SESSION_HANDOFF_2026-10-16.md`
+4. `docs/MODEL_CONTINUITY.md`
+5. `docs/DECISIONS.md`
+6. `docs/OPEN_QUESTIONS.md`
 
 任何模型或开发者继续接管前，都必须先阅读以上文档，不得根据旧对话自行重置产品方向。
 
@@ -43,6 +44,7 @@
 
 - `docs/PROJECT_CONTEXT.md`：项目事实、边界和事实优先级
 - `docs/RESEARCH_BASELINE.md`：参考产品研究基线
+- `docs/SESSION_HANDOFF_2026-10-16.md`：完整会话交接、DeepSeek 方案评审和修正建议
 - `docs/MODEL_CONTINUITY.md`：换模型后的续接和防止思路漂移规则
 - `docs/DECISIONS.md`：已确认和待确认的技术决策
 - `docs/OPEN_QUESTIONS.md`：等待用户回答的问题
