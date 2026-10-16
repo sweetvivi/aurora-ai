@@ -9,6 +9,7 @@
 - GitHub 远端：[https://github.com/sweetvivi/web-ai-design-clone-b](https://github.com/sweetvivi/web-ai-design-clone-b)（Private）
 - 当前阶段：M0 尚未开始，处于文档和范围确认阶段。
 - 实现边界：按 D-011 修订后的策略，界面结构、视觉和交互尽可能接近参考产品；品牌与受保护内容必须替换，原页面打包资源不得复用。
+- 模型切换：本轮准备交接给 `deepseek-4.1-flash-260910`；交接文件为 [`SESSION_HANDOFF_2026-10-16-v2.md`](SESSION_HANDOFF_2026-10-16-v2.md)。
 
 ## 用户情况
 
@@ -55,6 +56,7 @@
 - 用户已经明确授权的具体操作无需重复询问；若操作范围或目标发生变化，再确认新的范围。
 - 用户要求暂停或只做文档时，不得自行开始后续工程阶段。本轮只更新文档，不写业务代码、不建数据库表、不接真实模型；D-020 的表字段仅为设计约定。
 - 工作目录固定为 `C:\Users\Administrator\Desktop\project2`；不得修改 `Desktop/project` 和 `Desktop/project/ai-workbench-api`。
+- 模型切换交接完成后，下一模型必须先读取交接文件和项目核心文档、检查 Git 状态并输出摘要，等待用户下一步指令。
 
 ## 更新时机
 
