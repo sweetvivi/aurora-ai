@@ -7,6 +7,7 @@ import { HealthModule } from './health/health.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { ModelsModule } from './models/models.module';
+import { PointsModule } from './points/points.module';
 import { ProvidersModule } from './providers/providers.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { ProvidersModule } from './providers/providers.module';
     PrismaModule,
     RedisModule,
     ModelsModule,
+    PointsModule,
     ProvidersModule,
     AuthModule,
     HealthModule,
