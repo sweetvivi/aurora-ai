@@ -10,6 +10,12 @@
 - 远端仓库：`https://github.com/sweetvivi/web-ai-design-clone-b`（private）
 - 默认分支：`main`
 
+## 技术栈
+
+- 前端：Vue 3 + TypeScript + Vite + Ant Design Vue 5 + UnoCSS + Pinia
+- 后端：NestJS + Prisma + PostgreSQL + Redis + BullMQ
+- 远端 GitHub：`https://github.com/sweetvivi/web-ai-design-clone-b`
+
 ## 当前状态
 
 项目目前处于研究和架构评审阶段，尚未开始正式业务开发。
