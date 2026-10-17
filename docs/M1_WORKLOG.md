@@ -86,6 +86,7 @@
 - 2026-10-17：M1-7 完整验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`。测试共通过 45 项：API 29 项、Web 16 项；构建仅保留既有的大 chunk 警告。
 - 2026-10-17：Run #5 修复后按 CI 顺序复验通过：Prisma Client 生成、`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm test`；测试为 API 29/29、Web 16/16。
 - 2026-10-17：使用临时 PostgreSQL 17 容器从零执行两条迁移并运行完整测试，API 29/29、Web 16/16 通过；临时容器验证后已停止移除。
+- 2026-10-17：CI PostgreSQL 修复经 Run #10、#11、#12 在真实 GitHub runner 验证成功；提交 `e526e11` 已同步到 `main` 和 `feature/m1-vertical-slice`。
 
 ## 下一步
 
