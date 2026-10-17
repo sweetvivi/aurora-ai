@@ -22,7 +22,6 @@ import {
   ScissorOutlined,
   StarOutlined,
   ThunderboltFilled,
-  VideoCameraOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -80,7 +79,6 @@ const navigation: NavigationItem[] = [
   { icon: HomeOutlined, label: '首页', to: '/' },
   { icon: PictureOutlined, label: '作品广场', to: '/draw' },
   { icon: BgColorsOutlined, label: 'AI 绘画', to: '/draw' },
-  { icon: VideoCameraOutlined, label: 'AI 视频', to: '/video' },
   { icon: HighlightOutlined, label: '智能修图', to: '/image-tools' },
   { icon: AppstoreOutlined, label: '图片工具', to: '/map' },
 ];
@@ -94,7 +92,7 @@ const models: ModelItem[] = [
   { accent: '#d69a2d', label: '国风水墨 1.8', value: 'ink-1' },
 ];
 
-const topNavigation = ['做电商', '做视频', '拍写真', '搞设计'];
+const topNavigation = ['做电商', '拍写真', '搞设计'];
 const creationModes = ['文生图', '参考图重绘', '局部编辑', '商品图处理'];
 const ratios = ['智能比例', '1:1', '4:3', '3:4', '16:9', '9:16'];
 const amounts = [1, 2, 3, 4];
@@ -205,10 +203,10 @@ const creativeTypes: ToolItem[] = [
   },
   {
     accent: '#15966e',
-    description: '让静态画面自然运动，生成短片、镜头过渡和动态海报。',
-    glyph: '影',
-    label: 'AI 视频',
-    tags: ['图生视频', '文生视频', '视频特效'],
+    description: '一次探索多组画面方案，适合风格比较和批量内容生产。',
+    glyph: '批',
+    label: '批量创作',
+    tags: ['多图生成', '风格探索', '批量输出'],
   },
   {
     accent: '#e28732',
@@ -545,17 +543,6 @@ function openTemplatePicker(): void {
   });
 }
 
-function openVideoStudio(promptValue = prompt.value, sourceWorkId?: string): void {
-  void router.push({
-    name: 'video',
-    query: {
-      mode: sourceWorkId ? 'image-to-video' : 'text-to-video',
-      prompt: promptValue.trim() || undefined,
-      sourceWork: sourceWorkId,
-    },
-  });
-}
-
 function openRetouch(operation: string, work?: { id: string; prompt: string }): void {
   void router.push({
     name: 'smart-retouch',
@@ -613,7 +600,6 @@ function leaveGenerator(): void {
 
 function handleTopNavigation(item: string): void {
   const destinations: Record<string, () => void> = {
-    做视频: () => openVideoStudio(),
     做电商: () => void router.push('/commerce'),
     拍写真: () => openRetouch('restyle'),
     搞设计: () => void router.push('/canvas'),
@@ -628,18 +614,13 @@ function handleTopNavigation(item: string): void {
 }
 
 function handleCreativeType(item: ToolItem): void {
-  if (item.label === 'AI 视频') {
-    openVideoStudio();
-    return;
-  }
-
   if (item.label === '图片编辑') {
     openRetouch('enhance');
     return;
   }
 
   openGenerator({
-    mode: item.label === 'AI 绘画' ? '文生图' : '参考图重绘',
+    mode: item.label === 'AI 绘画' || item.label === '批量创作' ? '文生图' : '参考图重绘',
   });
 }
 
@@ -845,17 +826,6 @@ function editWork(operation: string, workId: string): void {
 
   closeWorkDetail();
   openRetouch(operation, work);
-}
-
-function animateWork(workId: string): void {
-  const work = workspace.works.find((item) => item.id === workId);
-
-  if (!work) {
-    return;
-  }
-
-  closeWorkDetail();
-  openVideoStudio(work.prompt, work.id);
 }
 
 function workStatusLabel(status: DrawWorkStatus): string {
@@ -1439,10 +1409,6 @@ onBeforeUnmount(() => {
                     <ReloadOutlined />
                     重新生成
                   </button>
-                  <button type="button" @click="animateWork(work.id)">
-                    <VideoCameraOutlined />
-                    视频
-                  </button>
                   <button type="button" @click="editWork('cutout', work.id)">
                     <ScissorOutlined />
                     抠图
@@ -1525,15 +1491,7 @@ onBeforeUnmount(() => {
               type="button"
               @click="handleTopNavigation(item)"
             >
-              <component
-                :is="
-                  item === '做视频'
-                    ? VideoCameraOutlined
-                    : item === '搞设计'
-                      ? HighlightOutlined
-                      : PictureOutlined
-                "
-              />
+              <component :is="item === '搞设计' ? HighlightOutlined : PictureOutlined" />
               {{ item }}
               <DownOutlined />
             </button>
@@ -1566,22 +1524,10 @@ onBeforeUnmount(() => {
             </div>
 
             <footer class="draw-composer__toolbar">
-              <div class="draw-composer__mode">
-                <button
-                  type="button"
-                  :class="{ active: selectedMode === '文生图' }"
-                  @click="selectedMode = '文生图'"
-                >
-                  图片
-                </button>
-                <button
-                  type="button"
-                  :class="{ active: selectedMode === '视频特效' }"
-                  @click="selectedMode = '视频特效'"
-                >
-                  视频
-                </button>
-              </div>
+              <span class="draw-composer__mode-label">
+                <PictureOutlined />
+                图片
+              </span>
 
               <label>
                 <select v-model="currentModel" aria-label="选择绘画模型">
@@ -1684,7 +1630,7 @@ onBeforeUnmount(() => {
           <header class="draw-section__heading">
             <div>
               <h2>电商与宣传</h2>
-              <p>商品图和宣传视频独立放在这里，方便从素材快速进入商业内容流程。</p>
+              <p>商品图、电商宣传和设计素材集中在这里，方便从素材快速进入商业内容流程。</p>
             </div>
           </header>
 
@@ -1847,10 +1793,6 @@ onBeforeUnmount(() => {
                   <button type="button" @click="editWork('restyle', activeWorkDetail.id)">
                     <EditOutlined />
                     编辑
-                  </button>
-                  <button type="button" @click="animateWork(activeWorkDetail.id)">
-                    <VideoCameraOutlined />
-                    视频
                   </button>
                   <button type="button" @click="editWork('cutout', activeWorkDetail.id)">
                     <ScissorOutlined />
@@ -3922,30 +3864,23 @@ onBeforeUnmount(() => {
   margin-top: 7px;
 }
 
-.draw-composer__mode {
-  display: flex;
+.draw-composer__mode-label {
+  display: inline-flex;
   flex: 0 0 auto;
-  padding: 2px;
+  height: 29px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
   border-radius: 7px;
   background: #f2f4f6;
-}
-
-.draw-composer__mode button {
-  min-width: 46px;
-  height: 29px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: #7c8592;
+  color: #626c79;
   font-size: 9px;
   font-weight: 700;
-  cursor: pointer;
 }
 
-.draw-composer__mode button.active {
-  background: #20242b;
-  color: #fff;
+.draw-composer__mode-label :deep(svg) {
+  color: #5f5ad8;
+  font-size: 11px;
 }
 
 .draw-composer__toolbar > label {
