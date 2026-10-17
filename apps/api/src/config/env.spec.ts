@@ -11,6 +11,8 @@ describe('environment schema', () => {
     expect(environment.IMAGE_DEFAULT_MODEL).toBe('gpt-image-2.5');
     expect(environment.IMAGE_DEFAULT_MODEL_ALIAS).toBe('jiguang-gpt-image-2.5');
     expect(environment.LLM_DEFAULT_MODEL).toBe('openai-gpt-6-astra');
+    expect(environment.LLM_DEEPSEEK_BASE_URL).toBe('https://api.example.com/v1');
+    expect(environment.LLM_QWEN_BASE_URL).toBe('https://api.example.com/v1');
     expect(environment.VIDEO_PROVIDER).toBe('auto');
     expect(environment.VIDEO_DEFAULT_MODEL).toBe('grok-imagine-video');
     expect(environment.VIDEO_DEFAULT_MODEL_ALIAS).toBe('xai-grok-imagine-video');
@@ -29,8 +31,12 @@ describe('environment schema', () => {
   it('treats an empty model key as not configured', () => {
     const environment = envSchema.parse({
       LLM_API_KEY: '',
+      LLM_DEEPSEEK_API_KEY: '',
+      LLM_QWEN_API_KEY: '',
     });
 
     expect(environment.LLM_API_KEY).toBeUndefined();
+    expect(environment.LLM_DEEPSEEK_API_KEY).toBeUndefined();
+    expect(environment.LLM_QWEN_API_KEY).toBeUndefined();
   });
 });

@@ -50,8 +50,12 @@ export const envSchema = z.object({
   IMAGE_TASK_POINTS_COST: z.coerce.number().int().min(0).default(5),
   LLM_BASE_URL: z.string().url().default('https://api.example.com/v1'),
   LLM_API_KEY: optionalNonEmptyString,
+  LLM_DEEPSEEK_BASE_URL: z.string().url().default('https://api.example.com/v1'),
+  LLM_DEEPSEEK_API_KEY: optionalNonEmptyString,
   LLM_DEFAULT_MODEL: z.string().min(1).default('openai-gpt-6-astra'),
   LLM_MOCK_MODE: booleanFromEnvironment.default(false),
+  LLM_QWEN_BASE_URL: z.string().url().default('https://api.example.com/v1'),
+  LLM_QWEN_API_KEY: optionalNonEmptyString,
   LLM_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(600_000).default(120_000),
   STORAGE_ROOT: z.string().min(1).default('../../storage'),
   FILE_MAX_SIZE_BYTES: z.coerce

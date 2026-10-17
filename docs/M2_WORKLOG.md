@@ -145,6 +145,17 @@
 
 AI 画布和电商工具复用同一异步图片任务 Store，并分别使用 `canvas` 和 `commerce` 工具键隔离记录。
 
+### 多模型对话路由
+
+- 注册表：`apps/api/src/models/model-registry.service.ts`
+- Provider：`apps/api/src/providers/openai-compatible/openai-compatible.provider.ts`
+- 模型：`openai-gpt-6-astra`、`openai-gpt-6-sol`、`deepseek-v4-pro-0813`、`deepseek-v4-1-flash-0910`、`qwen-3-8-max`、`qwen-3-8-flash`、`qwen-3-8-27b`、`qwen-3-8-max-0902`
+- 路由：模型别名携带独立 `providerCode`，对话服务按 Provider 组解析凭证，不再让 DeepSeek 或 Qwen 缺 Key 时回退到默认 GPT 组
+- 配置：新增 `LLM_DEEPSEEK_BASE_URL`、`LLM_DEEPSEEK_API_KEY`、`LLM_QWEN_BASE_URL`、`LLM_QWEN_API_KEY`
+- 公开边界：模型列表只返回别名、显示名和能力，不暴露上游模型 ID 或任何 Key
+- 真实联调：通过本地 API 和 `http://127.0.0.1:5173/chat` 选择 `Qwen 3.8 Max` 完成一次真实 SSE 对话，浏览器收到 `OK`，无页面错误或横向溢出
+- 可用性：GPT 和 DeepSeek 组当前受上游服务影响分别返回不可用或限流并自动退款；千问组已验证 4 个模型均可返回 `OK`
+
 ## 4. 验证记录
 
 以下命令已通过：
@@ -161,7 +172,7 @@ pnpm test
 测试规模：
 
 - Web：6 个测试文件，23 项通过
-- API：12 个测试文件，37 项通过
+- API：14 个测试文件，42 项通过
 
 页面验收脚本：
 
@@ -236,6 +247,16 @@ node outputs/ui-reference/verify-commerce-studio.mjs
 - 验证 `meta`、`delta`、`done`、`error` 对消息、会话、积分和状态的影响
 - 验证停止生成和重启恢复
 - 不触发真实对话 Key，不消耗参考产品或上游额度
+
+多模型真实对话补充验证：
+
+```text
+node outputs/ui-reference/verify-live-qwen-chat.mjs
+```
+
+- `1440x1000` 桌面端打开 `/chat` 后，模型下拉实际显示 8 个模型
+- 选择 `Qwen 3.8 Max` 发起“只回复 OK”，SSE 返回 `meta`、`delta`、`done`，页面完成态显示 `OK`
+- 验证过程不读取或输出 Key，不调用参考产品生成接口；上游对话按项目积分规则正常结算
 
 跨模块交互补充验证：
 

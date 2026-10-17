@@ -11,6 +11,28 @@ interface OpenAiStreamPayload {
   }>;
 }
 
+interface ProviderCredentialSource {
+  apiKeyName: string;
+  baseUrlName: string;
+}
+
+const DEFAULT_CREDENTIAL_SOURCE: ProviderCredentialSource = {
+  apiKeyName: 'LLM_API_KEY',
+  baseUrlName: 'LLM_BASE_URL',
+};
+
+const PROVIDER_CREDENTIAL_SOURCES: Record<string, ProviderCredentialSource> = {
+  deepseek: {
+    apiKeyName: 'LLM_DEEPSEEK_API_KEY',
+    baseUrlName: 'LLM_DEEPSEEK_BASE_URL',
+  },
+  jiguang: DEFAULT_CREDENTIAL_SOURCE,
+  qwen: {
+    apiKeyName: 'LLM_QWEN_API_KEY',
+    baseUrlName: 'LLM_QWEN_BASE_URL',
+  },
+};
+
 @Injectable()
 export class OpenAiCompatibleProvider implements LlmProvider {
   constructor(private readonly configService: ConfigService) {}
@@ -21,12 +43,13 @@ export class OpenAiCompatibleProvider implements LlmProvider {
       return;
     }
 
-    const apiKey = this.configService.get<string>('LLM_API_KEY');
+    const credentials = this.resolveCredentials(request.providerCode);
+    const apiKey = credentials.apiKey;
 
     if (!apiKey) {
       throw new ServiceUnavailableException({
         code: 'LLM_NOT_CONFIGURED',
-        message: 'LLM_API_KEY is not configured',
+        message: `${credentials.apiKeyName} is not configured`,
       });
     }
 
@@ -38,7 +61,7 @@ export class OpenAiCompatibleProvider implements LlmProvider {
       : timeoutController.signal;
 
     try {
-      const baseUrl = this.configService.getOrThrow<string>('LLM_BASE_URL').replace(/\/+$/, '');
+      const baseUrl = credentials.baseUrl.replace(/\/+$/, '');
       const response = await fetch(`${baseUrl}/chat/completions`, {
         body: JSON.stringify({
           messages: request.messages,
@@ -137,5 +160,30 @@ export class OpenAiCompatibleProvider implements LlmProvider {
     }
 
     return 'LLM_REQUEST_ERROR';
+  }
+
+  private resolveCredentials(providerCode?: string): {
+    apiKey?: string;
+    apiKeyName: string;
+    baseUrl: string;
+  } {
+    const source = PROVIDER_CREDENTIAL_SOURCES[providerCode ?? ''] ?? DEFAULT_CREDENTIAL_SOURCE;
+    const apiKey = this.configService.get<string>(source.apiKeyName)?.trim() || undefined;
+    const configuredBaseUrl =
+      this.configService.get<string>(source.baseUrlName)?.trim() ||
+      this.configService.get<string>('LLM_BASE_URL');
+
+    if (!configuredBaseUrl) {
+      throw new ServiceUnavailableException({
+        code: 'LLM_NOT_CONFIGURED',
+        message: `${source.baseUrlName} is not configured`,
+      });
+    }
+
+    return {
+      apiKey,
+      apiKeyName: source.apiKeyName,
+      baseUrl: configuredBaseUrl,
+    };
   }
 }

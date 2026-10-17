@@ -295,6 +295,17 @@
 - 约束：不接入或消耗 Seedance；切换到其他视频供应商前必须单独说明 Base URL、模型、额度和回退策略
 - 约束：真实视频验收需最低额度、单任务、受控执行；不得把 Key、完整上游响应或敏感请求头写入日志和文档
 
+### D-041 多模型对话路由
+
+- 状态：Accepted
+- 决策：模型对话首期注册 8 个公开别名，覆盖 GPT、DeepSeek 和 Qwen 三个 Provider 组
+- 决策：`openai-gpt-6-astra`、`openai-gpt-6-sol` 使用默认 LLM 凭证组；DeepSeek 与 Qwen 分别使用独立的环境变量凭证组
+- 决策：对话服务只把内部 `providerCode` 和 `providerModel` 传给后端 Provider，公开模型列表不返回上游模型 ID 或凭证信息
+- 决策：Provider 组缺少自身 Key 时返回 `LLM_NOT_CONFIGURED`，不回退到其他组的 Key
+- 决策：Qwen 组注册 `qwen3.8-max`、`qwen3.8-flash`、`qwen3.8-27b`、`qwen3.8-max-0902` 四个模型，保证至少有四个当前可用对话选项
+- 约束：真实对话验收只做低成本最小消息，不调用参考产品生成接口，不输出 Key 或完整上游响应
+- 约束：新增模型别名前必须确认上游模型、Provider 组、Base URL 和最低成本验证方式
+
 ## Proposed
 
 ### P-001 前端技术栈

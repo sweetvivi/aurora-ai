@@ -72,14 +72,54 @@ describe('chat and conversation endpoints', () => {
       .set('authorization', `Bearer ${accessToken}`)
       .expect(200);
 
-    expect(modelsResponse.body.data.items).toEqual([
-      expect.objectContaining({
-        alias: 'openai-gpt-6-astra',
-        capabilities: ['chat'],
-        displayName: 'GPT-6 Astra',
-      }),
-    ]);
-    expect(modelsResponse.body.data.items[0]).not.toHaveProperty('providerModel');
+    expect(modelsResponse.body.data.items).toHaveLength(8);
+    expect(modelsResponse.body.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          alias: 'openai-gpt-6-astra',
+          capabilities: ['chat'],
+          displayName: 'GPT-6 Astra',
+        }),
+        expect.objectContaining({
+          alias: 'openai-gpt-6-sol',
+          capabilities: ['chat'],
+          displayName: 'GPT-6 Sol',
+        }),
+        expect.objectContaining({
+          alias: 'deepseek-v4-pro-0813',
+          capabilities: ['chat'],
+          displayName: 'DeepSeek V4 Pro',
+        }),
+        expect.objectContaining({
+          alias: 'deepseek-v4-1-flash-0910',
+          capabilities: ['chat'],
+          displayName: 'DeepSeek V4.1 Flash',
+        }),
+        expect.objectContaining({
+          alias: 'qwen-3-8-max',
+          capabilities: ['chat'],
+          displayName: 'Qwen 3.8 Max',
+        }),
+        expect.objectContaining({
+          alias: 'qwen-3-8-flash',
+          capabilities: ['chat'],
+          displayName: 'Qwen 3.8 Flash',
+        }),
+        expect.objectContaining({
+          alias: 'qwen-3-8-27b',
+          capabilities: ['chat'],
+          displayName: 'Qwen 3.8 27B',
+        }),
+        expect.objectContaining({
+          alias: 'qwen-3-8-max-0902',
+          capabilities: ['chat'],
+          displayName: 'Qwen 3.8 Max 0902',
+        }),
+      ]),
+    );
+    expect(modelsResponse.body.data.items.every((item: object) => !('providerModel' in item))).toBe(
+      true,
+    );
 
     const conversationResponse = await request(app.getHttpServer())
       .post('/api/v1/conversations')
