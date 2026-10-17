@@ -478,6 +478,17 @@ function openGenerator(options: { auto?: boolean; mode?: string } = {}): void {
   });
 }
 
+function openVideoStudio(): void {
+  const popup = window.open('/video', '_blank');
+
+  if (popup) {
+    popup.opener = null;
+    return;
+  }
+
+  void router.push('/video');
+}
+
 function toggleDrawLibrary(): void {
   drawLibraryCollapsed.value = !drawLibraryCollapsed.value;
 }
@@ -492,7 +503,7 @@ function handleLibraryTool(item: ToolItem): void {
 
 function handleCreativeTag(item: ToolItem, tag: string): void {
   if (/视频/.test(tag)) {
-    void router.push('/video');
+    openVideoStudio();
     return;
   }
 
@@ -633,7 +644,7 @@ function leaveGenerator(): void {
 function handleTopNavigation(item: string): void {
   const destinations: Record<string, () => void> = {
     做电商: () => void router.push('/commerce'),
-    做视频: () => void router.push('/video'),
+    做视频: () => openVideoStudio(),
     拍写真: () => openRetouch('restyle'),
     搞设计: () => void router.push('/canvas'),
   };
@@ -653,7 +664,7 @@ function handleCreativeType(item: ToolItem): void {
   }
 
   if (item.label === 'AI 视频') {
-    void router.push('/video');
+    openVideoStudio();
     return;
   }
 

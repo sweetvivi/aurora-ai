@@ -192,6 +192,8 @@ onMounted(() => {
         v-for="campaign in campaigns"
         :key="campaign.title"
         :to="campaign.to"
+        :rel="campaign.to === '/video' ? 'noopener noreferrer' : undefined"
+        :target="campaign.to === '/video' ? '_blank' : undefined"
         class="home-campaign"
         :class="`home-campaign--${campaign.tone}`"
       >
@@ -308,6 +310,8 @@ onMounted(() => {
           v-for="(tool, index) in tools"
           :key="tool.label"
           :to="tool.to"
+          :rel="tool.to === '/video' ? 'noopener noreferrer' : undefined"
+          :target="tool.to === '/video' ? '_blank' : undefined"
           class="featured-card"
           :style="{ '--accent': tool.color, '--accent-soft': tool.soft }"
         >

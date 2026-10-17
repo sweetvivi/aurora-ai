@@ -689,6 +689,21 @@ node outputs/ui-reference/verify-newdraw-templates.mjs
 - 390px 移动端滚底审计覆盖 `/chat`、`/draw`、`/newdraw`、`/agents`、`/retouch`、`/image-generation`、`/video`、`/canvas`、`/commerce`，未发现固定或 sticky 创作区与移动导航重叠
 - `verify-newdraw-templates.mjs` 已加入创作栏与导航至少 `8px` 间距的断言，防止后续样式调整回归
 
+视频独立窗口修正：
+
+```text
+node outputs/ui-reference/verify-draw-navigation.mjs
+node outputs/ui-reference/verify-m2-interactions.mjs
+node outputs/ui-reference/verify-draw.mjs
+```
+
+- 参考截图确认视频生成会脱离主平台边栏，在独立窗口中使用自己的深色工具栏；`/video` 现已从 `PlatformShell` 移出并改为顶层 `standalone` 路由
+- 主侧栏、移动底栏、首页活动卡、首页精选工具、AI 绘画顶部“做视频”和“AI 视频”卡片均统一在新窗口打开视频工作台
+- 视频工作台移除主平台 56px 顶栏和横向内边距假设，首屏高度改为完整视口
+- `verify-draw-navigation.mjs` 和 `verify-m2-interactions.mjs` 改为捕获 popup，并校验 `/video` 路径和 `.video-studio` 渲染
+- `verify-draw.mjs` 的参考图数量断言同步到“已上传 1 / 10 张”，桌面端与移动端 Mock 批量生成链路继续通过
+- 本批仍使用 Mock 或请求拦截，不调用真实图片、视频和对话 Provider
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥

@@ -65,11 +65,6 @@ const mobileNavigation = computed<NavigationItem[]>(() => {
 const currentTitle = computed(() => String(route.meta.title ?? '工作台'));
 const isAdmin = computed(() => user.value?.role === 'ADMIN');
 const showCampaign = computed(() => ['/', '/draw', '/agents'].includes(route.path));
-const compactCreatorRoute = computed(() =>
-  ['/image-generation', '/image-tools', '/retouch', '/video'].some(
-    (path) => route.path === path || route.path.startsWith(`${path}/`),
-  ),
-);
 const pageTheme = computed(() => {
   if (route.path.startsWith('/chat')) {
     return 'theme-blue';
@@ -99,16 +94,17 @@ function toNavigationItem(item: ModuleCatalogItem): NavigationItem {
   };
 }
 
+function isStandaloneNavigation(target: string): boolean {
+  return target === '/video';
+}
+
 onMounted(() => {
   void moduleCatalogStore.load();
 });
 </script>
 
 <template>
-  <div
-    class="platform-shell"
-    :class="[pageTheme, { 'platform-shell--compact-creator': compactCreatorRoute }]"
-  >
+  <div class="platform-shell" :class="pageTheme">
     <section v-if="showCampaign" class="platform-campaign" aria-label="创作活动">
       <span class="platform-campaign__badge">
         <GiftOutlined />
@@ -141,6 +137,8 @@ onMounted(() => {
               v-for="item in group.items"
               :key="`${group.label}-${item.to}-${item.label}`"
               :to="item.to"
+              :rel="isStandaloneNavigation(item.to) ? 'noopener noreferrer' : undefined"
+              :target="isStandaloneNavigation(item.to) ? '_blank' : undefined"
               class="platform-sidebar__link"
               :class="{ 'platform-sidebar__link--active': isActivePath(route.path, item.to) }"
             >
@@ -184,6 +182,8 @@ onMounted(() => {
         v-for="item in mobileNavigation"
         :key="`mobile-${item.to}-${item.label}`"
         :to="item.to"
+        :rel="isStandaloneNavigation(item.to) ? 'noopener noreferrer' : undefined"
+        :target="isStandaloneNavigation(item.to) ? '_blank' : undefined"
         :class="{ active: isActivePath(route.path, item.to) }"
       >
         <component :is="item.icon" />
@@ -533,80 +533,6 @@ onMounted(() => {
 @media (max-width: 980px) {
   .platform-shell__body {
     grid-template-columns: 200px minmax(0, 1fr);
-  }
-}
-
-@media (min-width: 861px) {
-  .platform-shell--compact-creator .platform-shell__body {
-    grid-template-columns: 80px minmax(0, 1fr);
-  }
-
-  .platform-shell--compact-creator .platform-sidebar__navigation {
-    gap: 14px;
-    padding: 14px 6px;
-  }
-
-  .platform-shell--compact-creator .platform-sidebar__navigation section {
-    gap: 5px;
-  }
-
-  .platform-shell--compact-creator .platform-sidebar__navigation section + section {
-    padding-top: 14px;
-    border-top: 1px solid #262c37;
-  }
-
-  .platform-shell--compact-creator .platform-sidebar__group-label {
-    display: none;
-  }
-
-  .platform-shell--compact-creator .platform-sidebar__link {
-    min-height: 58px;
-    justify-items: center;
-    gap: 5px;
-    grid-template-columns: minmax(0, 1fr);
-    padding: 8px 3px;
-    border-radius: 10px;
-    font-size: 9px;
-    text-align: center;
-  }
-
-  .platform-shell--compact-creator .platform-sidebar__link--active {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nav-accent) 42%, transparent);
-  }
-
-  .platform-shell--compact-creator .platform-sidebar__icon {
-    width: 19px;
-    height: 19px;
-  }
-
-  .platform-shell--compact-creator .platform-sidebar__label {
-    width: 100%;
-    font-size: 9px;
-    line-height: 1.25;
-    white-space: normal;
-  }
-
-  .platform-shell--compact-creator .platform-sidebar__badge {
-    position: absolute;
-    top: 4px;
-    right: 5px;
-    padding: 0 3px;
-    font-size: 6px;
-  }
-
-  .platform-shell--compact-creator .platform-sidebar__footer {
-    padding: 8px 6px;
-  }
-
-  .platform-shell--compact-creator .platform-sidebar__footer button {
-    height: 58px;
-    flex-direction: column;
-    justify-content: center;
-    gap: 5px;
-    padding: 6px 3px;
-    font-size: 9px;
-    line-height: 1.25;
-    text-align: center;
   }
 }
 </style>

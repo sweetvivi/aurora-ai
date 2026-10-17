@@ -1079,9 +1079,9 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .video-studio {
-  min-height: calc(100vh - 56px);
+  min-height: 100vh;
   overflow: hidden;
-  padding: 0 18px 28px;
+  padding: 0 0 28px;
   background: radial-gradient(circle at 72% -10%, rgb(100 75 240 / 9%), transparent 360px), #08080a;
   color: #f2f2f5;
 }
@@ -1094,7 +1094,7 @@ onBeforeUnmount(() => {
   min-height: 58px;
   align-items: center;
   gap: 28px;
-  margin: 0 -18px;
+  margin: 0;
   padding: 0 22px;
   border-bottom: 1px solid #202127;
   background: rgb(9 9 12 / 96%);
@@ -1184,7 +1184,7 @@ onBeforeUnmount(() => {
 
 .video-workbench {
   display: grid;
-  min-height: calc(100vh - 114px);
+  min-height: calc(100vh - 58px);
   grid-template-columns: 78px 322px minmax(0, 1fr);
 }
 

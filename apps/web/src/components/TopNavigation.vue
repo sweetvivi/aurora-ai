@@ -39,6 +39,8 @@ const activePath = computed(() => route.path);
       v-for="item in navItems"
       :key="item.to"
       :to="item.to"
+      :rel="item.to === '/video' ? 'noopener noreferrer' : undefined"
+      :target="item.to === '/video' ? '_blank' : undefined"
       class="top-navigation__link"
       :class="{ 'top-navigation__link--active': activePath === item.to }"
     >

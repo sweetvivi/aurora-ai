@@ -88,14 +88,6 @@ export const appRoutes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'video',
-        name: 'video',
-        component: () => import('@/views/VideoStudioView.vue'),
-        meta: {
-          title: 'AI 视频',
-        },
-      },
-      {
         path: 'canvas',
         name: 'ai-canvas',
         component: () => import('@/views/CanvasStudioView.vue'),
@@ -129,6 +121,15 @@ export const appRoutes: RouteRecordRaw[] = [
         },
       },
     ],
+  },
+  {
+    path: '/video',
+    name: 'video',
+    component: () => import('@/views/VideoStudioView.vue'),
+    meta: {
+      shell: 'standalone',
+      title: 'AI 视频',
+    },
   },
   {
     path: '/map',
