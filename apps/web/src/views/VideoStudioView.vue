@@ -177,8 +177,12 @@ const prompt = ref('');
 const sourceFrames = ref<SourceFrame[]>([]);
 const sourceInput = ref<HTMLInputElement | null>(null);
 const formError = ref('');
+const previewShowcase = ref<ShowcaseItem | null>(null);
+const previewTask = ref<VideoWork | null>(null);
+const notice = ref('');
 const consumedRouteContext = ref('');
 const uploadingSource = ref(false);
+let noticeTimer: number | undefined;
 
 const activeModel = computed(
   () => models.find((model) => model.value === selectedModel.value) ?? models[0],
@@ -201,6 +205,28 @@ const canSubmit = computed(() => {
 });
 const imageHistory = computed(
   () => videoWorkspace.works.filter((task) => task.status === 'done').length,
+);
+const previewOpen = computed(() => Boolean(previewShowcase.value ?? previewTask.value));
+const previewTitle = computed(
+  () => previewTask.value?.prompt ?? previewShowcase.value?.title ?? '视频预览',
+);
+const previewPrompt = computed(
+  () => previewTask.value?.prompt ?? previewShowcase.value?.prompt ?? '',
+);
+const previewModel = computed(
+  () => previewTask.value?.modelLabel ?? previewShowcase.value?.model ?? '视频模型',
+);
+const previewRatio = computed(
+  () => previewTask.value?.ratio ?? previewShowcase.value?.ratio ?? '16:9',
+);
+const previewDuration = computed(() =>
+  previewTask.value
+    ? taskDuration(previewTask.value)
+    : `00:${String(previewShowcase.value?.duration ?? 0).padStart(2, '0')}`,
+);
+const previewResultUrl = computed(() => previewTask.value?.resultUrl ?? '');
+const previewIsVideo = computed(() =>
+  Boolean(previewTask.value && isVideoResult(previewTask.value)),
 );
 
 async function handleSourceUpload(event: Event): Promise<void> {
@@ -422,6 +448,73 @@ function reuseShowcase(item: ShowcaseItem): void {
   window.scrollTo({ behavior: 'smooth', top: 0 });
 }
 
+function showNotice(message: string): void {
+  notice.value = message;
+
+  if (noticeTimer !== undefined) {
+    window.clearTimeout(noticeTimer);
+  }
+
+  noticeTimer = window.setTimeout(() => {
+    notice.value = '';
+    noticeTimer = undefined;
+  }, 2200);
+}
+
+async function copyPrompt(value: string): Promise<void> {
+  const text = value.trim();
+
+  if (!text) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    showNotice('提示词已复制');
+  } catch {
+    showNotice('复制失败，请手动选择提示词');
+  }
+}
+
+function openShowcasePreview(item: ShowcaseItem): void {
+  previewTask.value = null;
+  previewShowcase.value = item;
+}
+
+function openTaskPreview(task: VideoWork): void {
+  if (task.status !== 'done') {
+    return;
+  }
+
+  previewShowcase.value = null;
+  previewTask.value = task;
+}
+
+function closeVideoPreview(): void {
+  previewShowcase.value = null;
+  previewTask.value = null;
+}
+
+function reusePreview(): void {
+  if (previewTask.value) {
+    reuseTask(previewTask.value);
+  } else if (previewShowcase.value) {
+    reuseShowcase(previewShowcase.value);
+  }
+
+  closeVideoPreview();
+}
+
+function handlePreviewKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && previewOpen.value) {
+    closeVideoPreview();
+  }
+}
+
+async function refreshTasks(): Promise<void> {
+  await videoWorkspace.loadInitialTasks();
+}
+
 async function downloadTask(taskId: string): Promise<void> {
   await videoWorkspace.downloadWork(taskId);
 }
@@ -451,6 +544,7 @@ function taskDuration(task: VideoWork): string {
 }
 
 onMounted(() => {
+  window.addEventListener('keydown', handlePreviewKeydown);
   void videoWorkspace.initialize();
   void consumeRouteContext();
 });
@@ -463,7 +557,12 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handlePreviewKeydown);
   removeAllSourceFrames();
+
+  if (noticeTimer !== undefined) {
+    window.clearTimeout(noticeTimer);
+  }
 });
 </script>
 
@@ -690,7 +789,18 @@ onBeforeUnmount(() => {
               <span>{{ imageHistory }}</span>
             </button>
           </div>
-          <p>注意：上传的素材和生成作品只保留 1 个月，请及时备份。</p>
+          <div class="video-gallery__meta">
+            <p>注意：上传的素材和生成作品只保留 1 个月，请及时备份。</p>
+            <button
+              type="button"
+              aria-label="刷新作品"
+              :disabled="videoWorkspace.status === 'loading'"
+              @click="refreshTasks"
+            >
+              <LoadingOutlined v-if="videoWorkspace.status === 'loading'" />
+              <ReloadOutlined v-else />
+            </button>
+          </div>
         </header>
 
         <div v-if="activeGalleryTab === 'discover'" class="video-showcase-grid">
@@ -701,8 +811,10 @@ onBeforeUnmount(() => {
             >
               <GalleryArtwork :title="item.title" :variant="item.variant" />
               <span class="video-showcase-card__model">{{ item.model }}</span>
-              <span class="video-showcase-card__duration">00:0{{ item.duration }}</span>
-              <button type="button" aria-label="放大预览">
+              <span class="video-showcase-card__duration">
+                00:{{ String(item.duration).padStart(2, '0') }}
+              </span>
+              <button type="button" aria-label="放大预览" @click="openShowcasePreview(item)">
                 <ExpandOutlined />
               </button>
               <div class="video-showcase-card__play">
@@ -711,7 +823,7 @@ onBeforeUnmount(() => {
             </div>
             <footer>
               <p>{{ item.prompt }}</p>
-              <button type="button" @click="reuseShowcase(item)">
+              <button type="button" @click="copyPrompt(item.prompt)">
                 <CopyOutlined />
                 复制
               </button>
@@ -769,6 +881,14 @@ onBeforeUnmount(() => {
               </div>
               <span class="video-showcase-card__model">{{ task.modelLabel }}</span>
               <span class="video-showcase-card__duration">{{ taskDuration(task) }}</span>
+              <button
+                v-if="task.status === 'done'"
+                type="button"
+                aria-label="放大预览"
+                @click="openTaskPreview(task)"
+              >
+                <ExpandOutlined />
+              </button>
               <div v-if="task.status === 'done'" class="video-showcase-card__play">
                 <PlayCircleOutlined />
               </div>
@@ -831,6 +951,69 @@ onBeforeUnmount(() => {
         </div>
       </main>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="previewOpen"
+        class="video-preview"
+        role="dialog"
+        aria-modal="true"
+        aria-label="视频作品预览"
+        @click.self="closeVideoPreview"
+      >
+        <section class="video-preview__dialog">
+          <header>
+            <div>
+              <span>{{ previewModel }}</span>
+              <strong>{{ previewTitle }}</strong>
+            </div>
+            <button type="button" aria-label="关闭预览" @click="closeVideoPreview">
+              <CloseOutlined />
+            </button>
+          </header>
+
+          <div class="video-preview__stage" :class="`ratio-${previewRatio.replace(':', '-')}`">
+            <video
+              v-if="previewTask && previewResultUrl && previewIsVideo"
+              :src="previewResultUrl"
+              controls
+              autoplay
+              playsinline
+            />
+            <img
+              v-else-if="previewTask && previewResultUrl"
+              :src="previewResultUrl"
+              :alt="previewPrompt"
+            />
+            <GalleryArtwork
+              v-else-if="previewShowcase"
+              :title="previewShowcase.title"
+              :variant="previewShowcase.variant"
+            />
+          </div>
+
+          <footer>
+            <div class="video-preview__meta">
+              <span>{{ previewRatio }}</span>
+              <span>{{ previewDuration }}</span>
+              <span>{{ previewModel }}</span>
+            </div>
+            <p>{{ previewPrompt }}</p>
+            <div class="video-preview__actions">
+              <button type="button" @click="copyPrompt(previewPrompt)">
+                <CopyOutlined />
+                复制提示词
+              </button>
+              <button type="button" @click="reusePreview">
+                <ReloadOutlined />
+                用于创作
+              </button>
+            </div>
+          </footer>
+        </section>
+      </div>
+      <div v-if="notice" class="video-notice" role="status">{{ notice }}</div>
+    </Teleport>
   </section>
 </template>
 
@@ -1458,6 +1641,41 @@ onBeforeUnmount(() => {
   font-size: 8px;
 }
 
+.video-gallery__meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.video-gallery__meta > button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #292930;
+  border-radius: 7px;
+  background: #121216;
+  color: #8e8e99;
+  cursor: pointer;
+}
+
+.video-gallery__meta > button:hover:not(:disabled) {
+  border-color: #6657d2;
+  color: #cbbdff;
+}
+
+.video-gallery__meta > button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.video-gallery__meta > button :deep(svg) {
+  font-size: 12px;
+}
+
 .video-showcase-grid {
   display: grid;
   gap: 13px;
@@ -1733,6 +1951,204 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+.video-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  overflow: auto;
+  box-sizing: border-box;
+  place-items: center;
+  padding: 20px;
+  background: rgb(3 3 6 / 84%);
+  backdrop-filter: blur(16px);
+}
+
+.video-preview__dialog {
+  width: min(1060px, 100%);
+  max-height: calc(100dvh - 40px);
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid #30303a;
+  border-radius: 10px;
+  background: #0e0e12;
+  box-shadow: 0 28px 90px rgb(0 0 0 / 58%);
+}
+
+.video-preview__dialog > header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 15px;
+  border-bottom: 1px solid #24242b;
+  background: #121216;
+}
+
+.video-preview__dialog > header > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.video-preview__dialog > header span {
+  color: #8f7bea;
+  font-size: 7px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.video-preview__dialog > header strong {
+  overflow: hidden;
+  color: #ededf1;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-preview__dialog > header button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #303038;
+  border-radius: 7px;
+  background: #18181e;
+  color: #a7a7b0;
+  cursor: pointer;
+}
+
+.video-preview__dialog > header button:hover {
+  border-color: #6657d2;
+  color: #fff;
+}
+
+.video-preview__stage {
+  position: relative;
+  display: grid;
+  width: min(100%, 1020px);
+  max-height: min(66vh, 640px);
+  aspect-ratio: 16 / 9;
+  margin: 0 auto;
+  overflow: hidden;
+  place-items: center;
+  background: radial-gradient(circle at 50% 30%, rgb(122 98 236 / 18%), transparent 45%), #07070a;
+}
+
+.video-preview__stage.ratio-9-16 {
+  width: auto;
+  height: min(66vh, 640px);
+  max-width: 100%;
+  aspect-ratio: 9 / 16;
+}
+
+.video-preview__stage.ratio-1-1 {
+  width: auto;
+  height: min(66vh, 620px);
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+.video-preview__stage > :deep(svg),
+.video-preview__stage > img,
+.video-preview__stage > video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.video-preview__stage > video {
+  background: #000;
+}
+
+.video-preview__dialog > footer {
+  display: grid;
+  min-width: 0;
+  gap: 11px;
+  padding: 14px 15px 15px;
+  border-top: 1px solid #24242b;
+  background: #111115;
+}
+
+.video-preview__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.video-preview__meta span {
+  padding: 4px 7px;
+  border: 1px solid #2c2c34;
+  border-radius: 5px;
+  background: #18181e;
+  color: #aaaab4;
+  font-size: 7px;
+}
+
+.video-preview__dialog > footer > p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #c8c8d0;
+  font-size: 9px;
+  line-height: 1.75;
+}
+
+.video-preview__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.video-preview__actions button {
+  display: inline-flex;
+  min-height: 31px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid #34343d;
+  border-radius: 7px;
+  background: #19191f;
+  color: #c2c2ca;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.video-preview__actions button:last-child {
+  border-color: #6656cf;
+  background: linear-gradient(90deg, #604ddb, #8158e3);
+  color: #fff;
+}
+
+.video-preview__actions button:hover {
+  border-color: #8372e8;
+  color: #fff;
+}
+
+.video-notice {
+  position: fixed;
+  bottom: max(24px, calc(env(safe-area-inset-bottom) + 24px));
+  left: 50%;
+  z-index: 10001;
+  max-width: calc(100vw - 36px);
+  padding: 9px 13px;
+  border: 1px solid #454052;
+  border-radius: 7px;
+  background: rgb(24 24 30 / 96%);
+  color: #ececf1;
+  font-size: 9px;
+  line-height: 1.5;
+  text-align: center;
+  transform: translateX(-50%);
+  box-shadow: 0 14px 38px rgb(0 0 0 / 38%);
+  pointer-events: none;
+}
+
 @media (max-width: 1180px) {
   .video-workbench {
     grid-template-columns: 72px 285px minmax(0, 1fr);
@@ -1847,6 +2263,16 @@ onBeforeUnmount(() => {
     gap: 7px;
   }
 
+  .video-gallery__meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .video-gallery__meta > button {
+    width: 31px;
+    height: 31px;
+  }
+
   .video-showcase-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
@@ -1867,6 +2293,47 @@ onBeforeUnmount(() => {
 
   .video-task-actions button {
     flex: 1;
+  }
+
+  .video-preview {
+    align-items: start;
+    padding: 10px;
+  }
+
+  .video-preview__dialog {
+    max-height: calc(100dvh - 20px);
+  }
+
+  .video-preview__dialog > header {
+    padding: 11px 12px;
+  }
+
+  .video-preview__stage {
+    width: 100%;
+    max-height: 54vh;
+  }
+
+  .video-preview__stage.ratio-9-16 {
+    width: auto;
+    height: min(54vh, 560px);
+  }
+
+  .video-preview__stage.ratio-1-1 {
+    width: auto;
+    height: min(54vh, 540px);
+  }
+
+  .video-preview__dialog > footer {
+    padding: 12px;
+  }
+
+  .video-preview__actions button {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .video-notice {
+    bottom: max(82px, calc(env(safe-area-inset-bottom) + 82px));
   }
 }
 
