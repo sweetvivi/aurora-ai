@@ -12,11 +12,14 @@ import {
 } from '@ant-design/icons-vue';
 import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { agentCapabilityOptions, type AgentCapabilityId } from '@/data/agents';
 import { type AgentDraft, useAgentWorkspaceStore } from '@/stores/agent-workspace';
 
 const router = useRouter();
 const workspace = useAgentWorkspaceStore();
-const activePanel = ref<'ui' | 'dialog'>('ui');
+const uiPanelOpen = ref(true);
+const dialogPanelOpen = ref(true);
+const tagMenuOpen = ref(false);
 const published = ref(false);
 const saved = ref(false);
 const dialogMode = ref('normal');
@@ -24,6 +27,7 @@ const previewPrompt = ref('');
 const previewReply = ref('');
 const draftId = `custom-agent-${Date.now().toString(36)}`;
 const draft = reactive<AgentDraft>({
+  capabilities: [],
   description: '',
   id: draftId,
   instructions: '',
@@ -57,6 +61,7 @@ const previewLines = computed(() => {
 function snapshotDraft(): AgentDraft {
   return {
     ...draft,
+    capabilities: [...draft.capabilities],
     starterPrompts: [...draft.starterPrompts],
     tags: [...draft.tags],
   };
@@ -86,6 +91,16 @@ function toggleTag(tag: string): void {
     draft.tags = draft.tags.filter((item) => item !== tag);
   } else {
     draft.tags = [...draft.tags, tag];
+  }
+
+  saved.value = false;
+}
+
+function toggleCapability(capabilityId: AgentCapabilityId): void {
+  if (draft.capabilities.includes(capabilityId)) {
+    draft.capabilities = draft.capabilities.filter((item) => item !== capabilityId);
+  } else {
+    draft.capabilities = [...draft.capabilities, capabilityId];
   }
 
   saved.value = false;
@@ -179,25 +194,40 @@ function sendPreview(): void {
 
         <div class="agent-field">
           <strong>标签</strong>
-          <div class="agent-tag-picker">
+          <div class="agent-tag-select">
             <button
-              v-for="tag in tagOptions"
-              :key="tag"
+              class="agent-tag-select__control"
               type="button"
-              :class="{ active: draft.tags.includes(tag) }"
-              @click="toggleTag(tag)"
+              :aria-expanded="tagMenuOpen"
+              @click="tagMenuOpen = !tagMenuOpen"
             >
-              {{ tag }}
+              <span v-if="draft.tags.length === 0" class="agent-tag-select__placeholder">
+                请选择标签
+              </span>
+              <span v-for="tag in draft.tags" :key="tag" class="agent-tag-select__value">
+                {{ tag }}
+              </span>
+              <DownOutlined :class="{ open: tagMenuOpen }" />
             </button>
+            <div v-if="tagMenuOpen" class="agent-tag-select__menu">
+              <label v-for="tag in tagOptions" :key="tag">
+                <input
+                  type="checkbox"
+                  :checked="draft.tags.includes(tag)"
+                  @change="toggleTag(tag)"
+                />
+                <span>{{ tag }}</span>
+              </label>
+            </div>
           </div>
         </div>
 
         <section class="agent-collapse">
-          <button type="button" @click="activePanel = 'ui'">
+          <button type="button" @click="uiPanelOpen = !uiPanelOpen">
             <span>界面定制</span>
-            <DownOutlined :class="{ open: activePanel === 'ui' }" />
+            <DownOutlined :class="{ open: uiPanelOpen }" />
           </button>
-          <div v-if="activePanel === 'ui'" class="agent-collapse__body">
+          <div v-if="uiPanelOpen" class="agent-collapse__body">
             <strong>对话模式</strong>
             <label>
               <input v-model="dialogMode" type="radio" value="normal" />
@@ -211,14 +241,11 @@ function sendPreview(): void {
         </section>
 
         <section class="agent-collapse">
-          <button type="button" @click="activePanel = 'dialog'">
+          <button type="button" @click="dialogPanelOpen = !dialogPanelOpen">
             <span>对话配置</span>
-            <DownOutlined :class="{ open: activePanel === 'dialog' }" />
+            <DownOutlined :class="{ open: dialogPanelOpen }" />
           </button>
-          <div
-            v-if="activePanel === 'dialog'"
-            class="agent-collapse__body agent-collapse__body--dialog"
-          >
+          <div v-if="dialogPanelOpen" class="agent-collapse__body agent-collapse__body--dialog">
             <p>对话模式已选择普通对话，可以继续配置开场白和推荐问题。</p>
             <label class="agent-field">
               <strong>开场白</strong>
@@ -242,9 +269,32 @@ function sendPreview(): void {
                 placeholder="请输入第三个推荐问题"
               />
             </div>
-            <div class="agent-upload">
-              <UploadOutlined />
-              <span>上传</span>
+            <div class="agent-field">
+              <strong>参考示例</strong>
+              <div class="agent-upload">
+                <UploadOutlined />
+                <span>上传</span>
+              </div>
+            </div>
+            <div class="agent-field">
+              <strong>模块能力 <small>（可多选）</small></strong>
+              <div class="agent-capability-grid">
+                <label
+                  v-for="capability in agentCapabilityOptions"
+                  :key="capability.id"
+                  :class="{ active: draft.capabilities.includes(capability.id) }"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="draft.capabilities.includes(capability.id)"
+                    @change="toggleCapability(capability.id)"
+                  />
+                  <span class="agent-capability-grid__check">
+                    <CheckOutlined v-if="draft.capabilities.includes(capability.id)" />
+                  </span>
+                  {{ capability.label }}
+                </label>
+              </div>
             </div>
           </div>
         </section>
@@ -478,6 +528,12 @@ function sendPreview(): void {
   font-weight: 700;
 }
 
+.agent-field > strong small {
+  color: #98a0ad;
+  font-size: 10px;
+  font-weight: 500;
+}
+
 .agent-field > strong i {
   margin-right: 2px;
   color: #f05b5b;
@@ -534,28 +590,86 @@ function sendPreview(): void {
   font-size: 10px;
 }
 
-.agent-tag-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
+.agent-tag-select {
+  position: relative;
 }
 
-.agent-tag-picker button {
-  height: 30px;
-  padding: 0 10px;
-  border: 1px solid #dfe3e9;
-  border-radius: 999px;
+.agent-tag-select__control {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 36px 5px 11px;
+  border: 1px solid #dfe2e8;
+  border-radius: 6px;
   background: #fff;
-  color: #687180;
-  font-size: 10px;
+  color: #596273;
+  font-size: 11px;
+  text-align: left;
   cursor: pointer;
 }
 
-.agent-tag-picker button.active {
-  border-color: #adc8f8;
+.agent-tag-select__control > svg {
+  position: absolute;
+  right: 12px;
+  color: #9aa2ae;
+  font-size: 10px;
+  transition: transform 160ms ease;
+}
+
+.agent-tag-select__control > svg.open {
+  transform: rotate(180deg);
+}
+
+.agent-tag-select__placeholder {
+  color: #b1b7c1;
+}
+
+.agent-tag-select__value {
+  padding: 3px 7px;
+  border-radius: 4px;
   background: #edf4ff;
   color: #3979ed;
-  font-weight: 700;
+  white-space: nowrap;
+}
+
+.agent-tag-select__menu {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 5px);
+  right: 0;
+  left: 0;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid #dfe4eb;
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgb(42 58 84 / 14%);
+}
+
+.agent-tag-select__menu label {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 5px;
+  color: #596273;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.agent-tag-select__menu label:hover {
+  background: #f5f8fc;
+}
+
+.agent-tag-select__menu input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #3979ed;
 }
 
 .agent-select {
@@ -651,6 +765,60 @@ function sendPreview(): void {
   border-radius: 7px;
   color: #808997;
   font-size: 10px;
+  cursor: pointer;
+}
+
+.agent-capability-grid {
+  display: grid;
+  gap: 9px 18px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.agent-capability-grid label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: #717a89;
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.agent-capability-grid input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.agent-capability-grid__check {
+  display: grid;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  place-items: center;
+  border: 1px solid #cfd5dd;
+  border-radius: 3px;
+  background: #fff;
+  color: #fff;
+}
+
+.agent-capability-grid__check :deep(svg) {
+  width: 8px;
+  height: 8px;
+}
+
+.agent-capability-grid label.active {
+  color: #3979ed;
+}
+
+.agent-capability-grid label.active .agent-capability-grid__check {
+  border-color: #3979ed;
+  background: #3979ed;
 }
 
 .agent-collapse--static > button {
@@ -786,6 +954,10 @@ function sendPreview(): void {
   .agent-create__preview {
     display: none;
   }
+
+  .agent-capability-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 600px) {
@@ -795,6 +967,10 @@ function sendPreview(): void {
 
   .agent-create__form {
     padding: 14px 12px 54px;
+  }
+
+  .agent-capability-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

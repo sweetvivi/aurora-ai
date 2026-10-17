@@ -3,7 +3,9 @@ import {
   BgColorsOutlined,
   CheckOutlined,
   CloseOutlined,
+  CommentOutlined,
   DeleteOutlined,
+  DownOutlined,
   DownloadOutlined,
   EditOutlined,
   ExperimentOutlined,
@@ -12,10 +14,15 @@ import {
   PictureOutlined,
   PlusOutlined,
   ReloadOutlined,
+  RedoOutlined,
   ScanOutlined,
   ScissorOutlined,
+  SendOutlined,
   StarOutlined,
   ThunderboltFilled,
+  UndoOutlined,
+  ZoomInOutlined,
+  ZoomOutOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -51,6 +58,12 @@ interface SourceImage {
   url: string;
 }
 
+interface RetouchModelOption {
+  description: string;
+  label: string;
+  value: string;
+}
+
 const generationModels: ModelOption[] = [
   { accent: '#7157e8', label: '极光光影 2.1', value: 'generation-light-2' },
   { accent: '#2f8ddb', label: '高清写实 4.0', value: 'generation-realistic-4' },
@@ -58,6 +71,11 @@ const generationModels: ModelOption[] = [
   { accent: '#d36c9b', label: '插画设计 3.0', value: 'generation-illustration-3' },
   { accent: '#d99a36', label: '国风水墨 1.8', value: 'generation-ink-1' },
   { accent: '#3979d5', label: '概念场景 2.4', value: 'generation-scene-2' },
+];
+
+const retouchModels: RetouchModelOption[] = [
+  { description: '快速修图与日常增强', label: 'Seedream 5.0 Lite', value: 'seedream-5-lite' },
+  { description: '更精细的人像与商品细节', label: 'Seedream 5.0 Pro', value: 'seedream-5-pro' },
 ];
 
 const retouchOperations: RetouchOperation[] = [
@@ -128,10 +146,14 @@ const prompt = ref('');
 const instruction = ref('');
 const selectedAmount = ref(1);
 const selectedModel = ref(generationModels[0]?.value ?? 'generation-light-2');
+const selectedRetouchModel = ref(retouchModels[0]?.value ?? 'seedream-5-lite');
 const selectedOperation = ref(retouchOperations[0]?.value ?? 'enhance');
 const selectedRatio = ref('智能比例');
 const selectedSize = ref('2K');
 const retouchStrength = ref(65);
+const legacyRetouchMode = ref(false);
+const canvasZoom = ref(100);
+const selectedCanvasWorkId = ref('');
 const sourceError = ref('');
 const sourceImage = ref<SourceImage | null>(null);
 const sourceInput = ref<HTMLInputElement | null>(null);
@@ -152,10 +174,29 @@ const activeModelLabel = computed(
   () =>
     generationModels.find((item) => item.value === selectedModel.value)?.label ?? '图片生成模型',
 );
+const activeRetouchModelLabel = computed(
+  () =>
+    retouchModels.find((item) => item.value === selectedRetouchModel.value)?.label ?? '智能修图',
+);
 const generationCost = computed(() =>
   isGeneration.value ? selectedAmount.value * IMAGE_TASK_POINTS_COST : IMAGE_TASK_POINTS_COST,
 );
 const visibleWorks = computed(() => workspace.works.filter((work) => work.tool === toolKey.value));
+const latestCanvasWork = computed(() =>
+  visibleWorks.value.find((work) => work.status === 'done' && work.artworkUrl),
+);
+const activeCanvasWork = computed(
+  () =>
+    visibleWorks.value.find(
+      (work) => work.id === selectedCanvasWorkId.value && work.status === 'done' && work.artworkUrl,
+    ) ?? latestCanvasWork.value,
+);
+const canvasImageUrl = computed(
+  () => activeCanvasWork.value?.artworkUrl ?? sourceImage.value?.url ?? '',
+);
+const canvasImageName = computed(
+  () => activeCanvasWork.value?.prompt ?? sourceImage.value?.name ?? '',
+);
 const submitting = computed(() => workspace.submitting || uploading.value);
 const canSubmit = computed(() => {
   if (submitting.value) {
@@ -172,12 +213,23 @@ function resetLocalForm(): void {
   selectedRatio.value = '智能比例';
   selectedSize.value = '2K';
   retouchStrength.value = 65;
+  legacyRetouchMode.value = false;
+  canvasZoom.value = 100;
+  selectedCanvasWorkId.value = '';
   sourceError.value = '';
 
   if (sourceImage.value) {
     URL.revokeObjectURL(sourceImage.value.url);
     sourceImage.value = null;
   }
+}
+
+function changeCanvasZoom(delta: number): void {
+  canvasZoom.value = Math.min(200, Math.max(25, canvasZoom.value + delta));
+}
+
+function selectCanvasWork(workId: string): void {
+  selectedCanvasWorkId.value = workId;
 }
 
 async function handleSourceUpload(event: Event): Promise<void> {
@@ -250,8 +302,8 @@ async function submitTask(): Promise<void> {
           operation: operation?.value,
           strength: retouchStrength.value,
         },
-    model: isGeneration.value ? selectedModel.value : 'smart-retouch',
-    modelLabel: isGeneration.value ? activeModelLabel.value : (operation?.label ?? '智能修图'),
+    model: isGeneration.value ? selectedModel.value : selectedRetouchModel.value,
+    modelLabel: isGeneration.value ? activeModelLabel.value : activeRetouchModelLabel.value,
     prompt: taskPrompt,
     ratio: isGeneration.value ? selectedRatio.value : '保持原图',
     size: isGeneration.value ? selectedSize.value : selectedSize.value,
@@ -303,7 +355,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="image-tool-view">
+  <section v-if="isGeneration || legacyRetouchMode" class="image-tool-view">
     <header class="image-tool-header">
       <div class="image-tool-header__copy">
         <span>{{ isGeneration ? 'IMAGE CREATION' : 'SMART RETOUCH' }}</span>
@@ -604,6 +656,234 @@ onBeforeUnmount(() => {
         </div>
       </main>
     </div>
+  </section>
+
+  <section v-else class="retouch-studio">
+    <main class="retouch-canvas">
+      <header class="retouch-canvas__header">
+        <div>
+          <span class="retouch-canvas__title-icon"><ExperimentOutlined /></span>
+          <strong>我的创作</strong>
+          <small>（{{ visibleWorks.length }} 张图片）</small>
+        </div>
+        <button type="button" @click="legacyRetouchMode = true">
+          <UndoOutlined />
+          返回旧版
+        </button>
+      </header>
+
+      <div class="retouch-canvas__workspace">
+        <div v-if="canvasImageUrl" class="retouch-canvas__artwork">
+          <img
+            :src="canvasImageUrl"
+            :alt="canvasImageName || '当前修图作品'"
+            :style="{ transform: `scale(${canvasZoom / 100})` }"
+          />
+          <span v-if="activeCanvasWork">{{ activeCanvasWork.modelLabel }}</span>
+        </div>
+
+        <div v-else class="retouch-empty-guide">
+          <div class="retouch-empty-guide__title">
+            <span>修图示例</span>
+            <small>动动嘴，一部 P 图</small>
+          </div>
+          <div class="retouch-empty-guide__examples" aria-label="智能修图能力示例">
+            <article>
+              <strong>换个发型</strong>
+              <i class="example-portrait example-portrait--hair" />
+            </article>
+            <article>
+              <strong>换个穿搭</strong>
+              <i class="example-portrait example-portrait--outfit" />
+            </article>
+            <article>
+              <strong>换个背景</strong>
+              <i class="example-portrait example-portrait--scene" />
+            </article>
+            <article>
+              <strong>一键抠图</strong>
+              <i class="example-portrait example-portrait--cutout" />
+            </article>
+          </div>
+          <p>上传图片后，在右侧输入修改效果即可开始</p>
+        </div>
+      </div>
+
+      <footer class="retouch-canvas__toolbar">
+        <input
+          ref="sourceInput"
+          type="file"
+          accept="image/*"
+          hidden
+          :disabled="uploading"
+          @change="handleSourceUpload"
+        />
+        <button
+          type="button"
+          class="retouch-toolbar__add"
+          :disabled="uploading"
+          @click="sourceInput?.click()"
+        >
+          <LoadingOutlined v-if="uploading" />
+          <PlusOutlined v-else />
+          <span>{{ uploading ? '上传中' : '添加' }}</span>
+        </button>
+        <div class="retouch-toolbar__zoom">
+          <button type="button" aria-label="缩小画布" @click="changeCanvasZoom(-10)">
+            <ZoomOutOutlined />
+          </button>
+          <span>{{ canvasZoom }}%</span>
+          <button type="button" aria-label="放大画布" @click="changeCanvasZoom(10)">
+            <ZoomInOutlined />
+          </button>
+        </div>
+        <div class="retouch-toolbar__history">
+          <button type="button" disabled aria-label="撤销">
+            <UndoOutlined />
+            <span>撤销</span>
+          </button>
+          <button type="button" disabled aria-label="恢复">
+            <RedoOutlined />
+            <span>恢复</span>
+          </button>
+        </div>
+      </footer>
+
+      <div v-if="workspace.error || sourceError" class="retouch-canvas__notice" role="alert">
+        <span>{{ workspace.error?.message || sourceError }}</span>
+        <button
+          type="button"
+          @click="workspace.error ? workspace.clearError() : (sourceError = '')"
+        >
+          关闭
+        </button>
+      </div>
+    </main>
+
+    <aside class="retouch-chat">
+      <header class="retouch-chat__new-project">
+        <span><PlusOutlined /></span>
+        <div>
+          <strong>新建项目</strong>
+          <small>开始新的修图对话</small>
+        </div>
+        <DownOutlined />
+      </header>
+
+      <div class="retouch-chat__body">
+        <div v-if="visibleWorks.length > 0" class="retouch-history">
+          <span class="retouch-history__label">最近创作</span>
+          <button
+            v-for="work in visibleWorks.slice(0, 5)"
+            :key="work.id"
+            type="button"
+            :class="{ active: activeCanvasWork?.id === work.id }"
+            @click="selectCanvasWork(work.id)"
+          >
+            <i>
+              <img
+                v-if="work.status === 'done' && work.artworkUrl"
+                :src="work.artworkUrl"
+                :alt="work.prompt"
+              />
+              <LoadingOutlined
+                v-else-if="work.status === 'generating' || work.status === 'queued'"
+              />
+              <CloseOutlined v-else />
+            </i>
+            <span>
+              <strong>{{ work.prompt }}</strong>
+              <small
+                >{{ workStatusLabel(work.status) }} · {{ formatWorkTime(work.createdAt) }}</small
+              >
+            </span>
+          </button>
+        </div>
+
+        <div v-else class="retouch-chat__empty">
+          <div class="retouch-chat__empty-mark">
+            <CommentOutlined />
+            <CommentOutlined />
+          </div>
+          <strong>开始您的 AI 修图之旅吧~</strong>
+          <button type="button" @click="sourceInput?.click()">查看示例演示 ✦</button>
+        </div>
+      </div>
+
+      <footer class="retouch-composer">
+        <div v-if="sourceImage" class="retouch-composer__source">
+          <img :src="sourceImage.url" :alt="sourceImage.name" />
+          <span>
+            <strong>{{ sourceImage.name }}</strong>
+            <small>原图已就绪</small>
+          </span>
+          <button type="button" aria-label="移除原图" @click="removeSource">
+            <CloseOutlined />
+          </button>
+        </div>
+
+        <div class="retouch-composer__operations">
+          <button
+            v-for="operation in retouchOperations"
+            :key="operation.value"
+            type="button"
+            :class="{ active: selectedOperation === operation.value }"
+            @click="selectedOperation = operation.value"
+          >
+            <component :is="operation.icon" />
+            {{ operation.label }}
+          </button>
+        </div>
+
+        <label class="retouch-composer__input">
+          <textarea
+            v-model="instruction"
+            maxlength="600"
+            placeholder="输入您想要的修改效果（@ 选择图片，/ 修图指令）"
+            @keydown.enter.exact.prevent="submitTask"
+          />
+        </label>
+
+        <div class="retouch-composer__actions">
+          <div>
+            <button
+              type="button"
+              class="retouch-composer__icon-button"
+              aria-label="上传图片"
+              :disabled="uploading"
+              @click="sourceInput?.click()"
+            >
+              <LoadingOutlined v-if="uploading" />
+              <PictureOutlined v-else />
+            </button>
+            <label class="retouch-composer__model">
+              <PictureOutlined />
+              <select v-model="selectedRetouchModel" aria-label="修图模型">
+                <option v-for="model in retouchModels" :key="model.value" :value="model.value">
+                  {{ model.label }}
+                </option>
+              </select>
+              <DownOutlined />
+            </label>
+          </div>
+          <button
+            type="button"
+            class="retouch-composer__submit"
+            :disabled="!canSubmit"
+            aria-label="提交修图"
+            @click="submitTask"
+          >
+            <LoadingOutlined v-if="submitting" />
+            <SendOutlined v-else />
+          </button>
+        </div>
+
+        <div class="retouch-composer__meta">
+          <span>{{ activeOperation?.label }} · {{ retouchStrength }}%</span>
+          <span>本次消耗 {{ generationCost }} 积分 · 余额 {{ sessionStore.points }}</span>
+        </div>
+      </footer>
+    </aside>
   </section>
 </template>
 
@@ -1320,9 +1600,796 @@ onBeforeUnmount(() => {
   font-size: 8px;
 }
 
+.retouch-studio {
+  display: grid;
+  min-height: calc(100vh - 56px);
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 20px;
+  overflow-x: hidden;
+  padding: 20px;
+  background: radial-gradient(circle at 42% 20%, rgb(58 75 139 / 12%), transparent 34%), #080b14;
+  color: #f4f6ff;
+}
+
+.retouch-canvas,
+.retouch-chat {
+  min-width: 0;
+  border: 1px solid #20263b;
+  border-radius: 18px;
+  background: #0d1120;
+  box-shadow: 0 22px 60px rgb(0 0 0 / 28%);
+}
+
+.retouch-canvas {
+  position: relative;
+  display: grid;
+  min-height: 720px;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.retouch-canvas::before {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(115 128 170 / 6%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(115 128 170 / 6%) 1px, transparent 1px);
+  background-size: 28px 28px;
+  content: '';
+  pointer-events: none;
+}
+
+.retouch-canvas__header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 20px;
+}
+
+.retouch-canvas__header > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.retouch-canvas__title-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #8d63ff, #3e275f);
+  color: #fff;
+  font-size: 13px;
+}
+
+.retouch-canvas__header strong {
+  font-size: 14px;
+  font-weight: 780;
+}
+
+.retouch-canvas__header small {
+  overflow: hidden;
+  color: #8089a3;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retouch-canvas__header button {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid #53a7ff;
+  border-radius: 7px;
+  background: #172743;
+  color: #59a9ff;
+  font-size: 11px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.retouch-canvas__workspace {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  overflow: auto;
+  padding: 24px;
+}
+
+.retouch-canvas__artwork {
+  position: relative;
+  display: grid;
+  width: min(100%, 880px);
+  height: min(100%, 640px);
+  place-items: center;
+}
+
+.retouch-canvas__artwork img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 4px;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 42%);
+  object-fit: contain;
+  transform-origin: center;
+  transition: transform 180ms ease;
+}
+
+.retouch-canvas__artwork > span {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 5px 8px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 6px;
+  background: rgb(8 11 20 / 78%);
+  color: #c5cbe0;
+  font-size: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.retouch-empty-guide {
+  display: grid;
+  width: min(100%, 520px);
+  justify-items: center;
+  gap: 22px;
+}
+
+.retouch-empty-guide__title {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+}
+
+.retouch-empty-guide__title span {
+  background: linear-gradient(90deg, #f65ce8, #aa66ff 54%, #52a7ff);
+  background-clip: text;
+  color: transparent;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.retouch-empty-guide__title small {
+  color: #a49ac3;
+  font-size: 10px;
+}
+
+.retouch-empty-guide__examples {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.retouch-empty-guide__examples article {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid #2a3046;
+  background: #0a0e1a;
+}
+
+.retouch-empty-guide__examples strong {
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  z-index: 2;
+  padding: 3px 8px;
+  background: #0b0f1c;
+  color: #f3f5ff;
+  font-size: 10px;
+  font-weight: 780;
+  text-align: center;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
+.example-portrait {
+  position: relative;
+  display: block;
+  height: 172px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, transparent 42%, rgb(15 18 28 / 32%) 43%),
+    linear-gradient(135deg, #d9d1cb, #968a83 48%, #554d4a);
+}
+
+.example-portrait::before {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  width: 52px;
+  height: 60px;
+  border-radius: 50% 50% 44% 44%;
+  background: #f0c2ab;
+  box-shadow: 0 -16px 0 8px #3a2928;
+  content: '';
+  transform: translateX(-50%);
+}
+
+.example-portrait::after {
+  position: absolute;
+  bottom: -26px;
+  left: 50%;
+  width: 118px;
+  height: 118px;
+  border-radius: 52% 52% 0 0;
+  background: #e8ecef;
+  content: '';
+  transform: translateX(-50%);
+}
+
+.example-portrait--hair::after {
+  background: #e8ecef;
+}
+
+.example-portrait--outfit {
+  background:
+    linear-gradient(180deg, transparent 42%, rgb(15 18 28 / 28%) 43%),
+    linear-gradient(135deg, #b7d1df, #4f8394 48%, #273f46);
+}
+
+.example-portrait--outfit::after {
+  background: #75a9bf;
+}
+
+.example-portrait--scene {
+  background:
+    linear-gradient(180deg, transparent 42%, rgb(15 18 28 / 28%) 43%),
+    linear-gradient(135deg, #ebc58e, #c26d4c 48%, #473140);
+}
+
+.example-portrait--scene::after {
+  background: #dea78d;
+}
+
+.example-portrait--cutout {
+  background:
+    linear-gradient(45deg, #dadde2 25%, transparent 25%),
+    linear-gradient(-45deg, #dadde2 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #dadde2 75%),
+    linear-gradient(-45deg, transparent 75%, #dadde2 75%), #f3f4f6;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+}
+
+.example-portrait--cutout::after {
+  background: #f0f1f4;
+}
+
+.retouch-empty-guide > p {
+  margin: 0;
+  color: #707a96;
+  font-size: 11px;
+}
+
+.retouch-canvas__toolbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-top: 1px solid rgb(255 255 255 / 5%);
+  background: rgb(9 13 23 / 72%);
+}
+
+.retouch-canvas__toolbar button {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid #353b53;
+  background: #151b2b;
+  color: #7d849a;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.retouch-canvas__toolbar button:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.retouch-toolbar__add {
+  border-color: #367a69 !important;
+  color: #62c5a7 !important;
+}
+
+.retouch-canvas__toolbar .retouch-toolbar__add {
+  min-width: 76px;
+  height: 54px;
+  flex-direction: column;
+  border-radius: 8px 0 0 8px;
+  font-size: 15px;
+}
+
+.retouch-toolbar__add span {
+  font-size: 10px;
+}
+
+.retouch-toolbar__zoom {
+  display: flex;
+  height: 38px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #353b53;
+  border-radius: 7px;
+}
+
+.retouch-toolbar__zoom button {
+  border: 0;
+  background: transparent;
+}
+
+.retouch-toolbar__zoom span {
+  min-width: 54px;
+  color: #be7df1;
+  font-size: 10px;
+  text-align: center;
+}
+
+.retouch-toolbar__history {
+  display: flex;
+  gap: 6px;
+}
+
+.retouch-toolbar__history button {
+  min-width: 58px;
+  height: 54px;
+  flex-direction: column;
+  border-radius: 8px;
+}
+
+.retouch-toolbar__history span {
+  font-size: 9px;
+}
+
+.retouch-canvas__notice {
+  position: absolute;
+  top: 72px;
+  right: 18px;
+  z-index: 5;
+  display: flex;
+  max-width: min(440px, calc(100% - 36px));
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #7c3f49;
+  border-radius: 8px;
+  background: rgb(52 22 29 / 92%);
+  color: #ffc1c7;
+  font-size: 11px;
+}
+
+.retouch-canvas__notice span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retouch-canvas__notice button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.retouch-chat {
+  display: grid;
+  min-height: 720px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.retouch-chat__new-project {
+  display: grid;
+  min-height: 68px;
+  align-items: center;
+  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  padding: 0 16px;
+  border-bottom: 1px solid #20263b;
+  background: #121729;
+}
+
+.retouch-chat__new-project > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #252044, #8a55e8);
+  color: #fff;
+}
+
+.retouch-chat__new-project > div {
+  display: grid;
+  gap: 2px;
+}
+
+.retouch-chat__new-project strong {
+  font-size: 13px;
+}
+
+.retouch-chat__new-project small {
+  color: #747d95;
+  font-size: 9px;
+}
+
+.retouch-chat__new-project > :deep(svg) {
+  color: #8e97ad;
+  font-size: 12px;
+}
+
+.retouch-chat__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.retouch-history {
+  display: grid;
+  gap: 8px;
+}
+
+.retouch-history__label {
+  padding: 2px 3px 4px;
+  color: #6e7891;
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.retouch-history button {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  padding: 8px;
+  border: 1px solid #252b40;
+  border-radius: 10px;
+  background: #111728;
+  color: #dfe4f3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.retouch-history button.active {
+  border-color: #6b57ac;
+  background: #191a32;
+  box-shadow: inset 3px 0 0 #8e68f0;
+}
+
+.retouch-history button > i {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #20263a;
+  color: #8992a8;
+}
+
+.retouch-history button img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.retouch-history button > span {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.retouch-history button strong {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retouch-history button small {
+  color: #74809a;
+  font-size: 9px;
+}
+
+.retouch-chat__empty {
+  display: grid;
+  min-height: 440px;
+  place-items: center;
+  align-content: center;
+  gap: 20px;
+  text-align: center;
+}
+
+.retouch-chat__empty-mark {
+  position: relative;
+  width: 62px;
+  height: 48px;
+}
+
+.retouch-chat__empty-mark :deep(svg) {
+  position: absolute;
+  color: #4f566c;
+  font-size: 34px;
+}
+
+.retouch-chat__empty-mark :deep(svg:first-child) {
+  top: 0;
+  left: 0;
+}
+
+.retouch-chat__empty-mark :deep(svg:last-child) {
+  right: 0;
+  bottom: 0;
+  color: #3d4357;
+}
+
+.retouch-chat__empty strong {
+  color: #717a90;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.retouch-chat__empty button {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid #6a548e;
+  border-radius: 8px;
+  background: #332450;
+  color: #e9dcff;
+  font-size: 11px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.retouch-composer {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid #22283d;
+  background: #101526;
+}
+
+.retouch-composer__source {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  grid-template-columns: 40px minmax(0, 1fr) 28px;
+  padding: 7px;
+  border: 1px solid #2b324b;
+  border-radius: 9px;
+  background: #171d30;
+}
+
+.retouch-composer__source img {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.retouch-composer__source > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.retouch-composer__source strong {
+  overflow: hidden;
+  color: #e4e8f5;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retouch-composer__source small {
+  color: #77819a;
+  font-size: 9px;
+}
+
+.retouch-composer__source button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #858da2;
+  cursor: pointer;
+}
+
+.retouch-composer__operations {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.retouch-composer__operations::-webkit-scrollbar {
+  display: none;
+}
+
+.retouch-composer__operations button {
+  display: inline-flex;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid #2a3148;
+  border-radius: 999px;
+  background: #161c2e;
+  color: #8d96ac;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.retouch-composer__operations button.active {
+  border-color: #735bb0;
+  background: #28203f;
+  color: #d9c8ff;
+}
+
+.retouch-composer__input {
+  display: block;
+}
+
+.retouch-composer__input textarea {
+  display: block;
+  width: 100%;
+  min-height: 90px;
+  padding: 12px;
+  border: 1px solid #293149;
+  border-radius: 10px;
+  outline: 0;
+  background: #151b2d;
+  color: #f1f3fa;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.retouch-composer__input textarea:focus {
+  border-color: #755eb0;
+  box-shadow: 0 0 0 3px rgb(122 91 199 / 12%);
+}
+
+.retouch-composer__input textarea::placeholder {
+  color: #697289;
+}
+
+.retouch-composer__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.retouch-composer__actions > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.retouch-composer__icon-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #2a3248;
+  border-radius: 8px;
+  background: #171d2f;
+  color: #d6dbea;
+  cursor: pointer;
+}
+
+.retouch-composer__model {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid #2a3248;
+  border-radius: 8px;
+  background: #171d2f;
+  color: #e7eaf4;
+}
+
+.retouch-composer__model :deep(svg) {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
+.retouch-composer__model select {
+  min-width: 0;
+  max-width: 150px;
+  appearance: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.retouch-composer__model option {
+  background: #171d2f;
+  color: #fff;
+}
+
+.retouch-composer__submit {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #7049dc, #9e5cf2);
+  color: #fff;
+  cursor: pointer;
+}
+
+.retouch-composer__submit:disabled {
+  background: #30364a;
+  color: #737b90;
+  cursor: not-allowed;
+}
+
+.retouch-composer__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #68728b;
+  font-size: 8px;
+}
+
 @media (max-width: 1060px) {
   .image-tool-layout {
     grid-template-columns: 340px minmax(0, 1fr);
+  }
+
+  .retouch-studio {
+    grid-template-columns: minmax(0, 1fr) 350px;
+    gap: 14px;
+    padding: 14px;
   }
 }
 
@@ -1353,6 +2420,24 @@ onBeforeUnmount(() => {
   .image-tool-panel {
     position: static;
   }
+
+  .retouch-studio {
+    min-height: calc(100vh - 56px);
+    grid-template-columns: 1fr;
+    padding: 12px 12px 78px;
+  }
+
+  .retouch-canvas {
+    min-height: 560px;
+  }
+
+  .retouch-chat {
+    min-height: 620px;
+  }
+
+  .retouch-chat__empty {
+    min-height: 280px;
+  }
 }
 
 @media (max-width: 500px) {
@@ -1371,6 +2456,50 @@ onBeforeUnmount(() => {
 
   .image-tool-empty {
     min-height: 360px;
+  }
+
+  .retouch-studio {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .retouch-canvas,
+  .retouch-chat {
+    border-radius: 13px;
+  }
+
+  .retouch-canvas__header {
+    padding: 0 12px;
+  }
+
+  .retouch-canvas__header button {
+    padding: 0 9px;
+    font-size: 9px;
+  }
+
+  .retouch-canvas__workspace {
+    padding: 16px 10px;
+  }
+
+  .retouch-empty-guide {
+    gap: 15px;
+  }
+
+  .retouch-empty-guide__examples {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .example-portrait {
+    height: 130px;
+  }
+
+  .retouch-canvas__toolbar {
+    flex-wrap: wrap;
+    padding: 8px;
+  }
+
+  .retouch-composer__model select {
+    max-width: 116px;
   }
 }
 </style>

@@ -58,6 +58,7 @@ describe('agent workspace store', () => {
 
     store.toggleFavorite('visual-prompt');
     store.publishDraft({
+      capabilities: ['web-search', 'smart-chart'],
       description: '整理产品需求并输出验收清单。',
       id: 'custom-product-helper',
       instructions: '先澄清目标，再输出结构化结果。',
@@ -76,6 +77,7 @@ describe('agent workspace store', () => {
     expect(restoredStore.customAgents).toEqual([
       expect.objectContaining({
         category: '我的智能体',
+        capabilities: ['web-search', 'smart-chart'],
         id: 'custom-product-helper',
         name: '产品验收助手',
       }),

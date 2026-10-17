@@ -1,4 +1,49 @@
+export type AgentCapabilityId =
+  | 'ai-drawing'
+  | 'ai-video'
+  | 'ai-retouch'
+  | 'code'
+  | 'document-report'
+  | 'image-analysis'
+  | 'image-ocr'
+  | 'image-search'
+  | 'math'
+  | 'ppt'
+  | 'web-generation'
+  | 'web-reading'
+  | 'web-research'
+  | 'web-search'
+  | 'web-visualization'
+  | 'smart-chart'
+  | 'small-game';
+
+export interface AgentCapabilityOption {
+  id: AgentCapabilityId;
+  label: string;
+}
+
+export const agentCapabilityOptions: AgentCapabilityOption[] = [
+  { id: 'ai-drawing', label: 'AI 绘画' },
+  { id: 'ai-video', label: 'AI 视频' },
+  { id: 'ai-retouch', label: 'AI 修图' },
+  { id: 'web-search', label: '联网搜索' },
+  { id: 'code', label: '代码能力' },
+  { id: 'ppt', label: 'PPT 生成' },
+  { id: 'math', label: '数学运算' },
+  { id: 'image-analysis', label: '图片分析' },
+  { id: 'image-ocr', label: '图片 OCR' },
+  { id: 'image-search', label: '搜索图片' },
+  { id: 'smart-chart', label: '智能图表' },
+  { id: 'web-generation', label: '生成网页' },
+  { id: 'small-game', label: '小游戏生成' },
+  { id: 'web-reading', label: '网页读取' },
+  { id: 'document-report', label: '生成 PDF 报告' },
+  { id: 'web-research', label: '学术搜索' },
+  { id: 'web-visualization', label: '网页可视化数据' },
+];
+
 export interface AgentCatalogItem {
+  capabilities?: AgentCapabilityId[];
   category: string;
   color: string;
   description: string;

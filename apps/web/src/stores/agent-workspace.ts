@@ -1,6 +1,10 @@
 import { defineStore } from 'pinia';
 import { fetchModels, streamChat } from '@/app/api';
-import type { AgentCatalogItem } from '@/data/agents';
+import {
+  agentCapabilityOptions,
+  type AgentCapabilityId,
+  type AgentCatalogItem,
+} from '@/data/agents';
 import { useSessionStore } from './session';
 
 export type AgentMessageStatus = 'COMPLETED' | 'FAILED' | 'PENDING' | 'STREAMING';
@@ -25,6 +29,7 @@ export interface AgentSession {
 }
 
 export interface AgentDraft {
+  capabilities: AgentCapabilityId[];
   description: string;
   id: string;
   instructions: string;
@@ -172,11 +177,19 @@ function summarizeTitle(content: string): string {
 }
 
 function buildAgentSystemPrompt(agent: AgentCatalogItem): string {
+  const capabilityLabels =
+    agent.capabilities
+      ?.map((capabilityId) => {
+        return agentCapabilityOptions.find((option) => option.id === capabilityId)?.label;
+      })
+      .filter((label): label is string => Boolean(label)) ?? [];
+
   return [
     `你是“${agent.name}”，一个专注于${agent.category}的智能体。`,
     `角色说明：${agent.description}`,
     agent.instructions ? `工作规则：${agent.instructions}` : '',
     agent.tags.length > 0 ? `能力标签：${agent.tags.join('、')}` : '',
+    capabilityLabels.length > 0 ? `启用模块：${capabilityLabels.join('、')}` : '',
     `开场介绍：${agent.opening}`,
     '请始终以第一人称直接回应用户，先解决当前问题，再补充必要说明。',
     '需要更多材料时，请明确列出缺失信息；不得声称已经执行尚未实际执行的外部操作。',
@@ -433,6 +446,7 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
       });
       const existingIndex = this.customAgents.findIndex((agent) => agent.id === savedDraft.id);
       const customAgent: AgentCatalogItem = {
+        capabilities: [...savedDraft.capabilities],
         category: '我的智能体',
         color: customAgentColors[this.customAgents.length % customAgentColors.length] ?? '#3979ed',
         description: savedDraft.description.trim() || '由极光AI创建的专属智能体。',
