@@ -22,12 +22,15 @@ import {
   fetchAdminOverview,
   fetchAdminProviders,
   fetchAdminUsers,
+  importAdminDiscoveredModels,
+  probeAdminProvider,
   updateAdminModel,
   updateAdminProvider,
   updateAdminUser,
   type AdminModel,
   type AdminOverview,
   type AdminProvider,
+  type AdminProviderProbeResult,
   type AdminUser,
 } from '@/app/api';
 
@@ -73,6 +76,13 @@ const providerForm = reactive({
   keyRef: '',
   priority: 100,
 });
+const discoveryModalOpen = ref(false);
+const discoveryProvider = ref<AdminProvider | null>(null);
+const discoveryKey = ref('');
+const discoveryLoading = ref(false);
+const importingDiscoveredModels = ref(false);
+const discoveryResult = ref<AdminProviderProbeResult | null>(null);
+const selectedDiscoveredModels = ref<string[]>([]);
 
 const modelModalOpen = ref(false);
 const editingModel = ref<AdminModel | null>(null);
@@ -102,7 +112,7 @@ const providerColumns = [
   { dataIndex: 'priority', key: 'priority', title: '优先级', width: 84 },
   { dataIndex: '_count', key: 'modelCount', title: '模型数', width: 84 },
   { dataIndex: 'enabled', key: 'enabled', title: '状态', width: 86 },
-  { key: 'actions', title: '操作', width: 92 },
+  { key: 'actions', title: '操作', width: 154 },
 ];
 
 const modelColumns = [
@@ -135,6 +145,12 @@ const completionRate = computed(() => {
   }
 
   return Math.round((overview.value.models.enabled / overview.value.models.total) * 100);
+});
+
+const selectedDiscoveredModelItems = computed(() => {
+  const selected = new Set(selectedDiscoveredModels.value);
+
+  return discoveryResult.value?.models.filter((model) => selected.has(model.providerModel)) ?? [];
 });
 
 async function loadAll(): Promise<void> {
@@ -317,6 +333,104 @@ async function saveProvider(): Promise<void> {
   } finally {
     saving.value = false;
   }
+}
+
+function openDiscoveryModal(provider: AdminProvider): void {
+  discoveryProvider.value = provider;
+  discoveryKey.value = '';
+  discoveryLoading.value = false;
+  discoveryResult.value = null;
+  selectedDiscoveredModels.value = [];
+  discoveryModalOpen.value = true;
+}
+
+function resetDiscovery(): void {
+  discoveryProvider.value = null;
+  discoveryKey.value = '';
+  discoveryLoading.value = false;
+  discoveryResult.value = null;
+  selectedDiscoveredModels.value = [];
+}
+
+async function runProviderProbe(): Promise<void> {
+  if (!discoveryProvider.value) {
+    return;
+  }
+
+  discoveryLoading.value = true;
+  discoveryResult.value = null;
+  selectedDiscoveredModels.value = [];
+
+  try {
+    const result = await probeAdminProvider(discoveryProvider.value.id, {
+      apiKey: discoveryKey.value.trim() || undefined,
+      baseUrl: discoveryProvider.value.baseUrl,
+      protocol: 'openai-compatible',
+      timeoutMs: 15_000,
+    });
+
+    discoveryResult.value = result;
+    selectedDiscoveredModels.value = result.models.map((model) => model.providerModel);
+
+    if (result.modelCount === 0) {
+      message.warning('连接成功，但厂商没有返回可用模型');
+    } else {
+      message.success(`连接成功，发现 ${result.modelCount} 个模型`);
+    }
+  } catch (error) {
+    message.error(getErrorMessage(error));
+  } finally {
+    discoveryLoading.value = false;
+  }
+}
+
+async function importSelectedModels(): Promise<void> {
+  if (!discoveryProvider.value || selectedDiscoveredModelItems.value.length === 0) {
+    message.warning('请至少选择一个模型');
+    return;
+  }
+
+  importingDiscoveredModels.value = true;
+
+  try {
+    const result = await importAdminDiscoveredModels({
+      models: selectedDiscoveredModelItems.value.map((model) => ({
+        capabilities: model.capabilities,
+        displayName: model.displayName,
+        enabled: true,
+        providerModel: model.providerModel,
+      })),
+      providerCode: discoveryProvider.value.code,
+    });
+
+    if (result.imported.length > 0) {
+      message.success(
+        result.skipped.length > 0
+          ? `已导入 ${result.imported.length} 个模型，跳过 ${result.skipped.length} 个重复项`
+          : `已导入 ${result.imported.length} 个模型`,
+      );
+    } else {
+      message.info(`所选 ${result.skipped.length} 个模型均已存在`);
+    }
+
+    discoveryModalOpen.value = false;
+    activeTab.value = 'models';
+    resetDiscovery();
+    await Promise.all([loadModels(), refreshOverview()]);
+  } catch (error) {
+    message.error(getErrorMessage(error));
+  } finally {
+    importingDiscoveredModels.value = false;
+  }
+}
+
+function capabilityLabel(capability: 'chat' | 'embedding' | 'image' | 'video'): string {
+  return {
+    chat: '对话',
+    embedding: '向量',
+    image: '图片',
+    video: '视频',
+  }[capability];
 }
 
 function openModelModal(model?: AdminModel): void {
@@ -647,10 +761,15 @@ onMounted(() => {
                 </a-tag>
               </template>
               <template v-else-if="column.key === 'actions'">
-                <a-button size="small" @click="openProviderModal(record)">
-                  <EditOutlined />
-                  编辑
-                </a-button>
+                <div class="admin-row-actions">
+                  <a-button size="small" @click="openProviderModal(record)">
+                    <EditOutlined />
+                    编辑
+                  </a-button>
+                  <a-button size="small" type="primary" ghost @click="openDiscoveryModal(record)">
+                    检测模型
+                  </a-button>
+                </div>
               </template>
             </template>
           </a-table>
@@ -905,6 +1024,106 @@ onMounted(() => {
           </a-form-item>
         </div>
       </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="discoveryModalOpen"
+      :confirm-loading="importingDiscoveredModels"
+      :ok-button-props="{ disabled: selectedDiscoveredModels.length === 0 }"
+      cancel-text="取消"
+      ok-text="导入所选模型"
+      title="检测厂商模型"
+      width="760px"
+      @cancel="resetDiscovery"
+      @ok="importSelectedModels"
+    >
+      <div class="admin-discovery">
+        <div class="admin-discovery__intro">
+          <strong>{{ discoveryProvider?.displayName }}</strong>
+          <code>{{ discoveryProvider?.baseUrl }}/models</code>
+          <span>检测 Key 仅用于本次请求，不会保存到数据库、日志或页面响应。</span>
+        </div>
+
+        <a-form layout="vertical">
+          <a-form-item label="本次检测 Key（可选）">
+            <a-input-password
+              v-model:value="discoveryKey"
+              autocomplete="new-password"
+              placeholder="留空时使用服务端环境变量"
+              @press-enter="runProviderProbe"
+            />
+          </a-form-item>
+        </a-form>
+
+        <div class="admin-discovery__actions">
+          <a-button :loading="discoveryLoading" type="primary" @click="runProviderProbe">
+            检测连接并读取模型
+          </a-button>
+          <span v-if="discoveryResult">
+            {{ discoveryResult.latencyMs }} ms · 发现 {{ discoveryResult.modelCount }} 个模型
+            <template v-if="discoveryResult.truncated">（仅展示前 200 个）</template>
+          </span>
+        </div>
+
+        <div v-if="discoveryResult" class="admin-discovery__result">
+          <div class="admin-discovery__result-header">
+            <div>
+              <strong>发现的模型</strong>
+              <span
+                >已选择 {{ selectedDiscoveredModels.length }} /
+                {{ discoveryResult.models.length }}</span
+              >
+            </div>
+            <div>
+              <a-button
+                size="small"
+                @click="
+                  selectedDiscoveredModels = discoveryResult.models.map(
+                    (item) => item.providerModel,
+                  )
+                "
+              >
+                全选
+              </a-button>
+              <a-button size="small" @click="selectedDiscoveredModels = []">清空</a-button>
+            </div>
+          </div>
+
+          <a-checkbox-group
+            v-model:value="selectedDiscoveredModels"
+            class="admin-discovery__models"
+          >
+            <label
+              v-for="model in discoveryResult.models"
+              :key="model.providerModel"
+              class="admin-discovery-model"
+            >
+              <a-checkbox :value="model.providerModel" />
+              <span class="admin-discovery-model__body">
+                <strong>{{ model.displayName }}</strong>
+                <code>{{ model.providerModel }}</code>
+              </span>
+              <span class="admin-discovery-model__capabilities">
+                <a-tag
+                  v-for="capability in model.capabilities"
+                  :key="capability"
+                  :color="
+                    capability === 'chat'
+                      ? 'blue'
+                      : capability === 'image'
+                        ? 'purple'
+                        : capability === 'video'
+                          ? 'orange'
+                          : 'default'
+                  "
+                >
+                  {{ capabilityLabel(capability) }}
+                </a-tag>
+              </span>
+            </label>
+          </a-checkbox-group>
+        </div>
+      </div>
     </a-modal>
   </section>
 </template>
@@ -1200,6 +1419,129 @@ onMounted(() => {
   gap: 12px;
 }
 
+.admin-discovery {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-discovery__intro {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid #e6e8ef;
+  border-radius: 8px;
+  background: #f8f9fc;
+}
+
+.admin-discovery__intro strong {
+  color: #252a36;
+  font-size: 14px;
+}
+
+.admin-discovery__intro code {
+  overflow: hidden;
+  color: #6252b8;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-discovery__intro span,
+.admin-discovery__actions span,
+.admin-discovery__result-header span {
+  color: #858d9d;
+  font-size: 11px;
+}
+
+.admin-discovery__actions,
+.admin-discovery__result-header,
+.admin-discovery__result-header > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-discovery__actions {
+  justify-content: space-between;
+}
+
+.admin-discovery__result {
+  overflow: hidden;
+  border: 1px solid #e6e8ef;
+  border-radius: 8px;
+}
+
+.admin-discovery__result-header {
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eceef3;
+  background: #fafbfc;
+}
+
+.admin-discovery__result-header strong,
+.admin-discovery__result-header span {
+  display: block;
+}
+
+.admin-discovery__result-header strong {
+  color: #303644;
+  font-size: 12px;
+}
+
+.admin-discovery__models {
+  display: grid;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.admin-discovery-model {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid #f0f1f5;
+  cursor: pointer;
+}
+
+.admin-discovery-model:last-child {
+  border-bottom: 0;
+}
+
+.admin-discovery-model:hover {
+  background: #faf9ff;
+}
+
+.admin-discovery-model__body {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.admin-discovery-model__body strong,
+.admin-discovery-model__body code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-discovery-model__body strong {
+  color: #303644;
+  font-size: 12px;
+}
+
+.admin-discovery-model__body code {
+  color: #8c94a4;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 10px;
+}
+
+.admin-discovery-model__capabilities {
+  display: flex;
+  gap: 4px;
+}
+
 @media (max-width: 1260px) {
   .admin-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1271,6 +1613,20 @@ onMounted(() => {
   .admin-form-grid {
     grid-template-columns: 1fr;
     gap: 0;
+  }
+
+  .admin-discovery__actions,
+  .admin-discovery__result-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-discovery-model {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .admin-discovery-model__capabilities {
+    grid-column: 2;
   }
 }
 

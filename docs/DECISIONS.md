@@ -171,9 +171,9 @@
 - 决策：首批统一使用极光 GPT Key 中转站和 OpenAI 兼容适配器
 - Base URL：`https://api.example.com/v1`
 - 默认对话模型：`gpt-6-astra`
-- 生图：先 Mock；真实测试固定使用 1、3 号图像 Key，不使用 Seedance
+- 生图：先 Mock；真实测试固定使用 1、3 号图像 Key，不使用视频测试 Key
 - 视频：先 Mock，M4 接入
-- 修订 2026-10-17：2 号 DeepSeek Key 用于模型对话；4 号 Seedance Key 只用于后续视频生成
+- 修订 2026-10-17：2 号 DeepSeek Key 用于模型对话；4 号当前识别为 Grok/xAI 测试 Key，只用于后续视频生成
 - Embedding：暂不做
 - 后续备用模型：GLM、Kimi、DeepSeek
 
@@ -239,8 +239,8 @@
 ### D-035 测试 Key 能力分工
 
 - 状态：Accepted
-- 决策：1、3 号 Key 固定用于生图；2 号 DeepSeek Key 用于模型对话；4 号 Seedance Key 只用于后续视频生成
-- 约束：Seedance 不作为生图备用 Key，也不在 M1 生图阶段消耗额度
+- 决策：1、3 号 Key 固定用于生图；2 号 DeepSeek Key 用于模型对话；4 号当前识别为 Grok/xAI 测试 Key，只用于后续视频生成
+- 约束：视频测试 Key 不作为生图备用 Key，也不在 M1 生图阶段消耗额度
 - 约束：真实密钥只通过后端环境变量注入，不进入 Git、日志、普通文档和回复
 
 ### D-038 真实图片 Provider
@@ -292,7 +292,7 @@
 - 决策：结果支持远程下载、300 MB 上限、视频 MIME 和文件头校验，并保存为用户隔离的结果文件
 - 决策：创建请求继续使用幂等键；由于 PostgreSQL JSONB 会调整对象键顺序，参数比较使用深度相等语义
 - 约束：自动测试和页面验收不得调用真实视频接口，只能使用 Mock Provider 或 Playwright 路由拦截
-- 约束：不接入或消耗 Seedance；切换到其他视频供应商前必须单独说明 Base URL、模型、额度和回退策略
+- 约束：不主动消耗视频测试额度；切换到其他视频供应商前必须单独说明 Base URL、模型、额度和回退策略
 - 约束：真实视频验收需最低额度、单任务、受控执行；不得把 Key、完整上游响应或敏感请求头写入日志和文档
 
 ### D-041 多模型对话路由

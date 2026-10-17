@@ -101,6 +101,22 @@ export interface AdminModel {
   updatedAt: string;
 }
 
+export interface AdminProviderProbeModel {
+  capabilities: Array<'chat' | 'embedding' | 'image' | 'video'>;
+  displayName: string;
+  providerModel: string;
+  suggestedAlias: string;
+}
+
+export interface AdminProviderProbeResult {
+  checkedAt: string;
+  latencyMs: number;
+  modelCount: number;
+  models: AdminProviderProbeModel[];
+  protocol: 'doubao' | 'openai-compatible' | 'xai';
+  truncated: boolean;
+}
+
 export interface AuthenticatedUser {
   displayName: string;
   email: string | null;
@@ -458,6 +474,23 @@ export async function updateAdminProvider(
   return response.data.data;
 }
 
+export async function probeAdminProvider(
+  providerId: string,
+  input: {
+    apiKey?: string;
+    baseUrl: string;
+    protocol?: 'doubao' | 'openai-compatible' | 'xai';
+    timeoutMs?: number;
+  },
+): Promise<AdminProviderProbeResult> {
+  const response = await apiClient.post<ApiEnvelope<AdminProviderProbeResult>>(
+    `/api/v1/admin/providers/${encodeURIComponent(providerId)}/probe`,
+    input,
+  );
+
+  return response.data.data;
+}
+
 export async function fetchAdminModels(params: {
   capability?: 'chat' | 'embedding' | 'image' | 'video';
   enabled?: boolean;
@@ -482,6 +515,36 @@ export async function createAdminModel(input: {
   providerModel: string;
 }): Promise<AdminModel> {
   const response = await apiClient.post<ApiEnvelope<AdminModel>>('/api/v1/admin/models', input);
+
+  return response.data.data;
+}
+
+export async function importAdminDiscoveredModels(input: {
+  models: Array<{
+    capabilities: Array<'chat' | 'embedding' | 'image' | 'video'>;
+    displayName: string;
+    enabled?: boolean;
+    providerModel: string;
+  }>;
+  providerCode: string;
+}): Promise<{
+  imported: AdminModel[];
+  skipped: Array<{
+    alias: string;
+    providerModel: string;
+    reason: 'already_exists';
+  }>;
+}> {
+  const response = await apiClient.post<
+    ApiEnvelope<{
+      imported: AdminModel[];
+      skipped: Array<{
+        alias: string;
+        providerModel: string;
+        reason: 'already_exists';
+      }>;
+    }>
+  >('/api/v1/admin/models/import-discovered', input);
 
   return response.data.data;
 }

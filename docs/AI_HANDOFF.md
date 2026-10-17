@@ -43,7 +43,7 @@
 - 原页面公开检查发现会员中心路由 `/console/vip` 和部分公开脚本字段。用户虽已在浏览器登录，但当前命令行无法读取浏览器登录 Cookie；未获得截图前，不得把价格单位、完整权益、有效期或档位写成确定事实。详细记录见 `docs/OPEN_QUESTIONS.md`。
 - 后续新增的重要注意事项、决策、待确认问题和协作规则，都要同步更新本文件，并按项目规则更新 `CHANGELOG.md`。
 - M0 执行按 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) 的三档规则进行：自动执行范围内直接做；安装依赖、项目配置、额外服务和本地数据库先说明；删除、密钥、部署、公网暴露和普通推送等红线先确认。
-- M1 测试 Key 分工：1、3 号 Key 用于生图，2 号 DeepSeek Key 用于模型对话，4 号 Seedance Key 只用于后续视频生成。M1 自动化测试仍使用 Mock provider，不消耗真实额度。
+- M1 测试 Key 分工：1、3 号 Key 用于生图，2 号 DeepSeek Key 用于模型对话，4 号当前识别为 Grok/xAI 测试 Key，只用于后续视频生成。M1 自动化测试仍使用 Mock provider，不消耗真实额度。
 - 本地 PostgreSQL 和 Redis 虽由 Docker Compose 管理，但当前 `compose.yaml` 使用第三方镜像代理 `dockerproxy.net`。演示阶段可用，正式部署前必须重新评估官方或公司内部镜像源。
 
 ## 待确认问题

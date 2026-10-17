@@ -7,7 +7,7 @@
 - 工作目录：`C:\Users\Administrator\Desktop\project2`
 - 分支：`main`
 - M3 范围：运行时模型配置、管理后台首版和管理员权限边界
-- 当前基线：M2 工具套件首版已完成，M3 管理后台首版和超级智能体流式修复已通过本地验证
+- 当前基线：M2 工具套件首版已完成，M3 管理后台首版、厂商模型探测与超级智能体流式修复已通过本地验证
 
 ## 2. 本批范围
 
@@ -17,8 +17,8 @@
 2. 平台总览：用户、积分、厂商、模型、对话和媒体任务统计
 3. 用户管理：分页查询、状态和角色查看、编辑用户
 4. 积分调整：管理员为指定用户增减积分并写入账本
-5. 厂商管理：厂商启停、Base URL、Key 引用和优先级
-6. 模型管理：模型别名、上游模型 ID、能力、上下文窗口和启停状态
+5. 厂商管理：厂商启停、Base URL、Key 引用、优先级和模型检测
+6. 模型管理：模型别名、上游模型 ID、能力、上下文窗口、启停状态和发现后批量导入
 7. 运行时模型注册表：数据库配置优先，默认模型回退
 
 真实密钥不在本批写入数据库。管理后台只保存 `keyRef` 名称，Provider 仍从服务端环境变量读取实际密钥。
@@ -41,8 +41,18 @@
 - 总览：`GET /overview`
 - 用户：`GET /users`、`PATCH /users/:userId`、`POST /users/:userId/points-adjustments`
 - 厂商：`GET /providers`、`POST /providers`、`PATCH /providers/:providerId`
-- 模型：`GET /models`、`POST /models`、`PATCH /models/:modelId`
+- 厂商探测：`POST /providers/probe`、`POST /providers/:providerId/probe`
+- 模型：`GET /models`、`POST /models`、`POST /models/import-discovered`、`PATCH /models/:modelId`
 - 所有管理员接口都要求已认证的 `ADMIN` 用户
+
+### 厂商模型探测与导入
+
+- 后端新增 `provider-probe.service.ts` 和对应 DTO/单测
+- 探测地址固定为厂商 `baseUrl + /models`，当前支持 OpenAI-compatible 的 `data`、`models`、`items` 三种模型数组结构
+- 根据上游模型 ID 推断对话、图片、视频和向量能力，也支持读取显式 `capabilities`
+- 后台弹层支持本次瞬态 Key、服务端 `keyRef`、连接延迟、发现数量、能力标签、全选、清空和导入所选模型
+- 导入只写厂商代码、模型别名、上游模型、能力和启停状态，重复上游模型自动跳过，别名冲突自动增加后缀
+- 单次最多展示和导入 200 个模型，避免异常响应拖垮后台
 
 ### 运行时模型注册表
 
@@ -65,10 +75,12 @@
 - `pnpm format:check` 通过
 - `pnpm lint` 通过
 - `pnpm typecheck` 通过
-- `pnpm test`：API 16 个文件 59 项通过，Web 6 个文件 24 项通过
+- `pnpm test`：API 17 个文件 63 项通过，Web 6 个文件 24 项通过
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-admin-console.mjs` 通过
+- `node outputs/ui-reference/verify-admin-provider-probe.mjs` 通过
 - 后台验收覆盖 `1440x1000` 和 `390x844`，无横向溢出、无页面脚本错误
+- 厂商探测验收覆盖瞬态 Key、能力标签、全选/清空、导入请求和 Key 不泄露；截图输出为 `m3-admin-provider-probe-desktop.png`、`m3-admin-provider-probe-mobile.png`
 
 后台截图输出：
 
@@ -79,7 +91,7 @@
 
 ## 5. 安全边界
 
-- 管理员接口不接受真实 API Key 明文，只接受环境变量引用名 `keyRef`
+- 厂商配置接口只接受环境变量引用名 `keyRef`；模型探测接口的瞬态 Key 仅用于当前请求，不保存、不回显、不写日志
 - 数据库、API 响应、日志、截图和 Git 中不保存真实 Key
 - `providers`、模型和用户管理接口均经过认证与管理员角色校验
 - 积分调整会写入积分账本，不能直接无记录地修改余额
@@ -88,7 +100,8 @@
 ## 6. 已知限制
 
 - Provider 实例选择仍由 `IMAGE_PROVIDER`、`VIDEO_PROVIDER` 等环境变量决定；数据库目前主要控制模型、端点和 Key 引用，尚未按厂商类别动态选择 Provider 实现
-- Key 自动检测、手动模型选择和厂商连通性测试尚未实现
+- 真实 Key 尚未提供后台加密持久化；当前仍通过服务端环境变量和 `keyRef` 使用，避免在未确定加密、轮换、审计和备份方案前落库
+- 厂商探测允许管理员填写任意 Base URL，生产启用前需要增加内网地址拦截、域名策略或受控出口，降低 SSRF 风险
 - 模块展示配置（图标、图片和导航展示）尚未进入后台；当前后台优先覆盖 Key/厂商、用户和模型
 - 支付仍是后续沙箱阶段，未接入真实支付
 
@@ -96,9 +109,9 @@
 
 1. 使用真实低额度 Key 或 Mock Provider 验收超级智能体首轮消息、流式更新、停止生成、错误退款和历史切换
 2. 将 AI 绘画页面中与核心绘画流程无关的视频入口弱化或移除
-3. 在管理后台增加厂商连通性测试、模型自动检测和手动模型选择
-4. 为 Provider 类别增加数据库驱动的动态实例化
-5. 继续补充后台操作审计、失败回滚和真实环境恢复测试
+3. 为 Provider 类别增加数据库驱动的动态实例化
+4. 继续补充后台操作审计、失败回滚和真实环境恢复测试
+5. 在获得单独确认后设计真实 Key 的加密存储、轮换、审计和备份方案
 
 ## 8. 2026-10-17 补充修复
 

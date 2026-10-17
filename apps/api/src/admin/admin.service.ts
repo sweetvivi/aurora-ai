@@ -11,11 +11,14 @@ import { ModelRegistryService } from '../models/model-registry.service';
 import type { AdjustAdminUserPointsDto } from './dto/adjust-admin-user-points.dto';
 import type { CreateModelConfigDto } from './dto/create-model-config.dto';
 import type { CreateProviderConfigDto } from './dto/create-provider-config.dto';
+import type { ImportDiscoveredModelsDto } from './dto/import-discovered-models.dto';
 import type { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 import type { ListModelConfigsQueryDto } from './dto/list-model-configs-query.dto';
+import type { ProbeProviderDto } from './dto/probe-provider.dto';
 import type { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 import type { UpdateModelConfigDto } from './dto/update-model-config.dto';
 import type { UpdateProviderConfigDto } from './dto/update-provider-config.dto';
+import { ProviderProbeService } from './provider-probe.service';
 
 type Capability = 'chat' | 'embedding' | 'image' | 'video';
 
@@ -80,6 +83,7 @@ export class AdminService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly modelRegistryService: ModelRegistryService,
+    private readonly providerProbeService: ProviderProbeService,
   ) {}
 
   async getOverview() {
@@ -366,6 +370,32 @@ export class AdminService {
     }
   }
 
+  async probeDraftProvider(input: ProbeProviderDto) {
+    return this.providerProbeService.probe(input);
+  }
+
+  async probeProvider(providerId: string, input: ProbeProviderDto) {
+    const provider = await this.prismaService.providerConfig.findUnique({
+      select: {
+        baseUrl: true,
+        code: true,
+        keyRef: true,
+      },
+      where: { id: providerId },
+    });
+
+    if (!provider) {
+      throw this.notFound('PROVIDER_NOT_FOUND', '模型厂商不存在');
+    }
+
+    return this.providerProbeService.probe({
+      ...input,
+      baseUrl: provider.baseUrl,
+      keyRef: input.keyRef ?? provider.keyRef,
+      providerCode: provider.code,
+    });
+  }
+
   async updateProvider(providerId: string, input: UpdateProviderConfigDto) {
     const data: Prisma.ProviderConfigUpdateInput = {};
 
@@ -485,6 +515,86 @@ export class AdminService {
     }
   }
 
+  async importDiscoveredModels(input: ImportDiscoveredModelsDto) {
+    const provider = await this.prismaService.providerConfig.findUnique({
+      select: {
+        code: true,
+        id: true,
+      },
+      where: { code: input.providerCode },
+    });
+
+    if (!provider) {
+      throw this.notFound('PROVIDER_NOT_FOUND', '模型厂商不存在');
+    }
+
+    const result = await this.prismaService.$transaction(async (transaction) => {
+      const existing = await transaction.modelConfig.findMany({
+        select: {
+          alias: true,
+          providerId: true,
+          providerModel: true,
+        },
+        where: {
+          providerId: provider.id,
+        },
+      });
+      const usedAliases = new Set(
+        (
+          await transaction.modelConfig.findMany({
+            select: { alias: true },
+          })
+        ).map((model) => model.alias),
+      );
+      const imported = [];
+      const skipped = [];
+
+      for (const model of input.models) {
+        const providerModel = model.providerModel.trim();
+        const duplicate = existing.find(
+          (candidate) =>
+            candidate.providerId === provider.id && candidate.providerModel === providerModel,
+        );
+
+        if (duplicate) {
+          skipped.push({
+            alias: duplicate.alias,
+            providerModel,
+            reason: 'already_exists' as const,
+          });
+          continue;
+        }
+
+        const alias = this.allocateModelAlias(provider.code, providerModel, usedAliases);
+        const created = await transaction.modelConfig.create({
+          data: {
+            alias,
+            capabilities: model.capabilities.map((capability) => capabilityToDatabase[capability]),
+            displayName: model.displayName.trim(),
+            enabled: model.enabled,
+            providerId: provider.id,
+            providerModel,
+          },
+          select: modelSelect,
+        });
+
+        usedAliases.add(alias);
+        imported.push(created);
+      }
+
+      return {
+        imported,
+        skipped,
+      };
+    });
+
+    if (result.imported.length > 0) {
+      await this.modelRegistryService.reload();
+    }
+
+    return result;
+  }
+
   async updateModel(modelId: string, input: UpdateModelConfigDto) {
     const data: Prisma.ModelConfigUpdateInput = {};
 
@@ -560,5 +670,29 @@ export class AdminService {
         message,
       });
     }
+  }
+
+  private allocateModelAlias(
+    providerCode: string,
+    providerModel: string,
+    usedAliases: Set<string>,
+  ): string {
+    const base =
+      `${providerCode}-${providerModel}`
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/[-_.]{2,}/g, '-')
+        .replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '')
+        .slice(0, 80) || `model-${Date.now()}`;
+    let candidate = /^[a-z0-9]/.test(base) ? base : `model-${base}`;
+    let suffix = 2;
+
+    while (usedAliases.has(candidate)) {
+      const suffixText = `-${suffix}`;
+      candidate = `${candidate.slice(0, 80 - suffixText.length).replace(/[^a-z0-9]+$/g, '')}${suffixText}`;
+      suffix += 1;
+    }
+
+    return candidate;
   }
 }

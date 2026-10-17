@@ -2,7 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/bootstrap/configure-app';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
@@ -66,6 +66,7 @@ describe('admin endpoints', () => {
       },
     });
     await app.close();
+    vi.unstubAllGlobals();
   });
 
   it('requires an authenticated administrator', async () => {
@@ -323,6 +324,109 @@ describe('admin endpoints', () => {
 
     expect(response.body.error.code).toBe('BAD_REQUEST');
     expect(JSON.stringify(response.body)).not.toContain('sk-should-never-be-accepted');
+  });
+
+  it('probes a provider with a transient key and imports selected models', async () => {
+    const providerCode = `${testProviderPrefix}${randomUUID().slice(0, 8)}`;
+    const providerResponse = await request(app.getHttpServer())
+      .post('/api/v1/admin/providers')
+      .set('authorization', `Bearer ${admin.accessToken}`)
+      .send({
+        baseUrl: 'https://discovery.example/v1',
+        code: providerCode,
+        displayName: '模型发现测试厂',
+        enabled: true,
+        keyRef: 'ADMIN_E2E_DISCOVERY_KEY',
+        priority: 20,
+      })
+      .expect(201);
+    const transientKey = 'sk-discovery-secret';
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [{ id: 'discovered-chat' }, { id: 'discovered-image' }, { id: 'discovered-video' }],
+        }),
+        {
+          headers: {
+            'content-type': 'application/json',
+          },
+          status: 200,
+        },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const probeResponse = await request(app.getHttpServer())
+      .post(`/api/v1/admin/providers/${providerResponse.body.data.id}/probe`)
+      .set('authorization', `Bearer ${admin.accessToken}`)
+      .send({
+        apiKey: transientKey,
+        baseUrl: 'https://discovery.example/v1',
+      })
+      .expect(201);
+
+    expect(probeResponse.body.data).toMatchObject({
+      modelCount: 3,
+      protocol: 'openai-compatible',
+      truncated: false,
+    });
+    expect(probeResponse.body.data.models).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          capabilities: ['chat'],
+          providerModel: 'discovered-chat',
+        }),
+        expect.objectContaining({
+          capabilities: ['image'],
+          providerModel: 'discovered-image',
+        }),
+        expect.objectContaining({
+          capabilities: ['video'],
+          providerModel: 'discovered-video',
+        }),
+      ]),
+    );
+    expect(JSON.stringify(probeResponse.body)).not.toContain(transientKey);
+
+    const selectedModels = probeResponse.body.data.models.map(
+      (model: { capabilities: string[]; displayName: string; providerModel: string }) => ({
+        capabilities: model.capabilities,
+        displayName: model.displayName,
+        enabled: true,
+        providerModel: model.providerModel,
+      }),
+    );
+    const importResponse = await request(app.getHttpServer())
+      .post('/api/v1/admin/models/import-discovered')
+      .set('authorization', `Bearer ${admin.accessToken}`)
+      .send({
+        models: selectedModels,
+        providerCode,
+      })
+      .expect(201);
+
+    expect(importResponse.body.data.imported).toHaveLength(3);
+    expect(importResponse.body.data.skipped).toHaveLength(0);
+
+    const secondImportResponse = await request(app.getHttpServer())
+      .post('/api/v1/admin/models/import-discovered')
+      .set('authorization', `Bearer ${admin.accessToken}`)
+      .send({
+        models: selectedModels,
+        providerCode,
+      })
+      .expect(201);
+
+    expect(secondImportResponse.body.data.imported).toHaveLength(0);
+    expect(secondImportResponse.body.data.skipped).toHaveLength(3);
+
+    const registry = app.get(ModelRegistryService);
+
+    expect(registry.getByAlias(`${providerCode}-discovered-chat`)).toMatchObject({
+      capabilities: ['chat'],
+      providerCode,
+      providerModel: 'discovered-chat',
+    });
   });
 
   async function registerUser(email: string, displayName: string): Promise<RegisteredUser> {

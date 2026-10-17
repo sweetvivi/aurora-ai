@@ -5,8 +5,10 @@ import { AdminService } from './admin.service';
 import { AdjustAdminUserPointsDto } from './dto/adjust-admin-user-points.dto';
 import { CreateModelConfigDto } from './dto/create-model-config.dto';
 import { CreateProviderConfigDto } from './dto/create-provider-config.dto';
+import { ImportDiscoveredModelsDto } from './dto/import-discovered-models.dto';
 import { ListAdminUsersQueryDto } from './dto/list-admin-users-query.dto';
 import { ListModelConfigsQueryDto } from './dto/list-model-configs-query.dto';
+import { ProbeProviderDto } from './dto/probe-provider.dto';
 import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 import { UpdateModelConfigDto } from './dto/update-model-config.dto';
 import { UpdateProviderConfigDto } from './dto/update-provider-config.dto';
@@ -54,6 +56,16 @@ export class AdminController {
     return this.adminService.createProvider(input);
   }
 
+  @Post('providers/probe')
+  probeDraftProvider(@Body() input: ProbeProviderDto) {
+    return this.adminService.probeDraftProvider(input);
+  }
+
+  @Post('providers/:providerId/probe')
+  probeProvider(@Param('providerId') providerId: string, @Body() input: ProbeProviderDto) {
+    return this.adminService.probeProvider(providerId, input);
+  }
+
   @Patch('providers/:providerId')
   updateProvider(@Param('providerId') providerId: string, @Body() input: UpdateProviderConfigDto) {
     return this.adminService.updateProvider(providerId, input);
@@ -67,6 +79,11 @@ export class AdminController {
   @Post('models')
   createModel(@Body() input: CreateModelConfigDto) {
     return this.adminService.createModel(input);
+  }
+
+  @Post('models/import-discovered')
+  importDiscoveredModels(@Body() input: ImportDiscoveredModelsDto) {
+    return this.adminService.importDiscoveredModels(input);
   }
 
   @Patch('models/:modelId')
