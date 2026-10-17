@@ -21,6 +21,7 @@ import { RouterLink, useRoute } from 'vue-router';
 import { fetchFileBlob } from '@/app/api';
 import GalleryArtwork from '@/components/GalleryArtwork.vue';
 import { useDrawWorkspaceStore } from '@/stores/draw-workspace';
+import { useModelCatalogStore } from '@/stores/model-catalog';
 import {
   VIDEO_TASK_POINTS_COST,
   type VideoWork,
@@ -61,31 +62,7 @@ const modes: { description: string; label: string; value: VideoMode }[] = [
   { description: '控制首尾画面', label: '首尾帧', value: 'first-last-frame' },
 ];
 
-const models: VideoModel[] = [
-  {
-    accent: '#7c72ff',
-    badge: '推荐',
-    description: '新一代多模态视频模型，适合电影感镜头与商业内容。',
-    label: '极光影像 3.0',
-    short: '极',
-    value: 'aurora-video-3',
-  },
-  {
-    accent: '#e5689a',
-    badge: '新',
-    description: '节奏自然，适合人物、产品和短视频叙事。',
-    label: '光影电影 2.4',
-    short: '光',
-    value: 'cinema-motion-2',
-  },
-  {
-    accent: '#21a77c',
-    description: '稳定构图与商业场景表现，适合电商和广告。',
-    label: '商业镜头 2.1',
-    short: '商',
-    value: 'commerce-shot-2',
-  },
-];
+const modelAccents = ['#7c72ff', '#e5689a', '#21a77c', '#3979d5'];
 
 const showcaseItems: ShowcaseItem[] = [
   {
@@ -168,8 +145,9 @@ const activeGalleryTab = ref<GalleryTab>('discover');
 const route = useRoute();
 const drawWorkspace = useDrawWorkspaceStore();
 const videoWorkspace = useVideoWorkspaceStore();
+const modelCatalog = useModelCatalogStore();
 const mode = ref<VideoMode>('text-to-video');
-const selectedModel = ref(models[0]?.value ?? 'aurora-video-3');
+const selectedModel = ref(modelCatalog.resolveAlias('video'));
 const selectedRatio = ref('16:9');
 const selectedDuration = ref(5);
 const selectedResolution = ref('1080P');
@@ -184,8 +162,21 @@ const consumedRouteContext = ref('');
 const uploadingSource = ref(false);
 let noticeTimer: number | undefined;
 
+const models = computed<VideoModel[]>(() =>
+  modelCatalog.modelsFor('video').map((model, index) => ({
+    accent: modelAccents[index % modelAccents.length] ?? '#7c72ff',
+    badge: index === 0 ? '推荐' : undefined,
+    description:
+      index === 0
+        ? '当前默认视频模型，适合电影感镜头与商业内容。'
+        : '补充视频模型，可用于不同节奏、构图和内容风格。',
+    label: model.displayName,
+    short: model.displayName.slice(0, 1),
+    value: model.alias,
+  })),
+);
 const activeModel = computed(
-  () => models.find((model) => model.value === selectedModel.value) ?? models[0],
+  () => models.value.find((model) => model.value === selectedModel.value) ?? models.value[0],
 );
 const sortedTasks = computed(() =>
   [...videoWorkspace.works].sort((left, right) => right.createdAt - left.createdAt),
@@ -376,6 +367,7 @@ async function submitTask(): Promise<void> {
     lastFrameFileId: mode.value === 'first-last-frame' ? sourceIds[1] : undefined,
     mode: mode.value,
     model: selectedModel.value,
+    modelAlias: selectedModel.value,
     modelLabel: activeModel.value?.label ?? '视频模型',
     prompt: prompt.value.trim(),
     ratio: selectedRatio.value,
@@ -425,7 +417,7 @@ function reuseTask(task: VideoWork): void {
   }
 
   prompt.value = task.prompt;
-  selectedModel.value = task.model;
+  selectedModel.value = task.modelAlias;
   selectedRatio.value = task.ratio;
   selectedDuration.value = task.duration;
   selectedResolution.value = task.resolution;
@@ -437,8 +429,9 @@ function reuseShowcase(item: ShowcaseItem): void {
   selectedRatio.value = item.ratio;
   selectedDuration.value = item.duration;
   const model =
-    models.find((entry) => entry.label.includes(item.model) || entry.value.includes(item.model)) ??
-    models[item.variant % models.length];
+    models.value.find(
+      (entry) => entry.label.includes(item.model) || entry.value.includes(item.model),
+    ) ?? models.value[item.variant % models.value.length];
 
   if (model) {
     selectedModel.value = model.value;
@@ -545,9 +538,22 @@ function taskDuration(task: VideoWork): string {
 
 onMounted(() => {
   window.addEventListener('keydown', handlePreviewKeydown);
+  void modelCatalog.load();
   void videoWorkspace.initialize();
   void consumeRouteContext();
 });
+
+watch(
+  () =>
+    modelCatalog
+      .modelsFor('video')
+      .map((model) => model.alias)
+      .join('|'),
+  () => {
+    selectedModel.value = modelCatalog.resolveAlias('video', selectedModel.value);
+  },
+  { immediate: true },
+);
 
 watch(
   () => [route.query.mode, route.query.prompt, route.query.sourceWork],

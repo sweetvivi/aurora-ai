@@ -40,11 +40,13 @@ import {
   type ModuleDisplayGroup,
 } from '@/app/api';
 import { resolveModuleIcon, useModuleCatalogStore } from '@/stores/module-catalog';
+import { useModelCatalogStore } from '@/stores/model-catalog';
 
 type AdminTab = 'models' | 'modules' | 'overview' | 'providers' | 'users';
 type ModelCapability = 'chat' | 'embedding' | 'image' | 'video';
 
 const moduleCatalogStore = useModuleCatalogStore();
+const modelCatalogStore = useModelCatalogStore();
 const activeTab = ref<AdminTab>('overview');
 const loading = ref(false);
 const saving = ref(false);
@@ -485,7 +487,7 @@ async function importSelectedModels(): Promise<void> {
     discoveryModalOpen.value = false;
     activeTab.value = 'models';
     resetDiscovery();
-    await Promise.all([loadModels(), refreshOverview()]);
+    await Promise.all([loadModels(), refreshOverview(), modelCatalogStore.load(true)]);
   } catch (error) {
     message.error(getErrorMessage(error));
   } finally {
@@ -557,7 +559,7 @@ async function saveModel(): Promise<void> {
         );
     modelModalOpen.value = false;
     message.success(editingModel.value ? '模型配置已更新' : '模型配置已创建');
-    await refreshOverview();
+    await Promise.all([refreshOverview(), modelCatalogStore.load(true)]);
   } catch (error) {
     message.error(getErrorMessage(error));
   } finally {

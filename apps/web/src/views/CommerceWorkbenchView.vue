@@ -36,6 +36,7 @@ import {
   useDrawWorkspaceStore,
   type DrawWorkStatus,
 } from '@/stores/draw-workspace';
+import { useModelCatalogStore } from '@/stores/model-catalog';
 import { useSessionStore } from '@/stores/session';
 
 type CommerceForm = 'background' | 'pattern' | 'placeholder' | 'replace' | 'retouch' | 'try-on';
@@ -472,6 +473,7 @@ const uploadMeta: Record<UploadRole, UploadMeta> = {
 };
 
 const workspace = useDrawWorkspaceStore();
+const modelCatalog = useModelCatalogStore();
 const sessionStore = useSessionStore();
 
 const searchQuery = ref('');
@@ -482,6 +484,7 @@ const helpOpen = ref(false);
 const prompt = ref('');
 const uploadError = ref('');
 const uploadingRole = ref<UploadRole | null>(null);
+const selectedImageModel = computed(() => modelCatalog.modelsFor('image')[0] ?? null);
 const pendingUploadRole = ref<UploadRole | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
 const backgroundCategory = ref(backgroundCategories[0] ?? '服饰箱包');
@@ -969,8 +972,9 @@ async function submitTask(): Promise<void> {
       tryOnScene: isTryOnTool.value ? tryOnScene.value : undefined,
       tryOnResolution: isTryOnTool.value ? tryOnResolution.value : undefined,
     },
-    model: 'commerce-visual-3',
-    modelLabel: activeTool.value.label,
+    model: selectedImageModel.value?.alias ?? '',
+    modelAlias: selectedImageModel.value?.alias ?? '',
+    modelLabel: selectedImageModel.value?.displayName ?? activeTool.value.label,
     prompt: buildPrompt(),
     ratio: selectedRatio.value,
     referenceFileIds: referenceFileId ? [referenceFileId] : undefined,
@@ -1053,6 +1057,7 @@ function workStatusLabel(status: DrawWorkStatus): string {
 }
 
 onMounted(() => {
+  void modelCatalog.load();
   void workspace.initialize();
 });
 

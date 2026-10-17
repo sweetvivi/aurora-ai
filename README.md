@@ -32,6 +32,7 @@
 - 视频生成：参考产品式深色工作台、文生视频、单图参考、任务轮询、取消、重试、下载和播放
 - AI 画布：节点增删、多选拖拽、连线校验、缩放平移、图片/输出/视频节点、从节点派生文本/图像/视频任务、3D 视角控制、素材库、组合分组、右键菜单、自动布局、工作流 JSON 导入导出、批量生成队列、历史、灵感面板和本地持久化
 - 电商工具：四栏工作台、商品换背景、服饰图案替换、产品包装/部件/材质替换、商品抠图、放大、风格转换、虚拟模特试穿和手持模特替换
+- 运行时模型目录：绘画、画布、修图、图片生成、电商和视频工作台统一读取后台已启用模型；后台保存或导入后即时刷新，API 不可用时回退到内置兼容模型
 - M3 管理后台：管理员路由守卫、总览、用户管理、积分调整、厂商管理、模型管理，以及数据库优先的运行时模型注册表
 - 模块展示管理：后台可配置模块名称、图标、封面、分组、路由、排序、角标和显隐；主侧栏、移动底栏、首页快捷入口、精选工具和分类会统一读取同一份模块目录
 - 厂商模型探测：后台可输入瞬态 Key 或服务端 Key 引用，检测 OpenAI-compatible `/models`，预览能力标签并批量导入所选模型；瞬态 Key 不落库、不回显、不写日志
@@ -41,8 +42,9 @@
 当前批次验证结果：
 
 - `pnpm format:check`、`pnpm lint`、`pnpm typecheck` 通过
-- `pnpm test`：API 18 个文件 68 项，Web 7 个文件 27 项
+- `pnpm test`：API 18 个文件 68 项，Web 8 个文件 32 项
 - `pnpm build` 通过
+- `node outputs/ui-reference/verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-canvas-studio.mjs`、`verify-video-tasks.mjs`、`verify-m2-interactions.mjs`、`verify-m2-routes.mjs` 和 `verify-admin-modules.mjs` 全部通过
 - `node outputs/ui-reference/verify-admin-modules.mjs` 通过，模块改名、角标、排序和显隐会同步刷新共享目录；桌面端和移动端无横向溢出、无页面脚本错误
 - `node outputs/ui-reference/verify-admin-provider-probe.mjs` 通过，桌面端和移动端无横向溢出，探测 Key 未出现在页面、响应或控制台
 - `node outputs/ui-reference/verify-canvas-studio.mjs` 通过，画布批量面板、右键菜单、组合分组和节点生成菜单在桌面端与移动端无脚本错误或横向溢出

@@ -32,6 +32,7 @@ import {
   useDrawWorkspaceStore,
   type DrawWorkStatus,
 } from '@/stores/draw-workspace';
+import { useModelCatalogStore } from '@/stores/model-catalog';
 import { useSessionStore } from '@/stores/session';
 
 interface NavigationItem {
@@ -83,14 +84,7 @@ const navigation: NavigationItem[] = [
   { icon: AppstoreOutlined, label: '图片工具', to: '/map' },
 ];
 
-const models: ModelItem[] = [
-  { accent: '#ff7043', label: '香蕉绘影 3.1', value: 'canvas-3' },
-  { accent: '#7a5cff', label: '极光光影 2.1', value: 'light-2', badge: '推荐' },
-  { accent: '#20a66a', label: '高清写实 4.0', value: 'realistic-4' },
-  { accent: '#2f8ddb', label: '插画设计 3.0', value: 'illustration-3' },
-  { accent: '#d05b9a', label: '产品摄影 2.0', value: 'product-2' },
-  { accent: '#d69a2d', label: '国风水墨 1.8', value: 'ink-1' },
-];
+const modelAccents = ['#7a5cff', '#ff7043', '#20a66a', '#2f8ddb', '#d05b9a', '#d69a2d'];
 
 const topNavigation = ['做电商', '拍写真', '搞设计'];
 const creationModes = ['文生图', '参考图重绘', '局部编辑', '商品图处理'];
@@ -359,7 +353,8 @@ const imageToolGroups: { label: string; tools: ToolItem[] }[] = [
 
 const prompt = ref('');
 const libraryQuery = ref('');
-const currentModel = ref('light-2');
+const modelCatalog = useModelCatalogStore();
+const currentModel = ref(modelCatalog.resolveAlias('image'));
 const selectedRatio = ref('智能比例');
 const selectedAmount = ref(1);
 const selectedSize = ref('1K');
@@ -382,18 +377,27 @@ const router = useRouter();
 const sessionStore = useSessionStore();
 const workspace = useDrawWorkspaceStore();
 
+const models = computed<ModelItem[]>(() =>
+  modelCatalog.modelsFor('image').map((model, index) => ({
+    accent: modelAccents[index % modelAccents.length] ?? '#7a5cff',
+    badge: index === 0 ? '推荐' : undefined,
+    label: model.displayName,
+    value: model.alias,
+  })),
+);
+
 const filteredModels = computed(() => {
   const query = libraryQuery.value.trim().toLowerCase();
 
   if (!query) {
-    return models;
+    return models.value;
   }
 
-  return models.filter((model) => model.label.toLowerCase().includes(query));
+  return models.value.filter((model) => model.label.toLowerCase().includes(query));
 });
 
 const selectedModelLabel = computed(
-  () => models.find((model) => model.value === currentModel.value)?.label ?? '选择模型',
+  () => models.value.find((model) => model.value === currentModel.value)?.label ?? '选择模型',
 );
 
 const isGeneratingView = computed(() => route.query.view === 'generate');
@@ -486,7 +490,7 @@ function syncGeneratorFromRoute(): void {
     prompt.value = routePrompt;
   }
 
-  if (typeof routeModel === 'string' && models.some((model) => model.value === routeModel)) {
+  if (typeof routeModel === 'string' && models.value.some((model) => model.value === routeModel)) {
     currentModel.value = routeModel;
   }
 
@@ -582,6 +586,7 @@ async function startGeneration(): Promise<void> {
   const createdWorks = await workspace.createGenerationWorks({
     amount: selectedAmount.value,
     model: currentModel.value,
+    modelAlias: currentModel.value,
     modelLabel: selectedModelLabel.value,
     prompt: prompt.value.trim(),
     ratio: selectedRatio.value,
@@ -796,6 +801,7 @@ async function submitWorkModification(workId: string, rawPrompt?: string): Promi
       amount: 1,
       extraParameters: work.parameters,
       model: work.model,
+      modelAlias: work.modelAlias,
       modelLabel: work.modelLabel,
       prompt: nextPrompt,
       ratio: work.ratio,
@@ -879,8 +885,17 @@ watch(
 );
 
 onMounted(() => {
+  void modelCatalog.load();
   void workspace.initialize();
 });
+
+watch(
+  () => models.value.map((model) => model.value).join('|'),
+  () => {
+    currentModel.value = modelCatalog.resolveAlias('image', currentModel.value);
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(() => {
   for (const image of referenceImages.value) {

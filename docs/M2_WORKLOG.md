@@ -1,6 +1,6 @@
 # M2 工具套件工作日志
 
-更新时间：2026-10-17
+更新时间：2026-10-18
 
 ## 1. 当前分支和基线
 
@@ -10,6 +10,7 @@
 - 视频链路批次基线：`19af73a feat: connect media workflows and agent history`
 - 当前批次基线：`6c3b3c0 docs: sync project status and module coverage`
 - 画布增强批次基线：`60f470d feat: complete commerce replacement tools`
+- 运行时模型目录批次基线：`136e1f5 feat: add configurable platform modules`
 - 当前阶段：M2 工具套件闭环收尾；智能体、图片和视频优先链路已打通
 
 ## 2. 本批范围
@@ -53,6 +54,16 @@
 - 创建器结构：标签改为多选下拉，“界面定制”和“对话配置”支持同时展开，并新增参考示例上传占位
 - 模块能力：新增 AI 绘画、AI 视频、AI 修图、联网搜索、代码、PPT、数学、图片分析、OCR、图片搜索、图表、网页生成、小游戏、网页读取、PDF 报告、学术搜索和网页可视化共 17 项复选能力
 - 能力生效：选中的模块能力会保存到智能体草稿，并拼入后续真实会话的临时系统提示词
+
+### 运行时模型目录
+
+- Store：`apps/web/src/stores/model-catalog.ts`
+- 能力过滤：按后台模型的 `chat`、`image`、`video` 能力返回可用项，拉取失败时回退到现有内置默认项
+- 数据收敛：空别名或空展示名会被忽略；重复别名会合并能力并采用较新的展示名称
+- 后台联动：管理员保存单个模型或批量导入后强制刷新目录，不需要刷新页面即可同步到前台工作台
+- 工作台接入：AI 绘画、AI 画布、智能修图、图片生成、电商工具和视频生成均使用真实模型别名创建任务
+- 记录恢复：图片和视频工作记录新增独立 `modelAlias`；旧记录缺少该字段时继续从任务参数或默认别名恢复
+- 兼容边界：旧调用未传 `modelAlias` 时仍使用原默认别名，避免影响既有测试和 Mock 链路
 
 ### AI 绘画
 
@@ -410,6 +421,30 @@ node outputs/ui-reference/verify-image-workbench-detail.mjs
 - 桌面端 `1440x1000`：高级设置展开正常，效果示例固定为 6 张，智能修图右栏宽度为 350px，六项处理方式全部同排且无文字截断
 - 移动端 `390x844`：高级设置、存储选择和效果示例可用，页面无横向溢出；处理方式在右栏内横向排列
 - 验收不创建真实生成任务，不读取或输出 Key
+
+运行时模型目录补充验证：
+
+```text
+pnpm --filter @aurora/web test
+pnpm --filter @aurora/web typecheck
+pnpm format:check
+pnpm lint
+pnpm test
+pnpm build
+node outputs/ui-reference/verify-image-generation.mjs
+node outputs/ui-reference/verify-image-workbench-detail.mjs
+node outputs/ui-reference/verify-canvas-studio.mjs
+node outputs/ui-reference/verify-video-tasks.mjs
+node outputs/ui-reference/verify-m2-interactions.mjs
+node outputs/ui-reference/verify-m2-routes.mjs
+node outputs/ui-reference/verify-admin-modules.mjs
+```
+
+- Web 单元测试为 8 个文件 32 项，新增模型目录去重、缓存、强制刷新、能力过滤、别名替换和 API 不可用回退覆盖
+- API 单元与端到端测试保持 18 个文件 68 项，API 与 Web 构建均通过
+- 图片生成、图片工作台细节、画布、视频任务、跨模块交互、8 个优先路由和后台模块管理浏览器验收全部通过
+- `1440x1000` 桌面端和 `390x844` 移动端均无横向溢出和页面脚本错误
+- 自动验收全部使用 Mock 或 Playwright 路由拦截，没有调用真实图片、视频或对话 Provider
 
 对话页视觉对齐和参考产品交互修正补充验证：
 

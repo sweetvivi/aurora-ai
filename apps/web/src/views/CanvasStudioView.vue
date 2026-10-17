@@ -43,6 +43,7 @@ import {
   type DrawWork,
   type DrawWorkStatus,
 } from '@/stores/draw-workspace';
+import { useModelCatalogStore } from '@/stores/model-catalog';
 
 type CanvasNodeKind = 'image' | 'output' | 'prompt' | 'video';
 type CanvasNodeStatus = 'done' | 'failed' | 'generating' | 'idle' | 'queued';
@@ -175,13 +176,6 @@ const categoryLabels: Record<Exclude<CanvasAssetCategory, 'all'>, string> = {
   style: '风格',
 };
 
-const generationModels: GenerationModel[] = [
-  { label: '极光绘影 3.0', value: 'canvas-aurora-3' },
-  { label: '高清摄影 2.4', value: 'canvas-photo-2' },
-  { label: '商业视觉 2.1', value: 'canvas-commerce-2' },
-  { label: '概念场景 1.9', value: 'canvas-scene-1' },
-];
-
 const batchFilters: { label: string; value: BatchFilter }[] = [
   { label: '未生成', value: 'pending' },
   { label: '失败', value: 'failed' },
@@ -214,6 +208,7 @@ const workflowTemplates: CanvasWorkflow[] = [
 
 const routeName = 'ai-canvas';
 const workspace = useDrawWorkspaceStore();
+const modelCatalog = useModelCatalogStore();
 const nodes = ref<CanvasNode[]>([]);
 const edges = ref<CanvasEdge[]>([]);
 const groups = ref<CanvasGroup[]>([]);
@@ -235,7 +230,7 @@ const inspirationMessage = ref('');
 const composerPrompt = ref('');
 const composerSourceNodeId = ref('');
 const composerTargetNodeId = ref('');
-const selectedModel = ref(generationModels[0]?.value ?? 'canvas-aurora-3');
+const selectedModel = ref(modelCatalog.resolveAlias('image'));
 const selectedRatio = ref('16:9');
 const selectedSize = ref('1K');
 const uploadCategory = ref<Exclude<CanvasAssetCategory, 'all'>>('other');
@@ -285,6 +280,13 @@ let saveTimer: number | undefined;
 let noticeTimer: number | undefined;
 let hydrated = false;
 
+const generationModels = computed<GenerationModel[]>(() =>
+  modelCatalog.modelsFor('image').map((model) => ({
+    label: model.displayName,
+    value: model.alias,
+  })),
+);
+
 const selectedNode = computed(() => nodes.value.find((node) => node.id === selectedNodeId.value));
 const selectedNodeCount = computed(() => selectedNodeIds.value.length);
 const angleDialogNode = computed(() =>
@@ -298,8 +300,8 @@ const anglePreviewLabel = computed(
 );
 const selectedModelLabel = computed(
   () =>
-    generationModels.find((model) => model.value === selectedModel.value)?.label ??
-    generationModels[0]?.label ??
+    generationModels.value.find((model) => model.value === selectedModel.value)?.label ??
+    generationModels.value[0]?.label ??
     '画布模型',
 );
 const generatedWorks = computed(() =>
@@ -1343,6 +1345,7 @@ async function generateAngleView(): Promise<void> {
         tilt: angleTilt.value,
       },
       model: selectedModel.value,
+      modelAlias: selectedModel.value,
       modelLabel: '3D 视角控制',
       prompt,
       ratio: selectedRatio.value,
@@ -1474,6 +1477,7 @@ async function submitComposer(): Promise<void> {
       mode: 'canvas',
     },
     model: selectedModel.value,
+    modelAlias: selectedModel.value,
     modelLabel: selectedModelLabel.value,
     prompt,
     ratio: selectedRatio.value,
@@ -1803,6 +1807,7 @@ async function runBatchGeneration(): Promise<void> {
           mode: 'canvas-batch',
         },
         model: selectedModel.value,
+        modelAlias: selectedModel.value,
         modelLabel: selectedModelLabel.value,
         prompt: current.prompt,
         ratio: selectedRatio.value,
@@ -2029,8 +2034,21 @@ watch(
   { deep: true },
 );
 
+watch(
+  () =>
+    modelCatalog
+      .modelsFor('image')
+      .map((model) => model.alias)
+      .join('|'),
+  () => {
+    selectedModel.value = modelCatalog.resolveAlias('image', selectedModel.value);
+  },
+  { immediate: true },
+);
+
 onMounted(() => {
   loadCanvas();
+  void modelCatalog.load();
   void workspace.initialize();
   window.addEventListener('pointermove', handlePointerMove);
   window.addEventListener('pointerup', finishPointerAction);

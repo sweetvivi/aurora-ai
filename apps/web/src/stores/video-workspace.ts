@@ -29,6 +29,7 @@ export interface VideoWork {
   lastFrameFileId: string | null;
   mode: string;
   model: string;
+  modelAlias: string;
   modelLabel: string;
   parameters: Record<string, unknown>;
   progress: number;
@@ -57,6 +58,7 @@ interface CreateVideoGenerationInput {
   lastFrameFileId?: string;
   mode: string;
   model: string;
+  modelAlias?: string;
   modelLabel: string;
   prompt: string;
   ratio: string;
@@ -68,6 +70,7 @@ interface VideoTaskDisplayMetadata {
   duration?: number;
   mode?: string;
   model?: string;
+  modelAlias?: string;
   modelLabel?: string;
   ratio?: string;
   resolution?: string;
@@ -194,7 +197,7 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
         const task = await createVideoTask(
           {
             lastFrameFileId: input.lastFrameFileId,
-            modelAlias: VIDEO_MODEL_ALIAS,
+            modelAlias: input.modelAlias || VIDEO_MODEL_ALIAS,
             parameters: {
               duration: input.duration,
               mode: input.mode,
@@ -209,7 +212,15 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
           idempotencyKey,
         );
 
-        return this.mergeTask(task);
+        return this.mergeTask(task, {
+          duration: input.duration,
+          mode: input.mode,
+          model: input.model,
+          modelAlias: input.modelAlias || VIDEO_MODEL_ALIAS,
+          modelLabel: input.modelLabel,
+          ratio: input.ratio,
+          resolution: input.resolution,
+        });
       } catch (error) {
         this.error = normalizeVideoError(error);
         return null;
@@ -231,6 +242,7 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
         lastFrameFileId: work.lastFrameFileId ?? undefined,
         mode: work.mode,
         model: work.model,
+        modelAlias: work.modelAlias,
         modelLabel: work.modelLabel,
         prompt: work.prompt,
         ratio: work.ratio,
@@ -363,6 +375,7 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
           lastFrameFileId: task.lastFrameFile?.id ?? null,
           mode: metadata?.mode ?? asString(task.parameters?.mode) ?? existing.mode,
           model: metadata?.model ?? asString(task.parameters?.uiModel) ?? existing.model,
+          modelAlias: metadata?.modelAlias ?? task.modelAlias ?? existing.modelAlias,
           modelLabel:
             metadata?.modelLabel ?? asString(task.parameters?.uiModelLabel) ?? existing.modelLabel,
           parameters: extractExtraParameters(task.parameters),
@@ -397,6 +410,7 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
         lastFrameFileId: task.lastFrameFile?.id ?? null,
         mode: metadata?.mode ?? asString(task.parameters?.mode) ?? 'text-to-video',
         model: metadata?.model ?? asString(task.parameters?.uiModel) ?? task.modelAlias,
+        modelAlias: metadata?.modelAlias ?? task.modelAlias ?? VIDEO_MODEL_ALIAS,
         modelLabel:
           metadata?.modelLabel ?? asString(task.parameters?.uiModelLabel) ?? task.modelAlias,
         parameters: extractExtraParameters(task.parameters),

@@ -38,6 +38,7 @@ import {
   type DrawWork,
   type DrawWorkStatus,
 } from '@/stores/draw-workspace';
+import { useModelCatalogStore } from '@/stores/model-catalog';
 import { useSessionStore } from '@/stores/session';
 
 interface ModelOption {
@@ -94,14 +95,7 @@ interface GenerationShowcase {
   ratio: string;
 }
 
-const generationModels: ModelOption[] = [
-  { accent: '#7157e8', label: '极光光影 2.1', value: 'generation-light-2' },
-  { accent: '#2f8ddb', label: '高清写实 4.0', value: 'generation-realistic-4' },
-  { accent: '#22a172', label: '商业摄影 3.0', value: 'generation-product-3' },
-  { accent: '#d36c9b', label: '插画设计 3.0', value: 'generation-illustration-3' },
-  { accent: '#d99a36', label: '国风水墨 1.8', value: 'generation-ink-1' },
-  { accent: '#3979d5', label: '概念场景 2.4', value: 'generation-scene-2' },
-];
+const modelAccents = ['#7157e8', '#2f8ddb', '#22a172', '#d36c9b', '#d99a36', '#3979d5'];
 
 const generationCategories: GenerationCategory[] = [
   { label: '全部', value: 'all' },
@@ -174,11 +168,6 @@ const generationShowcases: GenerationShowcase[] = [
     prompt: '移除画面中的干扰物和瑕疵，自然补全背景纹理，保持原有清晰度、色彩和构图。',
     ratio: '智能比例',
   },
-];
-
-const retouchModels: RetouchModelOption[] = [
-  { description: '快速修图与日常增强', label: 'Seedream 5.0 Lite', value: 'seedream-5-lite' },
-  { description: '更精细的人像与商品细节', label: 'Seedream 5.0 Pro', value: 'seedream-5-pro' },
 ];
 
 const retouchShowcases: RetouchShowcase[] = [
@@ -279,12 +268,13 @@ const amounts = [1, 2, 3, 4];
 const route = useRoute();
 const workspace = useDrawWorkspaceStore();
 const sessionStore = useSessionStore();
+const modelCatalog = useModelCatalogStore();
 
 const prompt = ref('');
 const instruction = ref('');
 const selectedAmount = ref(1);
-const selectedModel = ref(generationModels[0]?.value ?? 'generation-light-2');
-const selectedRetouchModel = ref(retouchModels[0]?.value ?? 'seedream-5-lite');
+const selectedModel = ref(modelCatalog.resolveAlias('image'));
+const selectedRetouchModel = ref(modelCatalog.resolveAlias('image'));
 const selectedOperation = ref(retouchOperations[0]?.value ?? 'enhance');
 const activeGenerationCategory = ref('all');
 const selectedRatio = ref('智能比例');
@@ -307,6 +297,21 @@ const sourceInput = ref<HTMLInputElement | null>(null);
 const uploading = ref(false);
 const consumedRouteContext = ref('');
 
+const generationModels = computed<ModelOption[]>(() =>
+  modelCatalog.modelsFor('image').map((model, index) => ({
+    accent: modelAccents[index % modelAccents.length] ?? '#7157e8',
+    label: model.displayName,
+    value: model.alias,
+  })),
+);
+const retouchModels = computed<RetouchModelOption[]>(() =>
+  modelCatalog.modelsFor('image').map((model, index) => ({
+    description: index === 0 ? '快速修图与日常增强' : '更精细的人像、商品与场景细节',
+    label: model.displayName,
+    value: model.alias,
+  })),
+);
+
 const isGeneration = computed(() => route.name === 'image-generation');
 const toolKey = computed(() => (isGeneration.value ? 'image-generation' : 'smart-retouch'));
 const pageTitle = computed(() => (isGeneration.value ? '图片生成' : '智能修图'));
@@ -320,11 +325,13 @@ const activeOperation = computed(() =>
 );
 const activeModelLabel = computed(
   () =>
-    generationModels.find((item) => item.value === selectedModel.value)?.label ?? '图片生成模型',
+    generationModels.value.find((item) => item.value === selectedModel.value)?.label ??
+    '图片生成模型',
 );
 const activeRetouchModelLabel = computed(
   () =>
-    retouchModels.find((item) => item.value === selectedRetouchModel.value)?.label ?? '智能修图',
+    retouchModels.value.find((item) => item.value === selectedRetouchModel.value)?.label ??
+    '智能修图',
 );
 const selectedRetouchShowcase = computed(() =>
   retouchShowcases.find((item) => item.id === selectedRetouchShowcaseId.value),
@@ -602,6 +609,7 @@ async function submitTask(): Promise<void> {
           strength: retouchStrength.value,
         },
     model: isGeneration.value ? selectedModel.value : selectedRetouchModel.value,
+    modelAlias: isGeneration.value ? selectedModel.value : selectedRetouchModel.value,
     modelLabel: isGeneration.value ? activeModelLabel.value : activeRetouchModelLabel.value,
     prompt: taskPrompt,
     ratio: isGeneration.value ? selectedRatio.value : '保持原图',
@@ -652,9 +660,23 @@ watch(
 );
 
 onMounted(() => {
+  void modelCatalog.load();
   void workspace.initialize();
   void consumeRouteContext();
 });
+
+watch(
+  () =>
+    modelCatalog
+      .modelsFor('image')
+      .map((model) => model.alias)
+      .join('|'),
+  () => {
+    selectedModel.value = modelCatalog.resolveAlias('image', selectedModel.value);
+    selectedRetouchModel.value = modelCatalog.resolveAlias('image', selectedRetouchModel.value);
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(() => {
   if (sourceImage.value) {

@@ -27,6 +27,7 @@ export interface DrawWork {
   favorite: boolean;
   id: string;
   model: string;
+  modelAlias: string;
   modelLabel: string;
   parameters: Record<string, unknown>;
   prompt: string;
@@ -51,6 +52,7 @@ interface CreateGenerationInput {
   amount: number;
   extraParameters?: Record<string, unknown>;
   model: string;
+  modelAlias?: string;
   modelLabel: string;
   prompt: string;
   ratio: string;
@@ -62,6 +64,7 @@ interface CreateGenerationInput {
 
 interface TaskDisplayMetadata {
   model: string;
+  modelAlias?: string;
   modelLabel: string;
   parameters?: Record<string, unknown>;
   ratio: string;
@@ -193,7 +196,7 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
         for (let index = 0; index < amount; index += 1) {
           const task = await createImageTask(
             {
-              modelAlias: IMAGE_MODEL_ALIAS,
+              modelAlias: input.modelAlias || IMAGE_MODEL_ALIAS,
               parameters: {
                 ...input.extraParameters,
                 ratio: input.ratio,
@@ -212,6 +215,7 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
           createdWorks.push(
             this.mergeTask(task, {
               model: input.model,
+              modelAlias: input.modelAlias || IMAGE_MODEL_ALIAS,
               modelLabel: input.modelLabel,
               parameters: input.extraParameters,
               ratio: input.ratio,
@@ -240,6 +244,7 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
       return this.createGenerationWorks({
         amount: 1,
         model: work.model,
+        modelAlias: work.modelAlias,
         modelLabel: work.modelLabel,
         extraParameters: work.parameters,
         prompt: work.prompt,
@@ -359,6 +364,7 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
           completedAt: toTimestamp(task.completedAt),
           errorMessage: task.errorMessage ?? '',
           model: metadata?.model ?? asString(task.parameters?.uiModel) ?? existing.model,
+          modelAlias: metadata?.modelAlias ?? task.modelAlias ?? existing.modelAlias,
           modelLabel:
             metadata?.modelLabel ?? asString(task.parameters?.uiModelLabel) ?? existing.modelLabel,
           parameters:
@@ -389,6 +395,7 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
         favorite: false,
         id: task.id,
         model: metadata?.model ?? asString(task.parameters?.uiModel) ?? task.modelAlias,
+        modelAlias: metadata?.modelAlias ?? task.modelAlias ?? IMAGE_MODEL_ALIAS,
         modelLabel:
           metadata?.modelLabel ?? asString(task.parameters?.uiModelLabel) ?? task.modelAlias,
         parameters: metadata?.parameters ?? extractExtraParameters(task.parameters) ?? {},
