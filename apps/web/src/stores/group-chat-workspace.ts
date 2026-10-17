@@ -119,8 +119,21 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
         return;
       }
 
+      const ownerChanged = this.ownerUserId !== null && this.ownerUserId !== authenticatedUserId;
+
+      if (ownerChanged) {
+        this.error = null;
+        this.rounds = [];
+        this.selectedAliases = [];
+      }
+
       this.ownerUserId = authenticatedUserId;
-      this.hydrateWorkspace(authenticatedUserId);
+      const hydrated = this.hydrateWorkspace(authenticatedUserId);
+
+      if (ownerChanged && !hydrated && this.models.length > 0) {
+        this.syncModels(this.models);
+      }
+
       this.initialized = true;
       this.status = 'ready';
     },
@@ -389,15 +402,16 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
 
       this.persistWorkspace();
     },
-    hydrateWorkspace(userId: string): void {
+    hydrateWorkspace(userId: string): boolean {
       const persisted = readPersistedWorkspace(userId);
 
       if (!persisted) {
-        return;
+        return false;
       }
 
       this.rounds = persisted.rounds;
       this.selectedAliases = persisted.selectedAliases;
+      return true;
     },
     persistWorkspace(): void {
       if (!this.ownerUserId) {

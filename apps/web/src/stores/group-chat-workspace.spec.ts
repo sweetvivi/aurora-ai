@@ -340,4 +340,51 @@ describe('group chat workspace store', () => {
     });
     expect(restoredGroupStore.rounds).toHaveLength(2);
   });
+
+  it('clears the previous workspace when a different user signs in', async () => {
+    const sessionStore = useSessionStore();
+    const groupStore = useGroupChatWorkspaceStore();
+
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+
+    await groupStore.initialize();
+    groupStore.syncModels(models.slice(0, 2));
+    groupStore.$patch({
+      rounds: [
+        {
+          attachments: [],
+          content: '第一位用户的问题',
+          createdAt: '2026-10-18T00:00:00.000Z',
+          id: 'private-round',
+          responses: [
+            {
+              alias: 'model-1',
+              content: '第一位用户可见的回答',
+              createdAt: '2026-10-18T00:00:00.000Z',
+              displayName: '模型一',
+              id: 'private-response',
+              status: 'COMPLETED',
+            },
+          ],
+        },
+      ],
+    });
+    groupStore.persistWorkspace();
+
+    sessionStore.$patch({
+      user: {
+        ...authenticatedUser,
+        email: 'second-user@example.com',
+        id: 'user-groups-second',
+      },
+    });
+
+    await groupStore.initialize();
+
+    expect(groupStore.rounds).toEqual([]);
+    expect(groupStore.selectedAliases).toEqual(['model-1', 'model-2']);
+  });
 });
