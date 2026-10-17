@@ -12,7 +12,7 @@ import {
 } from '@/app/api';
 import { useSessionStore } from './session';
 
-export const IMAGE_MODEL_ALIAS = 'volc-seedream-5';
+export const IMAGE_MODEL_ALIAS = 'jiguang-gpt-image-2.5';
 export const IMAGE_TASK_POINTS_COST = 5;
 
 export type DrawWorkStatus = 'done' | 'failed' | 'generating' | 'queued';

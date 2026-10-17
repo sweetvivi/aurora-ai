@@ -7,6 +7,9 @@ describe('environment schema', () => {
 
     expect(environment.API_HOST).toBe('127.0.0.1');
     expect(environment.API_PORT).toBe(3001);
+    expect(environment.IMAGE_PROVIDER).toBe('auto');
+    expect(environment.IMAGE_DEFAULT_MODEL).toBe('gpt-image-2.5');
+    expect(environment.IMAGE_DEFAULT_MODEL_ALIAS).toBe('jiguang-gpt-image-2.5');
     expect(environment.LLM_DEFAULT_MODEL).toBe('openai-gpt-6-astra');
   });
 

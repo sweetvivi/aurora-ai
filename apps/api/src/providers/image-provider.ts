@@ -1,4 +1,5 @@
 export interface GenerateImageInput {
+  model?: string;
   parameters?: Record<string, unknown>;
   prompt: string;
   sourceImage?: {

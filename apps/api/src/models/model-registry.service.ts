@@ -20,11 +20,11 @@ const DEFAULT_MODELS: RegisteredModel[] = [
     providerModel: 'gpt-6-astra',
   },
   {
-    alias: 'volc-seedream-5',
+    alias: 'jiguang-gpt-image-2.5',
     capabilities: ['image'],
-    displayName: 'Seedream 5',
-    providerCode: 'mock',
-    providerModel: 'mock-seedream-5',
+    displayName: 'GPT Image 2.5',
+    providerCode: 'jiguang',
+    providerModel: 'gpt-image-2.5',
   },
 ];
 
@@ -56,6 +56,8 @@ export class ModelRegistryService {
   }
 
   getDefaultImageModel(): RegisteredModel {
-    return this.getByAlias('volc-seedream-5');
+    return this.getByAlias(
+      this.configService.get<string>('IMAGE_DEFAULT_MODEL_ALIAS', 'jiguang-gpt-image-2.5'),
+    );
   }
 }

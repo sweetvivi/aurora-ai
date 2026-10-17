@@ -231,6 +231,7 @@ export class ImageTasksService implements OnModuleInit {
       return;
     }
 
+    const model = this.modelRegistryService.getByAlias(task.modelAlias);
     let resultStorageKey: string | undefined;
 
     try {
@@ -242,6 +243,7 @@ export class ImageTasksService implements OnModuleInit {
           }
         : undefined;
       const generated = await this.imageProvider.generateImage({
+        model: model.providerModel,
         parameters: this.toRecord(task.parameters),
         prompt: task.prompt,
         sourceImage,
@@ -454,9 +456,18 @@ export class ImageTasksService implements OnModuleInit {
 
     const messages: Record<string, string> = {
       IMAGE_GENERATION_FAILED: '图片生成失败，本次积分已退回',
+      IMAGE_AUTH_ERROR: '图片生成服务鉴权失败，本次积分已退回',
+      IMAGE_INVALID_RESPONSE: '图片生成服务返回了无效响应，本次积分已退回',
+      IMAGE_NOT_CONFIGURED: '图片生成服务尚未配置，本次积分已退回',
       IMAGE_PROVIDER_INVALID_RESULT: '图片生成服务返回了空结果，请重试',
+      IMAGE_PROVIDER_UNAVAILABLE: '图片生成服务暂时不可用，本次积分已退回',
+      IMAGE_RATE_LIMITED: '图片生成请求过于频繁，本次积分已退回',
+      IMAGE_REQUEST_ERROR: '图片生成请求失败，本次积分已退回',
+      IMAGE_RESULT_DOWNLOAD_FAILED: '图片结果下载失败，本次积分已退回',
+      IMAGE_RESULT_TOO_LARGE: '图片结果超过允许的大小，本次积分已退回',
       IMAGE_TASK_POINTS_NOT_RESERVED: '图片任务积分冻结记录不存在，请重新提交任务',
       IMAGE_TASK_STATE_CONFLICT: '图片任务状态已发生变化，请刷新后重试',
+      IMAGE_TIMEOUT: '图片生成请求超时，本次积分已退回',
       IMAGE_WORKER_RESTARTED: '生成任务因服务重启中断，本次积分已退回',
       INSUFFICIENT_POINTS: '积分不足，请先充值或减少任务消耗',
     };

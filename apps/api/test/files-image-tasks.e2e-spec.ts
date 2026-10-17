@@ -161,7 +161,7 @@ describe('file uploads and image tasks', () => {
 
     expect(task).toMatchObject({
       id: taskId,
-      modelAlias: 'volc-seedream-5',
+      modelAlias: 'jiguang-gpt-image-2.5',
       status: 'SUCCEEDED',
     });
     expect(task.resultFile).toMatchObject({

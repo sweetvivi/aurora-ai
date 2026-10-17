@@ -61,6 +61,14 @@ export const envSchema = z.object({
     .default(10 * 1024 * 1024),
   IMAGE_MOCK_DELAY_MS: z.coerce.number().int().min(0).max(60_000).default(1_200),
   IMAGE_MOCK_IMAGE_SIZE: z.coerce.number().int().min(64).max(1_024).default(512),
+  IMAGE_PROVIDER: z.enum(['auto', 'mock', 'openai']).default('auto'),
+  IMAGE_BASE_URL: z.string().url().default('https://api.example.com/v1'),
+  IMAGE_API_KEY: optionalNonEmptyString,
+  IMAGE_FALLBACK_API_KEY: optionalNonEmptyString,
+  IMAGE_ACTOR_AUTHORIZATION: z.string().min(1).default('local-image-extension'),
+  IMAGE_DEFAULT_MODEL: z.string().min(1).default('gpt-image-2.5'),
+  IMAGE_DEFAULT_MODEL_ALIAS: z.string().min(1).default('jiguang-gpt-image-2.5'),
+  IMAGE_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(600_000).default(180_000),
 });
 
 export type AppEnvironment = z.infer<typeof envSchema>;

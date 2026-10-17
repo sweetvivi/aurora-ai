@@ -243,6 +243,17 @@
 - 约束：Seedance 不作为生图备用 Key，也不在 M1 生图阶段消耗额度
 - 约束：真实密钥只通过后端环境变量注入，不进入 Git、日志、普通文档和回复
 
+### D-038 真实图片 Provider
+
+- 状态：Accepted
+- 决策：图片任务支持 `IMAGE_PROVIDER=auto|mock|openai`；`auto` 在配置图片 Key 时使用真实 Provider，无 Key 时使用确定性 Mock
+- 决策：首期真实图片 Provider 使用 OpenAI 兼容的 `/images/generations` 和 `/images/edits`
+- 决策：前端固定使用别名 `jiguang-gpt-image-2.5`，上游真实模型为 `gpt-image-2.5`
+- 决策：图片结果同时支持 Base64 和远程 URL，并由后端统一做大小、MIME 和文件头校验
+- 约束：备用图片 Key 只在主 Key 返回 `401/403` 时使用；限流、服务不可用和普通请求错误不重复扣费或重复提交
+- 约束：真实图片错误必须写入任务失败状态并退回积分，不把上游响应正文或密钥写入日志
+- 约束：视频生成继续使用本地演示，不调用 Seedance；真实视频 Provider 进入后续阶段后再单独确认
+
 ### D-036 M2 工具套件范围重排
 
 - 状态：Accepted
