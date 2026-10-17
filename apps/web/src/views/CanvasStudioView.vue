@@ -49,6 +49,7 @@ type CanvasNodeStatus = 'done' | 'failed' | 'generating' | 'idle' | 'queued';
 type CanvasAssetCategory = 'all' | 'character' | 'item' | 'other' | 'scene' | 'sound' | 'style';
 type HistoryTab = 'image' | 'video';
 type NodeGenerationAction = 'angle' | 'image' | 'local-image' | 'local-video' | 'text' | 'video';
+type BatchFilter = 'all' | 'failed' | 'pending';
 
 interface CanvasNode {
   createdAt: number;
@@ -74,6 +75,13 @@ interface CanvasEdge {
   to: string;
 }
 
+interface CanvasGroup {
+  color: string;
+  id: string;
+  nodeIds: string[];
+  title: string;
+}
+
 interface CanvasAsset {
   category: Exclude<CanvasAssetCategory, 'all'>;
   createdAt: number;
@@ -93,7 +101,28 @@ interface CanvasWorkflow {
 
 interface CanvasSnapshot {
   edges: CanvasEdge[];
+  groups: CanvasGroup[];
   nodes: CanvasNode[];
+}
+
+interface CanvasContextMenu {
+  kind: 'canvas' | 'node';
+  nodeId?: string;
+  x: number;
+  y: number;
+}
+
+interface CanvasWorkflowDocument {
+  edges: CanvasEdge[];
+  groups?: CanvasGroup[];
+  nodes: CanvasNode[];
+  title: string;
+  version: 1;
+  viewport?: {
+    scale: number;
+    x: number;
+    y: number;
+  };
 }
 
 interface Point {
@@ -104,7 +133,7 @@ interface Point {
 interface RailAction {
   icon: Component;
   label: string;
-  value: 'add' | 'assets' | 'history' | 'inspiration' | 'workflow';
+  value: 'add' | 'assets' | 'batch' | 'history' | 'inspiration' | 'workflow';
 }
 
 interface GenerationModel {
@@ -121,6 +150,7 @@ const railActions: RailAction[] = [
   { icon: PlusOutlined, label: '添加', value: 'add' },
   { icon: AppstoreOutlined, label: '素材', value: 'assets' },
   { icon: HistoryOutlined, label: '历史', value: 'history' },
+  { icon: ThunderboltFilled, label: '批量生成', value: 'batch' },
   { icon: BulbOutlined, label: '灵感', value: 'inspiration' },
   { icon: NodeIndexOutlined, label: '工作流', value: 'workflow' },
   { icon: UserOutlined, label: '账户', value: 'inspiration' },
@@ -152,6 +182,12 @@ const generationModels: GenerationModel[] = [
   { label: '概念场景 1.9', value: 'canvas-scene-1' },
 ];
 
+const batchFilters: { label: string; value: BatchFilter }[] = [
+  { label: '未生成', value: 'pending' },
+  { label: '失败', value: 'failed' },
+  { label: '全部', value: 'all' },
+];
+
 const workflowTemplates: CanvasWorkflow[] = [
   {
     description: '从提示词到图片节点，适合快速探索视觉方向',
@@ -180,15 +216,20 @@ const routeName = 'ai-canvas';
 const workspace = useDrawWorkspaceStore();
 const nodes = ref<CanvasNode[]>([]);
 const edges = ref<CanvasEdge[]>([]);
+const groups = ref<CanvasGroup[]>([]);
 const assets = ref<CanvasAsset[]>([]);
 const activeRailMenu = ref<RailAction['value'] | null>(null);
 const activeAssetCategory = ref<CanvasAssetCategory>('all');
 const activeHistoryTab = ref<HistoryTab>('image');
 const activeWorkflowTab = ref<'mine' | 'samples'>('mine');
+const activeBatchFilter = ref<BatchFilter>('pending');
 const canvasTitle = ref('新建画布');
 const selectedNodeId = ref('');
+const selectedNodeIds = ref<string[]>([]);
 const nodeMenuNodeId = ref('');
 const connectionFromId = ref('');
+const contextMenu = ref<CanvasContextMenu | null>(null);
+const canvasNotice = ref('');
 const inspirationOpen = ref(false);
 const inspirationMessage = ref('');
 const composerPrompt = ref('');
@@ -200,6 +241,9 @@ const selectedSize = ref('1K');
 const uploadCategory = ref<Exclude<CanvasAssetCategory, 'all'>>('other');
 const uploadingAssets = ref(false);
 const assetError = ref('');
+const batchSelectedIds = ref<string[]>([]);
+const batchRunning = ref(false);
+const batchCancelRequested = ref(false);
 const saveState = ref<'idle' | 'saved' | 'saving'>('saved');
 const lastSavedAt = ref('10:30');
 const viewport = ref({
@@ -207,8 +251,10 @@ const viewport = ref({
   x: 28,
   y: 32,
 });
+const workspaceElement = ref<HTMLElement | null>(null);
 const nodeUploadInput = ref<HTMLInputElement | null>(null);
 const assetUploadInput = ref<HTMLInputElement | null>(null);
+const workflowImportInput = ref<HTMLInputElement | null>(null);
 const fileUrls = ref<Record<string, string>>({});
 const undoStack = ref<CanvasSnapshot[]>([]);
 const redoStack = ref<CanvasSnapshot[]>([]);
@@ -222,9 +268,7 @@ const loadedFileIds = new Set<string>();
 const objectUrls = new Set<string>();
 let dragState:
   | {
-      id: string;
-      originX: number;
-      originY: number;
+      origins: Map<string, { x: number; y: number }>;
       pointerX: number;
       pointerY: number;
     }
@@ -238,9 +282,11 @@ let panState:
     }
   | undefined;
 let saveTimer: number | undefined;
+let noticeTimer: number | undefined;
 let hydrated = false;
 
 const selectedNode = computed(() => nodes.value.find((node) => node.id === selectedNodeId.value));
+const selectedNodeCount = computed(() => selectedNodeIds.value.length);
 const angleDialogNode = computed(() =>
   nodes.value.find((node) => node.id === angleDialogNodeId.value),
 );
@@ -270,6 +316,27 @@ const imageHistory = computed(() => workspace.works.filter((work) => work.status
 const visibleHistory = computed(() =>
   activeHistoryTab.value === 'image' ? imageHistory.value : [],
 );
+const batchCandidates = computed(() => {
+  const candidates = nodes.value.filter(
+    (node) => node.kind === 'image' || node.kind === 'output' || node.kind === 'video',
+  );
+
+  if (activeBatchFilter.value === 'all') {
+    return candidates;
+  }
+
+  if (activeBatchFilter.value === 'failed') {
+    return candidates.filter((node) => nodeStatus(node) === 'failed');
+  }
+
+  return candidates.filter((node) => nodeStatus(node) !== 'done');
+});
+const selectedBatchNodes = computed(() =>
+  nodes.value.filter(
+    (node) => batchSelectedIds.value.includes(node.id) && nodeStatus(node) !== 'done',
+  ),
+);
+const batchCost = computed(() => selectedBatchNodes.value.length * IMAGE_TASK_POINTS_COST);
 const composerCost = IMAGE_TASK_POINTS_COST;
 const submitting = computed(() => workspace.submitting);
 const canvasTransform = computed(
@@ -284,6 +351,47 @@ function createId(prefix: string): string {
   return `${prefix}-${randomPart}`;
 }
 
+function uniqueIds(ids: string[]): string[] {
+  return [...new Set(ids.filter(Boolean))];
+}
+
+function setSelection(ids: string[], primaryId = ''): void {
+  selectedNodeIds.value = uniqueIds(ids);
+  selectedNodeId.value =
+    primaryId && selectedNodeIds.value.includes(primaryId)
+      ? primaryId
+      : (selectedNodeIds.value.at(-1) ?? '');
+}
+
+function clearSelection(): void {
+  selectedNodeIds.value = [];
+  selectedNodeId.value = '';
+}
+
+function isNodeSelected(nodeId: string): boolean {
+  return selectedNodeIds.value.includes(nodeId);
+}
+
+function toggleNodeSelection(nodeId: string): void {
+  if (isNodeSelected(nodeId)) {
+    setSelection(
+      selectedNodeIds.value.filter((id) => id !== nodeId),
+      selectedNodeId.value === nodeId ? '' : selectedNodeId.value,
+    );
+    return;
+  }
+
+  setSelection([...selectedNodeIds.value, nodeId], nodeId);
+}
+
+function showCanvasNotice(message: string): void {
+  canvasNotice.value = message;
+  window.clearTimeout(noticeTimer);
+  noticeTimer = window.setTimeout(() => {
+    canvasNotice.value = '';
+  }, 2600);
+}
+
 function createSeedCanvas(): CanvasSnapshot {
   const firstId = 'node-seed-image';
   const secondId = 'node-seed-detail';
@@ -295,6 +403,7 @@ function createSeedCanvas(): CanvasSnapshot {
       { from: firstId, id: 'edge-seed-one', to: outputId },
       { from: secondId, id: 'edge-seed-two', to: outputId },
     ],
+    groups: [],
     nodes: [
       {
         createdAt: Date.now() - 240_000,
@@ -351,6 +460,7 @@ function createSeedCanvas(): CanvasSnapshot {
 function cloneSnapshot(): CanvasSnapshot {
   return {
     edges: edges.value.map((edge) => ({ ...edge })),
+    groups: groups.value.map((group) => ({ ...group, nodeIds: [...group.nodeIds] })),
     nodes: nodes.value.map((node) => ({ ...node })),
   };
 }
@@ -358,8 +468,13 @@ function cloneSnapshot(): CanvasSnapshot {
 function replaceSnapshot(snapshot: CanvasSnapshot): void {
   nodes.value = snapshot.nodes.map((node) => ({ ...node }));
   edges.value = snapshot.edges.map((edge) => ({ ...edge }));
-  selectedNodeId.value = '';
+  groups.value = (snapshot.groups ?? []).map((group) => ({
+    ...group,
+    nodeIds: [...group.nodeIds],
+  }));
+  clearSelection();
   nodeMenuNodeId.value = '';
+  contextMenu.value = null;
   composerTargetNodeId.value = '';
   composerSourceNodeId.value = '';
 }
@@ -396,6 +511,7 @@ function redo(): void {
 function loadCanvas(): void {
   const saved = readJson<{
     edges?: CanvasEdge[];
+    groups?: CanvasGroup[];
     nodes?: CanvasNode[];
     title?: string;
     viewport?: typeof viewport.value;
@@ -404,12 +520,16 @@ function loadCanvas(): void {
   if (saved?.nodes?.length) {
     nodes.value = saved.nodes;
     edges.value = Array.isArray(saved.edges) ? saved.edges : [];
+    groups.value = Array.isArray(saved.groups)
+      ? saved.groups.map((group) => ({ ...group, nodeIds: [...group.nodeIds] }))
+      : [];
     canvasTitle.value = saved.title || '新建画布';
     viewport.value = saved.viewport || viewport.value;
   } else {
     const seed = createSeedCanvas();
     nodes.value = seed.nodes;
     edges.value = seed.edges;
+    groups.value = seed.groups;
   }
 
   assets.value =
@@ -427,6 +547,7 @@ function persistCanvas(): void {
         CANVAS_STORAGE_KEY,
         JSON.stringify({
           edges: edges.value,
+          groups: groups.value,
           nodes: nodes.value.map((node) => ({
             ...node,
             previewUrl: undefined,
@@ -462,11 +583,18 @@ function readJson<T>(key: string): T | null {
 
 function openRail(action: RailAction['value']): void {
   nodeMenuNodeId.value = '';
+  contextMenu.value = null;
 
   if (action === 'inspiration') {
     activeRailMenu.value = null;
     inspirationOpen.value = !inspirationOpen.value;
     return;
+  }
+
+  if (action === 'batch') {
+    batchSelectedIds.value = batchCandidates.value
+      .filter((node) => nodeStatus(node) !== 'done')
+      .map((node) => node.id);
   }
 
   activeRailMenu.value = activeRailMenu.value === action ? null : action;
@@ -475,6 +603,7 @@ function openRail(action: RailAction['value']): void {
 function closeRailMenu(): void {
   activeRailMenu.value = null;
   nodeMenuNodeId.value = '';
+  contextMenu.value = null;
 }
 
 function createCanvas(): void {
@@ -484,8 +613,11 @@ function createCanvas(): void {
   canvasTitle.value = '新建画布';
   nodes.value = seed.nodes;
   edges.value = seed.edges;
-  selectedNodeId.value = '';
+  groups.value = seed.groups;
+  clearSelection();
   nodeMenuNodeId.value = '';
+  contextMenu.value = null;
+  batchSelectedIds.value = [];
   composerTargetNodeId.value = '';
   composerSourceNodeId.value = '';
   connectionFromId.value = '';
@@ -504,8 +636,11 @@ function loadWorkflow(workflow: CanvasWorkflow): void {
       nodes.value.some((node) => node.id === edge.from) &&
       nodes.value.some((node) => node.id === edge.to),
   );
-  selectedNodeId.value = '';
+  groups.value = [];
+  clearSelection();
   nodeMenuNodeId.value = '';
+  contextMenu.value = null;
+  batchSelectedIds.value = [];
   composerTargetNodeId.value = '';
   composerSourceNodeId.value = '';
   activeRailMenu.value = null;
@@ -528,7 +663,7 @@ function addPromptNode(prompt = '描述当前节点需要生成或处理的内�
 
   commitHistory();
   nodes.value = [...nodes.value, node];
-  selectedNodeId.value = node.id;
+  setSelection([node.id], node.id);
   return node;
 }
 
@@ -550,7 +685,7 @@ function addImageNodeFromAsset(asset: CanvasAsset): void {
 
   commitHistory();
   nodes.value = [...nodes.value, node];
-  selectedNodeId.value = node.id;
+  setSelection([node.id], node.id);
   activeRailMenu.value = null;
 }
 
@@ -572,59 +707,142 @@ function addImageNodeFromWork(work: DrawWork): void {
 
   commitHistory();
   nodes.value = [...nodes.value, node];
-  selectedNodeId.value = node.id;
+  setSelection([node.id], node.id);
   activeRailMenu.value = null;
 }
 
 function deleteSelectedNode(): void {
-  const nodeId = selectedNodeId.value;
+  const nodeIds = [...selectedNodeIds.value];
 
-  if (!nodeId) {
+  if (nodeIds.length === 0) {
     return;
   }
 
   commitHistory();
-  nodes.value = nodes.value.filter((node) => node.id !== nodeId);
-  edges.value = edges.value.filter((edge) => edge.from !== nodeId && edge.to !== nodeId);
-  selectedNodeId.value = '';
+  nodes.value = nodes.value.filter((node) => !nodeIds.includes(node.id));
+  edges.value = edges.value.filter(
+    (edge) => !nodeIds.includes(edge.from) && !nodeIds.includes(edge.to),
+  );
+  groups.value = groups.value
+    .map((group) => ({
+      ...group,
+      nodeIds: group.nodeIds.filter((id) => !nodeIds.includes(id)),
+    }))
+    .filter((group) => group.nodeIds.length >= 2);
+  batchSelectedIds.value = batchSelectedIds.value.filter((id) => !nodeIds.includes(id));
+  clearSelection();
   nodeMenuNodeId.value = '';
-  composerTargetNodeId.value =
-    composerTargetNodeId.value === nodeId ? '' : composerTargetNodeId.value;
-  composerSourceNodeId.value =
-    composerSourceNodeId.value === nodeId ? '' : composerSourceNodeId.value;
+  contextMenu.value = null;
+  composerTargetNodeId.value = nodeIds.includes(composerTargetNodeId.value)
+    ? ''
+    : composerTargetNodeId.value;
+  composerSourceNodeId.value = nodeIds.includes(composerSourceNodeId.value)
+    ? ''
+    : composerSourceNodeId.value;
   connectionFromId.value = '';
 }
 
 function duplicateSelectedNode(): void {
-  const node = selectedNode.value;
+  const sourceNodes = nodes.value.filter((node) => isNodeSelected(node.id));
 
-  if (!node) {
+  if (sourceNodes.length === 0) {
     return;
   }
 
-  const duplicate: CanvasNode = {
-    ...node,
-    createdAt: Date.now(),
-    id: createId(node.kind),
-    title: `${node.title} 副本`,
-    x: node.x + 34,
-    y: node.y + 34,
-  };
+  const idMap = new Map<string, string>();
+  const duplicates = sourceNodes.map((node) => {
+    const id = createId(node.kind);
+    idMap.set(node.id, id);
+
+    return {
+      ...node,
+      createdAt: Date.now(),
+      id,
+      title: `${node.title} 副本`,
+      x: node.x + 34,
+      y: node.y + 34,
+    };
+  });
+  const duplicateEdges = edges.value
+    .filter((edge) => idMap.has(edge.from) && idMap.has(edge.to))
+    .map((edge) => ({
+      from: idMap.get(edge.from) ?? edge.from,
+      id: createId('edge'),
+      to: idMap.get(edge.to) ?? edge.to,
+    }));
 
   commitHistory();
-  nodes.value = [...nodes.value, duplicate];
-  selectedNodeId.value = duplicate.id;
+  nodes.value = [...nodes.value, ...duplicates];
+  edges.value = [...edges.value, ...duplicateEdges];
+  setSelection(
+    duplicates.map((node) => node.id),
+    duplicates.at(-1)?.id,
+  );
+  contextMenu.value = null;
 }
 
 function startConnection(nodeId: string): void {
   connectionFromId.value = connectionFromId.value === nodeId ? '' : nodeId;
 }
 
+function canConnectNodes(source: CanvasNode, target: CanvasNode): boolean {
+  if (source.id === target.id || target.kind === 'prompt') {
+    return false;
+  }
+
+  if (source.kind === 'prompt') {
+    return target.kind === 'image' || target.kind === 'output' || target.kind === 'video';
+  }
+
+  if (source.kind === 'image' || source.kind === 'output' || source.kind === 'video') {
+    return target.kind === 'image' || target.kind === 'output' || target.kind === 'video';
+  }
+
+  return false;
+}
+
+function wouldCreateCycle(sourceId: string, targetId: string): boolean {
+  const visited = new Set<string>();
+  const stack = [targetId];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+
+    if (!current || visited.has(current)) {
+      continue;
+    }
+
+    if (current === sourceId) {
+      return true;
+    }
+
+    visited.add(current);
+    stack.push(...edges.value.filter((edge) => edge.from === current).map((edge) => edge.to));
+  }
+
+  return false;
+}
+
 function connectNode(targetId: string): void {
   const sourceId = connectionFromId.value;
 
   if (!sourceId || sourceId === targetId) {
-    selectedNodeId.value = targetId;
+    setSelection([targetId], targetId);
+    connectionFromId.value = '';
+    return;
+  }
+
+  const source = nodes.value.find((node) => node.id === sourceId);
+  const target = nodes.value.find((node) => node.id === targetId);
+
+  if (!source || !target || !canConnectNodes(source, target)) {
+    showCanvasNotice('节点类型不支持这样连接');
+    connectionFromId.value = '';
+    return;
+  }
+
+  if (wouldCreateCycle(sourceId, targetId)) {
+    showCanvasNotice('不能连接成循环工作流');
     connectionFromId.value = '';
     return;
   }
@@ -646,7 +864,7 @@ function connectNode(targetId: string): void {
   }
 
   connectionFromId.value = '';
-  selectedNodeId.value = targetId;
+  setSelection([targetId], targetId);
   nodeMenuNodeId.value = '';
 }
 
@@ -662,13 +880,29 @@ function handleNodePointerDown(event: PointerEvent, node: CanvasNode): void {
     return;
   }
 
-  selectedNodeId.value = node.id;
+  if (event.shiftKey || event.ctrlKey || event.metaKey) {
+    toggleNodeSelection(node.id);
+
+    if (!isNodeSelected(node.id)) {
+      return;
+    }
+  } else if (!isNodeSelected(node.id)) {
+    setSelection([node.id], node.id);
+  } else {
+    selectedNodeId.value = node.id;
+  }
+
   nodeMenuNodeId.value = '';
+  contextMenu.value = null;
   commitHistory();
+  const dragIds = isNodeSelected(node.id) ? selectedNodeIds.value : [node.id];
+
   dragState = {
-    id: node.id,
-    originX: node.x,
-    originY: node.y,
+    origins: new Map(
+      nodes.value
+        .filter((item) => dragIds.includes(item.id))
+        .map((item) => [item.id, { x: item.x, y: item.y }]),
+    ),
     pointerX: event.clientX,
     pointerY: event.clientY,
   };
@@ -679,10 +913,11 @@ function handleCanvasPointerDown(event: PointerEvent): void {
     return;
   }
 
-  selectedNodeId.value = '';
+  clearSelection();
   connectionFromId.value = '';
   activeRailMenu.value = null;
   nodeMenuNodeId.value = '';
+  contextMenu.value = null;
   panState = {
     originX: viewport.value.x,
     originY: viewport.value.y,
@@ -693,18 +928,16 @@ function handleCanvasPointerDown(event: PointerEvent): void {
 
 function handlePointerMove(event: PointerEvent): void {
   if (dragState) {
-    const node = nodes.value.find((item) => item.id === dragState?.id);
+    for (const [id, origin] of dragState.origins) {
+      const node = nodes.value.find((item) => item.id === id);
 
-    if (!node) {
-      return;
+      if (!node) {
+        continue;
+      }
+
+      node.x = Math.round(origin.x + (event.clientX - dragState.pointerX) / viewport.value.scale);
+      node.y = Math.round(origin.y + (event.clientY - dragState.pointerY) / viewport.value.scale);
     }
-
-    node.x = Math.round(
-      dragState.originX + (event.clientX - dragState.pointerX) / viewport.value.scale,
-    );
-    node.y = Math.round(
-      dragState.originY + (event.clientY - dragState.pointerY) / viewport.value.scale,
-    );
   }
 
   if (panState) {
@@ -914,7 +1147,8 @@ function closeNodeGenerationMenu(): void {
 }
 
 function toggleNodeGenerationMenu(nodeId: string): void {
-  selectedNodeId.value = nodeId;
+  setSelection([nodeId], nodeId);
+  contextMenu.value = null;
   nodeMenuNodeId.value = nodeMenuNodeId.value === nodeId ? '' : nodeId;
 }
 
@@ -932,7 +1166,7 @@ function appendNodeWithEdge(
   }
 
   nodes.value = [...nodes.value, node];
-  selectedNodeId.value = node.id;
+  setSelection([node.id], node.id);
   nodeMenuNodeId.value = '';
 
   if (sourceNode) {
@@ -1211,7 +1445,7 @@ async function submitComposer(): Promise<void> {
       status: 'queued',
       title: selectedModelLabel.value,
     });
-    selectedNodeId.value = outputNode.id;
+    setSelection([outputNode.id], outputNode.id);
   } else {
     const promptNode = addPromptNode(prompt);
 
@@ -1293,6 +1527,419 @@ function assetPreviewUrl(asset: CanvasAsset): string {
   return asset.previewUrl || (asset.fileId ? fileUrls.value[asset.fileId] || '' : '');
 }
 
+function groupBounds(group: CanvasGroup): {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+} {
+  const groupNodes = nodes.value.filter((node) => group.nodeIds.includes(node.id));
+
+  if (groupNodes.length === 0) {
+    return { height: 0, width: 0, x: 0, y: 0 };
+  }
+
+  const minX = Math.min(...groupNodes.map((node) => node.x));
+  const minY = Math.min(...groupNodes.map((node) => node.y));
+  const maxX = Math.max(...groupNodes.map((node) => node.x + node.width));
+  const maxY = Math.max(...groupNodes.map((node) => node.y + node.height));
+
+  return {
+    height: maxY - minY + 84,
+    width: maxX - minX + 72,
+    x: minX - 36,
+    y: minY - 56,
+  };
+}
+
+function createGroupFromSelection(): void {
+  const nodeIds = [...selectedNodeIds.value];
+
+  if (nodeIds.length < 2) {
+    showCanvasNotice('至少选择两个节点才能创建分组');
+    return;
+  }
+
+  const palette = ['#647dff', '#8a72f6', '#43a68b', '#d18b48', '#d06480'];
+  const group: CanvasGroup = {
+    color: palette[groups.value.length % palette.length] ?? '#647dff',
+    id: createId('group'),
+    nodeIds,
+    title: `分组 ${groups.value.length + 1}`,
+  };
+
+  commitHistory();
+  groups.value = [
+    ...groups.value
+      .map((item) => ({
+        ...item,
+        nodeIds: item.nodeIds.filter((id) => !nodeIds.includes(id)),
+      }))
+      .filter((item) => item.nodeIds.length >= 2),
+    group,
+  ];
+  contextMenu.value = null;
+  persistCanvas();
+}
+
+function ungroupSelection(): void {
+  const nodeIds = selectedNodeIds.value;
+
+  if (nodeIds.length === 0) {
+    return;
+  }
+
+  const nextGroups = groups.value.filter(
+    (group) => !group.nodeIds.some((nodeId) => nodeIds.includes(nodeId)),
+  );
+
+  if (nextGroups.length === groups.value.length) {
+    return;
+  }
+
+  commitHistory();
+  groups.value = nextGroups;
+  contextMenu.value = null;
+  persistCanvas();
+}
+
+function removeGroup(groupId: string): void {
+  commitHistory();
+  groups.value = groups.value.filter((group) => group.id !== groupId);
+  persistCanvas();
+}
+
+function autoLayoutCanvas(): void {
+  if (nodes.value.length === 0) {
+    return;
+  }
+
+  const depths = new Map(nodes.value.map((node) => [node.id, 0]));
+
+  for (let pass = 0; pass < nodes.value.length; pass += 1) {
+    let changed = false;
+
+    for (const edge of edges.value) {
+      const sourceDepth = depths.get(edge.from);
+      const targetDepth = depths.get(edge.to);
+
+      if (sourceDepth === undefined || targetDepth === undefined) {
+        continue;
+      }
+
+      const nextDepth = sourceDepth + 1;
+
+      if (nextDepth > targetDepth) {
+        depths.set(edge.to, nextDepth);
+        changed = true;
+      }
+    }
+
+    if (!changed) {
+      break;
+    }
+  }
+
+  const columns = new Map<number, CanvasNode[]>();
+
+  for (const node of nodes.value) {
+    const depth = depths.get(node.id) ?? 0;
+    columns.set(depth, [...(columns.get(depth) ?? []), node]);
+  }
+
+  const orderedDepth = [...columns.keys()].sort((left, right) => left - right);
+  const columnWidths = orderedDepth.map((depth) =>
+    Math.max(...(columns.get(depth) ?? []).map((node) => node.width), 320),
+  );
+  const columnOffsets = new Map<number, number>();
+  let offset = 170;
+
+  for (const depth of orderedDepth) {
+    columnOffsets.set(depth, offset);
+    offset += (columnWidths.shift() ?? 320) + 150;
+  }
+
+  commitHistory();
+  nodes.value = nodes.value.map((node) => {
+    const depth = depths.get(node.id) ?? 0;
+    const column = columns.get(depth) ?? [];
+    const index = column.findIndex((item) => item.id === node.id);
+
+    return {
+      ...node,
+      x: columnOffsets.get(depth) ?? 170,
+      y: 150 + Math.max(index, 0) * 280,
+    };
+  });
+  contextMenu.value = null;
+  persistCanvas();
+  fitCanvasView();
+}
+
+function fitCanvasView(): void {
+  if (nodes.value.length === 0 || !workspaceElement.value) {
+    resetViewport();
+    return;
+  }
+
+  const minX = Math.min(...nodes.value.map((node) => node.x));
+  const minY = Math.min(...nodes.value.map((node) => node.y));
+  const maxX = Math.max(...nodes.value.map((node) => node.x + node.width));
+  const maxY = Math.max(...nodes.value.map((node) => node.y + node.height));
+  const contentWidth = Math.max(maxX - minX, 600);
+  const contentHeight = Math.max(maxY - minY, 420);
+  const availableWidth = Math.max(workspaceElement.value.clientWidth - 190, 320);
+  const availableHeight = Math.max(workspaceElement.value.clientHeight - 230, 280);
+  const scale = Math.min(
+    1.15,
+    Math.max(0.42, Math.min(availableWidth / contentWidth, availableHeight / contentHeight)),
+  );
+
+  viewport.value = {
+    scale: Number(scale.toFixed(2)),
+    x: Math.round((workspaceElement.value.clientWidth - contentWidth * scale) / 2 - minX * scale),
+    y: Math.round(110 - minY * scale),
+  };
+}
+
+function clampContextMenuPosition(x: number, y: number): { x: number; y: number } {
+  return {
+    x: Math.max(10, Math.min(x, window.innerWidth - 238)),
+    y: Math.max(10, Math.min(y, window.innerHeight - 330)),
+  };
+}
+
+function openCanvasContextMenu(event: MouseEvent): void {
+  const position = clampContextMenuPosition(event.clientX, event.clientY);
+
+  contextMenu.value = {
+    ...position,
+    kind: 'canvas',
+  };
+}
+
+function openNodeContextMenu(event: MouseEvent, node: CanvasNode): void {
+  if (!isNodeSelected(node.id)) {
+    setSelection([node.id], node.id);
+  } else {
+    selectedNodeId.value = node.id;
+  }
+
+  const position = clampContextMenuPosition(event.clientX, event.clientY);
+
+  nodeMenuNodeId.value = '';
+  contextMenu.value = {
+    ...position,
+    kind: 'node',
+    nodeId: node.id,
+  };
+}
+
+function openContextNodeGeneration(): void {
+  const node = nodes.value.find((item) => item.id === contextMenu.value?.nodeId);
+
+  if (!node) {
+    return;
+  }
+
+  setSelection([node.id], node.id);
+  contextMenu.value = null;
+  nodeMenuNodeId.value = node.id;
+}
+
+function addPromptNodeFromContextMenu(): void {
+  addPromptNode();
+  contextMenu.value = null;
+}
+
+function toggleBatchNodeSelection(nodeId: string): void {
+  batchSelectedIds.value = batchSelectedIds.value.includes(nodeId)
+    ? batchSelectedIds.value.filter((id) => id !== nodeId)
+    : [...batchSelectedIds.value, nodeId];
+}
+
+function selectAllBatchNodes(): void {
+  const selectableIds = batchCandidates.value
+    .filter((node) => nodeStatus(node) !== 'done')
+    .map((node) => node.id);
+
+  batchSelectedIds.value =
+    selectableIds.length > 0 && selectableIds.every((id) => batchSelectedIds.value.includes(id))
+      ? []
+      : selectableIds;
+}
+
+async function runBatchGeneration(): Promise<void> {
+  const targets = [...selectedBatchNodes.value];
+
+  if (targets.length === 0 || batchRunning.value) {
+    return;
+  }
+
+  batchRunning.value = true;
+  batchCancelRequested.value = false;
+  let queuedCount = 0;
+
+  try {
+    await workspace.initialize();
+
+    for (const node of targets) {
+      if (batchCancelRequested.value) {
+        break;
+      }
+
+      const current = nodes.value.find((item) => item.id === node.id);
+
+      if (!current || nodeStatus(current) === 'done') {
+        continue;
+      }
+
+      current.status = 'generating';
+      const createdWorks = await workspace.createGenerationWorks({
+        amount: 1,
+        extraParameters: {
+          canvasBatch: true,
+          canvasNodeId: current.id,
+          mode: 'canvas-batch',
+        },
+        model: selectedModel.value,
+        modelLabel: selectedModelLabel.value,
+        prompt: current.prompt,
+        ratio: selectedRatio.value,
+        size: selectedSize.value,
+        sourceFileId: nodeSourceFileId(current),
+        toolKey: 'canvas',
+      });
+      const createdWork = createdWorks[0];
+
+      if (createdWork) {
+        current.workId = createdWork.id;
+        current.resultFileId = createdWork.resultFileId;
+        current.status = 'queued';
+        queuedCount += 1;
+      } else {
+        current.status = 'failed';
+      }
+    }
+  } catch (error) {
+    showCanvasNotice(error instanceof Error ? error.message : '批量生成提交失败');
+  } finally {
+    batchRunning.value = false;
+    batchSelectedIds.value = [];
+    persistCanvas();
+  }
+
+  if (queuedCount > 0) {
+    showCanvasNotice(`已提交 ${queuedCount} 个任务`);
+  }
+}
+
+async function importWorkflow(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+
+  if (!file) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(await file.text()) as Partial<CanvasWorkflowDocument>;
+    const validKinds = new Set<CanvasNodeKind>(['image', 'output', 'prompt', 'video']);
+    const nodeIds = new Set<string>();
+    const importedNodes = (Array.isArray(parsed.nodes) ? parsed.nodes : [])
+      .filter(
+        (node) =>
+          typeof node?.id === 'string' &&
+          typeof node?.prompt === 'string' &&
+          validKinds.has(node.kind),
+      )
+      .filter((node) => {
+        if (nodeIds.has(node.id)) {
+          return false;
+        }
+
+        nodeIds.add(node.id);
+        return true;
+      })
+      .map((node) => ({
+        createdAt: Number.isFinite(node.createdAt) ? node.createdAt : Date.now(),
+        generationMode: node.generationMode,
+        height: Math.max(120, Number(node.height) || 220),
+        id: node.id,
+        kind: node.kind,
+        prompt: node.prompt,
+        resultFileId: node.resultFileId,
+        sourceFileId: node.sourceFileId,
+        status: node.status ?? 'idle',
+        title: node.title || '导入节点',
+        width: Math.max(220, Number(node.width) || 330),
+        workId: node.workId,
+        x: Number.isFinite(node.x) ? node.x : 160,
+        y: Number.isFinite(node.y) ? node.y : 160,
+      }));
+
+    if (importedNodes.length === 0) {
+      throw new Error('文件里没有可用的画布节点');
+    }
+
+    const importedEdges = (Array.isArray(parsed.edges) ? parsed.edges : [])
+      .filter(
+        (edge) =>
+          typeof edge?.id === 'string' &&
+          nodeIds.has(edge.from) &&
+          nodeIds.has(edge.to) &&
+          edge.from !== edge.to,
+      )
+      .map((edge) => ({ from: edge.from, id: edge.id, to: edge.to }));
+    const importedGroups = (Array.isArray(parsed.groups) ? parsed.groups : [])
+      .filter((group) => typeof group?.id === 'string' && Array.isArray(group.nodeIds))
+      .map((group) => ({
+        color: group.color || '#647dff',
+        id: group.id,
+        nodeIds: group.nodeIds.filter((id) => nodeIds.has(id)),
+        title: group.title || '导入分组',
+      }))
+      .filter((group) => group.nodeIds.length >= 2);
+
+    commitHistory();
+    nodes.value = importedNodes;
+    edges.value = importedEdges;
+    groups.value = importedGroups;
+    canvasTitle.value = parsed.title?.trim() || file.name.replace(/\.json$/i, '') || '导入画布';
+    viewport.value = parsed.viewport ?? { scale: 0.88, x: 28, y: 32 };
+    clearSelection();
+    batchSelectedIds.value = [];
+    closeRailMenu();
+    persistCanvas();
+    showCanvasNotice(`已导入 ${importedNodes.length} 个节点`);
+  } catch (error) {
+    showCanvasNotice(error instanceof Error ? error.message : '工作流文件无法导入');
+  }
+}
+
+function exportWorkflow(): void {
+  const document: CanvasWorkflowDocument = {
+    edges: edges.value.map((edge) => ({ ...edge })),
+    groups: groups.value.map((group) => ({ ...group, nodeIds: [...group.nodeIds] })),
+    nodes: nodes.value.map((node) => ({ ...node, previewUrl: undefined })),
+    title: canvasTitle.value,
+    version: 1,
+    viewport: { ...viewport.value },
+  };
+  const blob = new Blob([JSON.stringify(document, null, 2)], {
+    type: 'application/json',
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = window.document.createElement('a');
+
+  anchor.href = url;
+  anchor.download = `${canvasTitle.value || 'aurora-canvas'}.json`;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  showCanvasNotice('工作流已导出');
+}
+
 function handleKeyboard(event: KeyboardEvent): void {
   const target = event.target as HTMLElement | null;
   const isEditing =
@@ -1301,6 +1948,8 @@ function handleKeyboard(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
     if (angleDialogOpen.value) {
       closeAngleDialog();
+    } else if (contextMenu.value) {
+      contextMenu.value = null;
     } else if (nodeMenuNodeId.value) {
       closeNodeGenerationMenu();
     } else {
@@ -1325,6 +1974,23 @@ function handleKeyboard(event: KeyboardEvent): void {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
     event.preventDefault();
     duplicateSelectedNode();
+  }
+
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+    event.preventDefault();
+    setSelection(
+      nodes.value.map((node) => node.id),
+      nodes.value.at(-1)?.id,
+    );
+  }
+
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'g') {
+    event.preventDefault();
+    if (event.shiftKey) {
+      ungroupSelection();
+    } else {
+      createGroupFromSelection();
+    }
   }
 
   if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -1376,6 +2042,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointerup', finishPointerAction);
   window.removeEventListener('keydown', handleKeyboard);
   window.clearTimeout(saveTimer);
+  window.clearTimeout(noticeTimer);
 
   for (const url of objectUrls) {
     URL.revokeObjectURL(url);
@@ -1389,9 +2056,11 @@ onBeforeUnmount(() => {
     :class="{ 'canvas-studio--without-inspiration': !inspirationOpen }"
   >
     <main
+      ref="workspaceElement"
       class="canvas-workspace"
       :class="{ 'canvas-workspace--plain': activeRailMenu === 'inspiration' }"
       @pointerdown="handleCanvasPointerDown"
+      @contextmenu.prevent="openCanvasContextMenu"
       @wheel="handleWheel"
     >
       <header class="canvas-topbar">
@@ -1497,6 +2166,16 @@ onBeforeUnmount(() => {
             <span>复制节点</span>
             <small>Ctrl D</small>
           </button>
+          <button type="button" :disabled="selectedNodeCount < 2" @click="createGroupFromSelection">
+            <AppstoreOutlined />
+            <span>组合选中</span>
+            <small>Ctrl G</small>
+          </button>
+          <button type="button" :disabled="selectedNodeCount === 0" @click="ungroupSelection">
+            <CloseOutlined />
+            <span>解散分组</span>
+            <small>Shift Ctrl G</small>
+          </button>
         </div>
       </Transition>
 
@@ -1522,6 +2201,19 @@ onBeforeUnmount(() => {
                 示例工作流
               </button>
             </div>
+            <input
+              ref="workflowImportInput"
+              type="file"
+              accept="application/json,.json"
+              hidden
+              @change="importWorkflow"
+            />
+            <button type="button" aria-label="导入工作流" @click="workflowImportInput?.click()">
+              <UploadOutlined />
+            </button>
+            <button type="button" aria-label="导出工作流" @click="exportWorkflow">
+              <DownloadOutlined />
+            </button>
             <button type="button" aria-label="关闭工作流" @click="closeRailMenu">
               <CloseOutlined />
             </button>
@@ -1701,6 +2393,109 @@ onBeforeUnmount(() => {
         </section>
       </Transition>
 
+      <Transition name="canvas-pop">
+        <section
+          v-if="activeRailMenu === 'batch'"
+          class="canvas-floating-panel canvas-batch-panel"
+          aria-label="批量生成"
+        >
+          <header>
+            <div>
+              <strong>批量生成</strong>
+              <span>{{ selectedBatchNodes.length }} 项待处理</span>
+            </div>
+            <button type="button" aria-label="关闭批量生成" @click="closeRailMenu">
+              <CloseOutlined />
+            </button>
+          </header>
+          <nav>
+            <button
+              v-for="filter in batchFilters"
+              :key="filter.value"
+              type="button"
+              :class="{ active: activeBatchFilter === filter.value }"
+              @click="
+                activeBatchFilter = filter.value;
+                batchSelectedIds = [];
+              "
+            >
+              {{ filter.label }}
+              <span>
+                {{
+                  filter.value === 'all'
+                    ? nodes.filter(
+                        (node) =>
+                          node.kind === 'image' || node.kind === 'output' || node.kind === 'video',
+                      ).length
+                    : filter.value === 'failed'
+                      ? nodes.filter((node) => nodeStatus(node) === 'failed').length
+                      : nodes.filter(
+                          (node) =>
+                            nodeStatus(node) !== 'done' &&
+                            (node.kind === 'image' ||
+                              node.kind === 'output' ||
+                              node.kind === 'video'),
+                        ).length
+                }}
+              </span>
+            </button>
+          </nav>
+          <div class="canvas-batch-toolbar">
+            <button type="button" @click="selectAllBatchNodes">
+              {{ batchSelectedIds.length > 0 ? '清空选择' : '选择全部' }}
+            </button>
+            <span>单线程队列，避免重复计费</span>
+          </div>
+          <div v-if="batchCandidates.length > 0" class="canvas-batch-list">
+            <label
+              v-for="node in batchCandidates"
+              :key="node.id"
+              :class="{ selected: batchSelectedIds.includes(node.id) }"
+            >
+              <input
+                type="checkbox"
+                :checked="batchSelectedIds.includes(node.id)"
+                :disabled="nodeStatus(node) === 'done' || batchRunning"
+                @change="toggleBatchNodeSelection(node.id)"
+              />
+              <span>
+                <strong>{{ node.title }}</strong>
+                <small>{{ node.prompt || '未填写生成描述' }}</small>
+              </span>
+              <em :class="`status-${nodeStatus(node)}`">{{ statusLabel(nodeStatus(node)) }}</em>
+            </label>
+          </div>
+          <div v-else class="canvas-panel-empty">
+            <ThunderboltFilled />
+            <strong>没有符合条件的节点</strong>
+            <small>从图片节点生成图片、视频或本地模型任务后，可在统一队列里提交。</small>
+          </div>
+          <footer>
+            <span>
+              <ThunderboltFilled />
+              预计 {{ batchCost }} 积分
+            </span>
+            <button
+              v-if="batchRunning"
+              type="button"
+              class="danger"
+              @click="batchCancelRequested = true"
+            >
+              停止后续任务
+            </button>
+            <button
+              v-else
+              type="button"
+              class="primary"
+              :disabled="selectedBatchNodes.length === 0"
+              @click="runBatchGeneration"
+            >
+              开始生成
+            </button>
+          </footer>
+        </section>
+      </Transition>
+
       <div
         class="canvas-world"
         :style="{
@@ -1736,6 +2531,30 @@ onBeforeUnmount(() => {
           />
         </svg>
 
+        <section
+          v-for="group in groups"
+          :key="group.id"
+          class="canvas-node-group"
+          :style="{
+            height: `${groupBounds(group).height}px`,
+            left: `${groupBounds(group).x}px`,
+            top: `${groupBounds(group).y}px`,
+            width: `${groupBounds(group).width}px`,
+            '--group-color': group.color,
+          }"
+        >
+          <header @pointerdown.stop>
+            <span>
+              <AppstoreOutlined />
+              {{ group.title }}
+              <small>{{ group.nodeIds.length }} 个节点</small>
+            </span>
+            <button type="button" aria-label="解散分组" @click="removeGroup(group.id)">
+              <CloseOutlined />
+            </button>
+          </header>
+        </section>
+
         <article
           v-for="node in nodes"
           :key="node.id"
@@ -1745,7 +2564,7 @@ onBeforeUnmount(() => {
             {
               'canvas-node--connecting': connectionFromId === node.id,
               'canvas-node--menu-open': nodeMenuNodeId === node.id,
-              'canvas-node--selected': selectedNodeId === node.id,
+              'canvas-node--selected': isNodeSelected(node.id),
             },
           ]"
           :style="{
@@ -1755,8 +2574,12 @@ onBeforeUnmount(() => {
             width: `${node.width}px`,
           }"
           @pointerdown="handleNodePointerDown($event, node)"
+          @contextmenu.prevent.stop="openNodeContextMenu($event, node)"
         >
           <div v-if="selectedNodeId === node.id" class="canvas-node__toolbar" @pointerdown.stop>
+            <span v-if="selectedNodeCount > 1" class="canvas-node__selection-count">
+              已选 {{ selectedNodeCount }} 项
+            </span>
             <button
               type="button"
               class="canvas-node__toolbar-generate"
@@ -2021,6 +2844,71 @@ onBeforeUnmount(() => {
             <ArrowRightOutlined v-else />
           </button>
         </footer>
+      </div>
+
+      <Transition name="canvas-pop">
+        <div
+          v-if="contextMenu"
+          class="canvas-context-menu"
+          :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
+          @pointerdown.stop
+          @contextmenu.prevent
+        >
+          <header>
+            <strong>{{ contextMenu.kind === 'node' ? '节点操作' : '画布操作' }}</strong>
+            <small>{{ contextMenu.kind === 'node' ? '右键快捷菜单' : '自动布局与编辑' }}</small>
+          </header>
+          <template v-if="contextMenu.kind === 'node'">
+            <button type="button" @click="openContextNodeGeneration">
+              <ThunderboltFilled />
+              <span>从该节点生成</span>
+            </button>
+            <button type="button" @click="duplicateSelectedNode">
+              <CopyOutlined />
+              <span>复制节点</span>
+            </button>
+            <button
+              type="button"
+              :disabled="selectedNodeCount < 2"
+              @click="createGroupFromSelection"
+            >
+              <AppstoreOutlined />
+              <span>组合选中</span>
+            </button>
+            <button type="button" @click="ungroupSelection">
+              <CloseOutlined />
+              <span>解散所在分组</span>
+            </button>
+            <i />
+            <button type="button" class="danger" @click="deleteSelectedNode">
+              <DeleteOutlined />
+              <span>删除{{ selectedNodeCount > 1 ? ` ${selectedNodeCount} 个节点` : '节点' }}</span>
+            </button>
+          </template>
+          <template v-else>
+            <button type="button" @click="addPromptNodeFromContextMenu">
+              <PlusOutlined />
+              <span>添加创作指令</span>
+            </button>
+            <button type="button" @click="autoLayoutCanvas">
+              <AppstoreOutlined />
+              <span>自动整理布局</span>
+            </button>
+            <button type="button" @click="fitCanvasView">
+              <ExpandOutlined />
+              <span>适应全部节点</span>
+            </button>
+            <button type="button" @click="exportWorkflow">
+              <DownloadOutlined />
+              <span>导出当前工作流</span>
+            </button>
+          </template>
+        </div>
+      </Transition>
+
+      <div v-if="canvasNotice" class="canvas-notice" role="status">
+        <CheckOutlined />
+        {{ canvasNotice }}
       </div>
 
       <div v-if="workspace.error" class="canvas-error" role="alert">
@@ -2549,7 +3437,8 @@ onBeforeUnmount(() => {
 
 .canvas-workflow-panel > header > button,
 .canvas-asset-panel > header > button,
-.canvas-history-panel > header > button {
+.canvas-history-panel > header > button,
+.canvas-batch-panel > header > button {
   display: grid;
   width: 26px;
   height: 26px;
@@ -2559,7 +3448,8 @@ onBeforeUnmount(() => {
 
 .canvas-workflow-panel > header > button:hover,
 .canvas-asset-panel > header > button:hover,
-.canvas-history-panel > header > button:hover {
+.canvas-history-panel > header > button:hover,
+.canvas-batch-panel > header > button:hover {
   background: #34353b;
   color: #fff;
 }
@@ -2940,6 +3830,221 @@ onBeforeUnmount(() => {
   font-size: 7px;
 }
 
+.canvas-batch-panel {
+  top: 206px;
+  left: 68px;
+  display: grid;
+  width: min(540px, calc(100% - 96px));
+  max-height: min(620px, calc(100% - 236px));
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  padding: 15px;
+}
+
+.canvas-batch-panel > header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.canvas-batch-panel > header strong {
+  color: #fff;
+  font-size: 12px;
+}
+
+.canvas-batch-panel > header span,
+.canvas-batch-toolbar span,
+.canvas-batch-panel > footer > span {
+  color: #878d99;
+  font-size: 8px;
+}
+
+.canvas-batch-panel > nav {
+  display: flex;
+  gap: 5px;
+  margin: 13px 0 9px;
+}
+
+.canvas-batch-panel > nav button {
+  display: inline-flex;
+  height: 29px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 7px;
+  background: #26272d;
+  color: #969ba6;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.canvas-batch-panel > nav button.active {
+  border-color: rgb(111 91 234 / 68%);
+  background: #36304f;
+  color: #d5ccff;
+}
+
+.canvas-batch-panel > nav button span {
+  min-width: 16px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 7%);
+  font-size: 7px;
+  text-align: center;
+}
+
+.canvas-batch-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 2px 9px;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+}
+
+.canvas-batch-toolbar button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #a596ff;
+  font-size: 8px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.canvas-batch-list {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-height: 132px;
+  margin-top: 9px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.canvas-batch-list label {
+  display: grid;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  gap: 9px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 7px 9px;
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 8px;
+  background: #27282e;
+  cursor: pointer;
+}
+
+.canvas-batch-list label:hover,
+.canvas-batch-list label.selected {
+  border-color: rgb(111 91 234 / 58%);
+  background: #302d3d;
+}
+
+.canvas-batch-list input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #6d5de8;
+}
+
+.canvas-batch-list label > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.canvas-batch-list strong,
+.canvas-batch-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-batch-list strong {
+  color: #e9eaf0;
+  font-size: 9px;
+}
+
+.canvas-batch-list small {
+  color: #7f8591;
+  font-size: 7px;
+}
+
+.canvas-batch-list em {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #383a41;
+  color: #aeb3bd;
+  font-size: 7px;
+  font-style: normal;
+}
+
+.canvas-batch-list em.status-done {
+  background: #21372f;
+  color: #70d0ab;
+}
+
+.canvas-batch-list em.status-failed {
+  background: #45272a;
+  color: #f0958e;
+}
+
+.canvas-batch-list em.status-generating,
+.canvas-batch-list em.status-queued {
+  background: #283754;
+  color: #8eafff;
+}
+
+.canvas-batch-panel > footer {
+  display: flex;
+  min-height: 42px;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(255 255 255 / 7%);
+}
+
+.canvas-batch-panel > footer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: auto;
+  color: #f1b654;
+}
+
+.canvas-batch-panel > footer > button {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 7px;
+  background: #33353c;
+  color: #e7e8ec;
+  font-size: 8px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.canvas-batch-panel > footer > button.primary {
+  border-color: transparent;
+  background: linear-gradient(145deg, #227ce8, #6551ed);
+  color: #fff;
+}
+
+.canvas-batch-panel > footer > button.danger {
+  border-color: rgb(235 105 96 / 34%);
+  background: #49282b;
+  color: #f3a29b;
+}
+
+.canvas-batch-panel > footer > button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
 .canvas-world {
   position: absolute;
   top: 0;
@@ -2954,6 +4059,72 @@ onBeforeUnmount(() => {
   left: 0;
   overflow: visible;
   pointer-events: none;
+}
+
+.canvas-node-group {
+  position: absolute;
+  z-index: 1;
+  border: 1px dashed color-mix(in srgb, var(--group-color) 58%, transparent);
+  border-radius: 16px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--group-color) 8%, transparent),
+    transparent 58%
+  );
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 2%);
+  pointer-events: none;
+}
+
+.canvas-node-group > header {
+  position: absolute;
+  top: -29px;
+  left: 14px;
+  display: flex;
+  height: 25px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 5px 0 9px;
+  border: 1px solid color-mix(in srgb, var(--group-color) 54%, transparent);
+  border-radius: 8px;
+  background: rgb(31 32 37 / 96%);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 24%);
+  color: #e8e9ee;
+  pointer-events: auto;
+}
+
+.canvas-node-group > header > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 8px;
+  font-weight: 720;
+}
+
+.canvas-node-group > header :deep(svg) {
+  color: var(--group-color);
+}
+
+.canvas-node-group > header small {
+  color: #878d98;
+  font-size: 7px;
+  font-weight: 500;
+}
+
+.canvas-node-group > header button {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #8c929d;
+  cursor: pointer;
+}
+
+.canvas-node-group > header button:hover {
+  background: #3b3c43;
+  color: #fff;
 }
 
 .canvas-node {
@@ -3316,6 +4487,18 @@ onBeforeUnmount(() => {
   background: #2384e8;
 }
 
+.canvas-node__selection-count {
+  display: inline-flex;
+  height: 21px;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 5px;
+  background: #394aa0;
+  color: #e8ecff;
+  font-size: 7px;
+  font-weight: 720;
+}
+
 .canvas-node__toolbar .canvas-node__toolbar-generate {
   padding-right: 9px;
   background: #2c2e35;
@@ -3646,6 +4829,98 @@ onBeforeUnmount(() => {
   background: #4c5058;
   color: #838792;
   cursor: not-allowed;
+}
+
+.canvas-context-menu {
+  position: fixed;
+  z-index: 70;
+  display: grid;
+  width: 228px;
+  gap: 3px;
+  padding: 7px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 10px;
+  background: rgb(37 38 43 / 99%);
+  box-shadow: 0 22px 58px rgb(0 0 0 / 48%);
+  color: #f1f2f5;
+  backdrop-filter: blur(18px);
+}
+
+.canvas-context-menu > header {
+  display: grid;
+  gap: 2px;
+  padding: 4px 7px 8px;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+}
+
+.canvas-context-menu > header strong {
+  font-size: 10px;
+}
+
+.canvas-context-menu > header small {
+  color: #7c828e;
+  font-size: 7px;
+}
+
+.canvas-context-menu > button {
+  display: grid;
+  min-height: 34px;
+  align-items: center;
+  gap: 9px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #d9dbe1;
+  font-size: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.canvas-context-menu > button:hover:not(:disabled) {
+  background: #373941;
+  color: #fff;
+}
+
+.canvas-context-menu > button:disabled {
+  color: #5e636d;
+  cursor: default;
+}
+
+.canvas-context-menu > button.danger {
+  color: #ef9a93;
+}
+
+.canvas-context-menu > button.danger:hover {
+  background: #48272a;
+  color: #ffb2ab;
+}
+
+.canvas-context-menu > i {
+  height: 1px;
+  margin: 4px 3px;
+  background: rgb(255 255 255 / 7%);
+}
+
+.canvas-notice {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  z-index: 80;
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 13px;
+  border: 1px solid rgb(110 205 170 / 24%);
+  border-radius: 9px;
+  background: rgb(28 46 40 / 96%);
+  box-shadow: 0 16px 44px rgb(0 0 0 / 40%);
+  color: #9ce1c5;
+  font-size: 8px;
+  transform: translateX(-50%);
+  backdrop-filter: blur(16px);
 }
 
 .canvas-error {
@@ -4326,7 +5601,8 @@ onBeforeUnmount(() => {
 
   .canvas-asset-panel,
   .canvas-workflow-panel,
-  .canvas-history-panel {
+  .canvas-history-panel,
+  .canvas-batch-panel {
     left: 62px;
   }
 }
@@ -4364,7 +5640,8 @@ onBeforeUnmount(() => {
   .canvas-rail-menu,
   .canvas-workflow-panel,
   .canvas-asset-panel,
-  .canvas-history-panel {
+  .canvas-history-panel,
+  .canvas-batch-panel {
     top: 105px;
     left: 58px;
     width: calc(100% - 68px);
@@ -4374,6 +5651,35 @@ onBeforeUnmount(() => {
   .canvas-asset-grid,
   .canvas-history-groups > section > div {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .canvas-batch-panel {
+    max-height: calc(100% - 115px);
+  }
+
+  .canvas-batch-panel > nav {
+    overflow-x: auto;
+  }
+
+  .canvas-batch-panel > nav button {
+    flex: 0 0 auto;
+  }
+
+  .canvas-batch-toolbar span {
+    display: none;
+  }
+
+  .canvas-node-group > header {
+    left: 7px;
+  }
+
+  .canvas-context-menu {
+    width: min(228px, calc(100vw - 20px));
+  }
+
+  .canvas-notice {
+    bottom: 58px;
+    max-width: calc(100vw - 28px);
   }
 
   .canvas-composer {
