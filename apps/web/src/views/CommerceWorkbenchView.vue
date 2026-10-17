@@ -2,25 +2,35 @@
 import {
   AppstoreOutlined,
   BgColorsOutlined,
-  CheckOutlined,
+  BulbOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
   CloseOutlined,
   DeleteOutlined,
   DownloadOutlined,
   ExperimentOutlined,
+  EyeOutlined,
+  FileImageOutlined,
+  HistoryOutlined,
+  InfoCircleOutlined,
   LoadingOutlined,
   PictureOutlined,
   PlusOutlined,
+  QuestionCircleOutlined,
   ReloadOutlined,
+  RightOutlined,
+  SearchOutlined,
   ShoppingCartOutlined,
   StarOutlined,
+  SwapOutlined,
   ThunderboltFilled,
   UploadOutlined,
   UserOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { RouterLink } from 'vue-router';
 import type { FileAsset } from '@/app/api';
+import GalleryArtwork from '@/components/GalleryArtwork.vue';
 import {
   IMAGE_TASK_POINTS_COST,
   useDrawWorkspaceStore,
@@ -28,20 +38,25 @@ import {
 } from '@/stores/draw-workspace';
 import { useSessionStore } from '@/stores/session';
 
-interface CommerceMode {
+type CommerceForm = 'background' | 'pattern' | 'placeholder';
+type UploadRole = 'background' | 'clothing' | 'model' | 'pattern' | 'product';
+type PreviewSide = 'after' | 'before';
+
+interface CatalogGroup {
+  items: CommerceTool[];
+  label: string;
+}
+
+interface CommerceTool {
   accent: string;
   description: string;
+  form: CommerceForm;
   glyph: string;
   icon: Component;
   label: string;
+  previewAfterVariant: number;
+  previewBeforeVariant: number;
   prompt: string;
-  value: string;
-}
-
-interface ScenePreset {
-  accent: string;
-  description: string;
-  label: string;
   value: string;
 }
 
@@ -51,241 +66,672 @@ interface UploadState {
   url: string;
 }
 
-interface PromptPreset {
+interface UploadMeta {
+  description: string;
+  icon: Component;
   label: string;
-  prompt: string;
 }
 
-const commerceModes: CommerceMode[] = [
+const catalogGroups: CatalogGroup[] = [
   {
-    accent: '#b9653c',
-    description: '自动抠图、布光与主图排版',
-    glyph: '主',
-    icon: ShoppingCartOutlined,
-    label: '商品主图',
-    prompt:
-      '将商品置于干净明亮的商业摄影棚中，主体居中，柔和棚拍光，材质细节清晰，画面适合电商主图展示。',
-    value: 'product-shot',
+    label: '商品替换',
+    items: [
+      {
+        accent: '#f07a38',
+        description: '替换展示台座与商品陈列环境。',
+        form: 'placeholder',
+        glyph: '台',
+        icon: AppstoreOutlined,
+        label: '展示台座替换大师',
+        previewAfterVariant: 5,
+        previewBeforeVariant: 1,
+        prompt: '替换商品展示台座，并保持商品材质和品牌信息不变。',
+        value: 'display-stand-replace',
+      },
+      {
+        accent: '#9c61d9',
+        description: '识别服饰结构并替换图案、花型和纹理。',
+        form: 'pattern',
+        glyph: '纹',
+        icon: AppstoreOutlined,
+        label: '服饰图案替换设计师',
+        previewAfterVariant: 6,
+        previewBeforeVariant: 2,
+        prompt:
+          '精准识别服饰轮廓与褶皱，将指定图案自然融合到面料表面，保持原服饰版型、光影和材质细节。',
+        value: 'pattern-replace',
+      },
+      {
+        accent: '#3678e8',
+        description: '智能识别并融合商品与目标背景。',
+        form: 'background',
+        glyph: '景',
+        icon: BgColorsOutlined,
+        label: '智能背景融合',
+        previewAfterVariant: 0,
+        previewBeforeVariant: 1,
+        prompt:
+          '智能识别商品主体并替换为指定背景，统一透视、光线、阴影和色温，保持商品边缘自然且细节完整。',
+        value: 'background-blend',
+      },
+      {
+        accent: '#4e9b78',
+        description: '替换场景道具并匹配真实透视关系。',
+        form: 'placeholder',
+        glyph: '道',
+        icon: AppstoreOutlined,
+        label: '场景道具替换器',
+        previewAfterVariant: 4,
+        previewBeforeVariant: 1,
+        prompt: '替换商品场景中的道具，并匹配原有透视、材质和光线。',
+        value: 'scene-prop-replace',
+      },
+      {
+        accent: '#bd8a36',
+        description: '根据季节氛围重建商品环境。',
+        form: 'placeholder',
+        glyph: '季',
+        icon: AppstoreOutlined,
+        label: '季节氛围替换大师',
+        previewAfterVariant: 3,
+        previewBeforeVariant: 5,
+        prompt: '为商品替换季节氛围背景，并保持商品色彩和细节准确。',
+        value: 'season-atmosphere',
+      },
+      {
+        accent: '#2b96ab',
+        description: '迁移商品到新的商业场景。',
+        form: 'placeholder',
+        glyph: '迁',
+        icon: AppstoreOutlined,
+        label: '商品场景迁移大师',
+        previewAfterVariant: 4,
+        previewBeforeVariant: 2,
+        prompt: '将商品迁移到新的商业场景，保持原商品形态和比例。',
+        value: 'scene-migration',
+      },
+      {
+        accent: '#d95d81',
+        description: '生成自然的手持商品展示效果。',
+        form: 'placeholder',
+        glyph: '手',
+        icon: UserOutlined,
+        label: '手持模特替换专家',
+        previewAfterVariant: 2,
+        previewBeforeVariant: 1,
+        prompt: '生成自然手持商品的展示画面，保持手部结构和商品外观准确。',
+        value: 'hand-model-replace',
+      },
+      {
+        accent: '#ee8b32',
+        description: '替换商品包装并保留品牌标识。',
+        form: 'placeholder',
+        glyph: '包',
+        icon: AppstoreOutlined,
+        label: '产品包装替换器',
+        previewAfterVariant: 5,
+        previewBeforeVariant: 1,
+        prompt: '替换商品包装设计，保持标签、结构和使用场景自然。',
+        value: 'package-replace',
+      },
+      {
+        accent: '#c8524e',
+        description: '替换指定商品部件和配件。',
+        form: 'placeholder',
+        glyph: '件',
+        icon: AppstoreOutlined,
+        label: '产品部件替换工具',
+        previewAfterVariant: 7,
+        previewBeforeVariant: 5,
+        prompt: '替换商品指定部件，保持连接关系、透视和材质一致。',
+        value: 'component-replace',
+      },
+      {
+        accent: '#8a7657',
+        description: '替换商品材质并保留外形结构。',
+        form: 'placeholder',
+        glyph: '材',
+        icon: AppstoreOutlined,
+        label: '商品材质替换器',
+        previewAfterVariant: 5,
+        previewBeforeVariant: 2,
+        prompt: '替换商品表面材质，保留原始轮廓、结构和文字信息。',
+        value: 'material-replace',
+      },
+      {
+        accent: '#7287d8',
+        description: '生成模特试穿和佩戴效果。',
+        form: 'placeholder',
+        glyph: '模',
+        icon: UserOutlined,
+        label: '虚拟模特试穿',
+        previewAfterVariant: 2,
+        previewBeforeVariant: 1,
+        prompt: '生成自然模特试穿效果，保持商品版型、颜色和材质准确。',
+        value: 'virtual-model',
+      },
+      {
+        accent: '#2e9ed1',
+        description: '一键抠图并替换新的商品背景。',
+        form: 'placeholder',
+        glyph: '换',
+        icon: BgColorsOutlined,
+        label: '一键商品换背景',
+        previewAfterVariant: 0,
+        previewBeforeVariant: 1,
+        prompt: '一键识别商品并替换背景，保持边缘和阴影自然。',
+        value: 'one-click-background',
+      },
+    ],
   },
   {
-    accent: '#3b83b8',
-    description: '保留商品，替换场景与氛围',
-    glyph: '景',
-    icon: BgColorsOutlined,
     label: '商品换背景',
-    prompt:
-      '保留商品主体、结构和品牌标签，替换为自然协调的商业场景，边缘融合真实，保持原有商品比例。',
-    value: 'background',
+    items: [
+      {
+        accent: '#518fd1',
+        description: '校正背景光影与透视关系。',
+        form: 'placeholder',
+        glyph: '光',
+        icon: BgColorsOutlined,
+        label: '光影透视校正大师',
+        previewAfterVariant: 0,
+        previewBeforeVariant: 1,
+        prompt: '校正商品背景的光影、透视和色温，使画面真实自然。',
+        value: 'light-perspective',
+      },
+      {
+        accent: '#7664d9',
+        description: '生成具有艺术感的背景画面。',
+        form: 'placeholder',
+        glyph: '艺',
+        icon: AppstoreOutlined,
+        label: '艺术创意背景画板',
+        previewAfterVariant: 6,
+        previewBeforeVariant: 2,
+        prompt: '为商品生成具有品牌质感的艺术背景。',
+        value: 'artistic-background',
+      },
+      {
+        accent: '#43a073',
+        description: '统一处理多张商品背景。',
+        form: 'placeholder',
+        glyph: '批',
+        icon: AppstoreOutlined,
+        label: '批量背景统一处理',
+        previewAfterVariant: 3,
+        previewBeforeVariant: 5,
+        prompt: '批量统一商品背景风格、尺寸与光线。',
+        value: 'batch-background',
+      },
+      {
+        accent: '#b78345',
+        description: '生成家居生活场景背景。',
+        form: 'placeholder',
+        glyph: '家',
+        icon: AppstoreOutlined,
+        label: '家居环境智能融合',
+        previewAfterVariant: 1,
+        previewBeforeVariant: 5,
+        prompt: '生成真实的家居环境并融合商品。',
+        value: 'home-background',
+      },
+      {
+        accent: '#3d97bc',
+        description: '生成数码科技质感背景。',
+        form: 'placeholder',
+        glyph: '科',
+        icon: AppstoreOutlined,
+        label: '数码科技背景设计',
+        previewAfterVariant: 6,
+        previewBeforeVariant: 1,
+        prompt: '生成具有科技感的商品背景，保持商品主体清晰。',
+        value: 'tech-background',
+      },
+      {
+        accent: '#d57e4f',
+        description: '生成美食氛围和陈列背景。',
+        form: 'placeholder',
+        glyph: '食',
+        icon: AppstoreOutlined,
+        label: '美食场景背景搭配',
+        previewAfterVariant: 5,
+        previewBeforeVariant: 2,
+        prompt: '为食品商品生成自然诱人的陈列背景。',
+        value: 'food-background',
+      },
+      {
+        accent: '#d75f8d',
+        description: '生成美妆产品的高级质感背景。',
+        form: 'placeholder',
+        glyph: '美',
+        icon: AppstoreOutlined,
+        label: '美妆质感背景大师',
+        previewAfterVariant: 0,
+        previewBeforeVariant: 1,
+        prompt: '生成适合美妆产品的高级商业背景。',
+        value: 'beauty-background',
+      },
+      {
+        accent: '#8755b8',
+        description: '生成服饰风格化的背景环境。',
+        form: 'placeholder',
+        glyph: '衣',
+        icon: AppstoreOutlined,
+        label: '服饰风格背景定制',
+        previewAfterVariant: 2,
+        previewBeforeVariant: 1,
+        prompt: '为服饰商品生成风格统一的展示背景。',
+        value: 'fashion-background',
+      },
+    ],
   },
   {
-    accent: '#8d63b1',
-    description: '商品上身，生成模特展示图',
-    glyph: '模',
-    icon: UserOutlined,
-    label: '模特试穿',
-    prompt:
-      '让模特自然穿戴或使用商品，保持商品颜色、材质和细节准确，模特姿态自然，整体光线真实，适合详情页展示。',
-    value: 'model-try-on',
-  },
-  {
-    accent: '#b48628',
-    description: '一套素材生成多比例展示图',
-    glyph: '套',
-    icon: AppstoreOutlined,
-    label: '多比例商拍',
-    prompt:
-      '以同一商品和统一视觉语言生成一组多比例商业展示图，保持品牌色调、光线方向和商品细节一致。',
-    value: 'multi-ratio',
+    label: '编辑与增强',
+    items: [
+      {
+        accent: '#397be5',
+        description: '一键去除背景，保留商品主体。',
+        form: 'placeholder',
+        glyph: '抠',
+        icon: PictureOutlined,
+        label: '商品抠图',
+        previewAfterVariant: 1,
+        previewBeforeVariant: 5,
+        prompt: '精准识别商品边缘并去除背景。',
+        value: 'image-cutout',
+      },
+      {
+        accent: '#9a57d7',
+        description: '将商品图转换为不同艺术风格。',
+        form: 'placeholder',
+        glyph: '风',
+        icon: AppstoreOutlined,
+        label: '风格转换',
+        previewAfterVariant: 6,
+        previewBeforeVariant: 1,
+        prompt: '转换商品图片艺术风格，同时保持商品主体一致。',
+        value: 'style-transfer',
+      },
+      {
+        accent: '#23a56e',
+        description: 'AI 无损放大，提升图片清晰度。',
+        form: 'placeholder',
+        glyph: '放',
+        icon: PictureOutlined,
+        label: '图片放大',
+        previewAfterVariant: 4,
+        previewBeforeVariant: 1,
+        prompt: '无损放大商品图片并提升细节清晰度。',
+        value: 'image-upscale',
+      },
+    ],
   },
 ];
 
-const scenePresets: ScenePreset[] = [
-  {
-    accent: '#e7e3dc',
-    description: '干净棚拍',
-    label: '高级灰',
-    value: 'studio-gray',
-  },
-  {
-    accent: '#d9e5df',
-    description: '自然柔和',
-    label: '松石绿',
-    value: 'soft-green',
-  },
-  {
-    accent: '#e7d7cb',
-    description: '生活方式',
-    label: '暖沙色',
-    value: 'warm-sand',
-  },
-  {
-    accent: '#d9e2ed',
-    description: '科技质感',
-    label: '雾霾蓝',
-    value: 'mist-blue',
-  },
-  {
-    accent: '#e2d9e9',
-    description: '柔光精品',
-    label: '淡雾紫',
-    value: 'soft-lilac',
-  },
-  {
-    accent: '#d9d5ce',
-    description: '质感深色',
-    label: '岩石灰',
-    value: 'stone-graphite',
-  },
+const commerceTools = catalogGroups.flatMap((group) => group.items);
+const backgroundCategories = [
+  '服饰箱包',
+  '美妆护肤',
+  '食品饮料',
+  '家居生活',
+  '数码电器',
+  '母婴玩具',
+  '运动户外',
+  '珠宝配饰',
+  '汽车配件',
+  '办公用品',
+  '图书音像',
+  '健康保健',
 ];
-
-const promptPresets: PromptPreset[] = [
-  {
-    label: '主图聚焦',
-    prompt: '商品居中，背景简洁，突出材质和轮廓，边缘干净，适合平台主图。',
-  },
-  {
-    label: '详情页延展',
-    prompt: '加入轻微场景层次和辅助道具，保持商品主体清晰，适合详情页与落地页。',
-  },
-  {
-    label: '社媒质感',
-    prompt: '自然抓拍感，柔和侧光，留出文案空间，适合社媒种草和活动海报。',
-  },
+const fusionModes = ['自然融合', '光影匹配', '边缘强化', '商品优先'];
+const backgroundResolutions = ['1K', '2K', '4K'];
+const patternApplications = ['胸前图案', '满版印花', '局部贴图', '披肩纹理'];
+const clothingCategories = [
+  'T 恤',
+  '连衣裙',
+  '衬衫',
+  '卫衣',
+  '帆布包',
+  '牛仔外套',
+  '针织衫',
+  '运动服',
+  '帽子',
+  '裤子',
+  '裙子',
+  '休闲装',
 ];
-
+const patternStrengths = ['自然贴合', '保持纹理', '强化图案'];
+const patternResolutions = ['1K', '2K', '4K'];
 const ratios = ['1:1', '4:5', '3:4', '16:9', '9:16'];
-const sizes = ['1K', '2K', '4K'];
 const amounts = [1, 2, 3, 4];
+const promptPresets = ['保持光线方向一致', '边缘融合自然', '突出商品材质', '留出文案空间'];
+
+const uploadMeta: Record<UploadRole, UploadMeta> = {
+  product: {
+    description: '点击或拖拽上传，支持 JPG、PNG、WebP，不超过 10MB',
+    icon: ShoppingCartOutlined,
+    label: '上传商品图片',
+  },
+  background: {
+    description: '上传希望替换到的目标背景图',
+    icon: BgColorsOutlined,
+    label: '上传目标背景图',
+  },
+  clothing: {
+    description: '上传需要替换图案的基础服饰图片',
+    icon: PictureOutlined,
+    label: '上传基础服饰图片',
+  },
+  pattern: {
+    description: '上传花型、纹理或设计图案素材',
+    icon: FileImageOutlined,
+    label: '上传图案素材',
+  },
+  model: {
+    description: '可选上传人物或模特参考图',
+    icon: UserOutlined,
+    label: '上传模特参考图',
+  },
+};
+
 const workspace = useDrawWorkspaceStore();
 const sessionStore = useSessionStore();
 
-const activePreview = ref<'preview' | 'checklist'>('preview');
-const modelImage = ref<UploadState | null>(null);
-const modelInput = ref<HTMLInputElement | null>(null);
-const productImage = ref<UploadState | null>(null);
-const productInput = ref<HTMLInputElement | null>(null);
+const searchQuery = ref('');
+const selectedToolKey = ref('background-blend');
+const previewSide = ref<PreviewSide>('after');
+const historyOpen = ref(false);
+const helpOpen = ref(false);
 const prompt = ref('');
-const selectedAmount = ref(1);
-const selectedMode = ref(commerceModes[0]?.value ?? 'product-shot');
-const selectedRatio = ref('1:1');
-const selectedScene = ref(scenePresets[0]?.value ?? 'studio-gray');
-const selectedSize = ref('2K');
 const uploadError = ref('');
-const uploadingRole = ref<'model' | 'product' | null>(null);
+const uploadingRole = ref<UploadRole | null>(null);
+const pendingUploadRole = ref<UploadRole | null>(null);
+const uploadInput = ref<HTMLInputElement | null>(null);
+const backgroundCategory = ref(backgroundCategories[0] ?? '服饰箱包');
+const fusionMode = ref(fusionModes[0] ?? '自然融合');
+const backgroundResolution = ref('2K');
+const patternApplication = ref(patternApplications[0] ?? '胸前图案');
+const clothingCategory = ref(clothingCategories[0] ?? 'T 恤');
+const patternStrength = ref(patternStrengths[0] ?? '自然贴合');
+const patternResolution = ref('2K');
+const selectedRatio = ref('1:1');
+const selectedAmount = ref(1);
+const imageUploads = ref<Record<UploadRole, UploadState | null>>({
+  background: null,
+  clothing: null,
+  model: null,
+  pattern: null,
+  product: null,
+});
 
-const activeMode = computed(
-  () => commerceModes.find((mode) => mode.value === selectedMode.value) ?? commerceModes[0],
+const activeTool = computed<CommerceTool>(
+  () => commerceTools.find((tool) => tool.value === selectedToolKey.value) ?? commerceTools[0]!,
 );
-const activeScene = computed(
-  () => scenePresets.find((scene) => scene.value === selectedScene.value) ?? scenePresets[0],
+const filteredGroups = computed(() => {
+  const keyword = searchQuery.value.trim().toLowerCase();
+
+  if (!keyword) {
+    return catalogGroups;
+  }
+
+  return catalogGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) =>
+          item.label.toLowerCase().includes(keyword) ||
+          item.description.toLowerCase().includes(keyword),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+});
+const filteredToolCount = computed(() =>
+  filteredGroups.value.reduce((count, group) => count + group.items.length, 0),
+);
+const isAvailableTool = computed(() => activeTool.value.form !== 'placeholder');
+const isBackgroundTool = computed(() => activeTool.value.form === 'background');
+const isPatternTool = computed(() => activeTool.value.form === 'pattern');
+const requiredUploads = computed<UploadRole[]>(() => {
+  if (isBackgroundTool.value) {
+    return ['product', 'background'];
+  }
+
+  if (isPatternTool.value) {
+    return ['clothing', 'pattern'];
+  }
+
+  return [];
+});
+const missingUploadLabels = computed(() =>
+  requiredUploads.value
+    .filter((role) => !imageUploads.value[role])
+    .map((role) => uploadMeta[role].label.replace('上传', '')),
+);
+const previewImage = computed(() => {
+  if (isBackgroundTool.value) {
+    return previewSide.value === 'before'
+      ? imageUploads.value.product?.url
+      : imageUploads.value.background?.url;
+  }
+
+  if (isPatternTool.value) {
+    return previewSide.value === 'before'
+      ? imageUploads.value.clothing?.url
+      : imageUploads.value.pattern?.url;
+  }
+
+  return undefined;
+});
+const previewVariant = computed(() =>
+  previewSide.value === 'before'
+    ? activeTool.value.previewBeforeVariant
+    : activeTool.value.previewAfterVariant,
+);
+const previewSideLabel = computed(() => (previewSide.value === 'before' ? 'BEFORE' : 'AFTER'));
+const previewTitle = computed(() =>
+  previewSide.value === 'before' ? '原始素材' : `${activeTool.value.label}效果展示`,
+);
+const previewDescription = computed(() => {
+  if (isBackgroundTool.value) {
+    return previewSide.value === 'before'
+      ? '上传需要处理的商品原图'
+      : '融合目标背景，并统一光影、透视和商品边缘';
+  }
+
+  if (isPatternTool.value) {
+    return previewSide.value === 'before'
+      ? '上传需要替换图案的基础服饰'
+      : '图案自然贴合面料，同时保留服饰版型和褶皱';
+  }
+
+  return activeTool.value.description;
+});
+const generationCost = computed(() => selectedAmount.value * IMAGE_TASK_POINTS_COST);
+const submitting = computed(() => workspace.submitting || uploadingRole.value !== null);
+const canSubmit = computed(
+  () => isAvailableTool.value && missingUploadLabels.value.length === 0 && !submitting.value,
 );
 const visibleWorks = computed(() => workspace.works.filter((work) => work.tool === 'commerce'));
-const submitting = computed(() => workspace.submitting || uploadingRole.value !== null);
-const generationCost = computed(() => selectedAmount.value * IMAGE_TASK_POINTS_COST);
-const canSubmit = computed(() => Boolean(productImage.value) && !submitting.value);
-const modeRequiresModel = computed(() => selectedMode.value === 'model-try-on');
-
-function setMode(mode: CommerceMode): void {
-  selectedMode.value = mode.value;
-
-  if (!prompt.value.trim()) {
-    prompt.value = mode.prompt;
-  }
-}
-
-function setPromptPreset(preset: PromptPreset): void {
-  prompt.value = preset.prompt;
-}
-
-async function handleUpload(role: 'model' | 'product', event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-
-  if (!file) {
-    return;
+const toolSteps = computed(() => {
+  if (isBackgroundTool.value) {
+    return [
+      '上传包含原商品的图片',
+      '上传希望替换到的目标背景图',
+      '选择商品类目和融合模式',
+      '点击开始处理，等待 AI 完成融合',
+    ];
   }
 
+  if (isPatternTool.value) {
+    return [
+      '上传需要替换图案的基础服饰图',
+      '上传新的图案或纹理素材',
+      '选择服饰类目和图案融合度',
+      '点击开始处理，等待 AI 完成替换',
+    ];
+  }
+
+  return ['先选择左侧可用工具', '按面板提示上传素材', '调整参数后开始处理'];
+});
+const toolTips = computed(() => {
+  if (isBackgroundTool.value) {
+    return [
+      '确保原图和目标背景的商品方向一致',
+      '高分辨率商品图会保留更多材质细节',
+      '目标背景的光照方向与商品越接近越自然',
+    ];
+  }
+
+  if (isPatternTool.value) {
+    return [
+      '图案分辨率越高，面料纹理越清晰',
+      '服饰主体不要被大面积遮挡',
+      '复杂褶皱会由 AI 自动匹配图案透视',
+    ];
+  }
+
+  return ['尚未开放的工具会保留和参考产品一致的入口位置'];
+});
+
+function setTool(tool: CommerceTool): void {
+  selectedToolKey.value = tool.value;
+  prompt.value = '';
+  previewSide.value = 'after';
+  uploadError.value = '';
+}
+
+function setPromptPreset(value: string): void {
+  prompt.value = prompt.value.trim() ? `${prompt.value.trim()}；${value}` : value;
+}
+
+function openUpload(role: UploadRole): void {
+  pendingUploadRole.value = role;
+  uploadInput.value?.click();
+}
+
+async function uploadFile(role: UploadRole, file: File): Promise<void> {
   uploadingRole.value = role;
   uploadError.value = '';
 
   try {
     const asset: FileAsset = await workspace.uploadReference(file);
-    const previous = role === 'product' ? productImage.value : modelImage.value;
+    const previous = imageUploads.value[role];
 
     if (previous) {
       URL.revokeObjectURL(previous.url);
     }
 
-    const nextImage: UploadState = {
-      assetId: asset.id,
-      name: asset.originalName,
-      url: URL.createObjectURL(file),
+    imageUploads.value = {
+      ...imageUploads.value,
+      [role]: {
+        assetId: asset.id,
+        name: asset.originalName,
+        url: URL.createObjectURL(file),
+      },
     };
-
-    if (role === 'product') {
-      productImage.value = nextImage;
-    } else {
-      modelImage.value = nextImage;
-    }
   } catch (error) {
     uploadError.value = error instanceof Error ? error.message : '素材上传失败，请重试';
   } finally {
-    input.value = '';
     uploadingRole.value = null;
+    pendingUploadRole.value = null;
   }
 }
 
-function removeImage(role: 'model' | 'product'): void {
-  const target = role === 'product' ? productImage.value : modelImage.value;
+function handleUpload(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  const role = pendingUploadRole.value;
+
+  if (file && role) {
+    void uploadFile(role, file);
+  } else {
+    pendingUploadRole.value = null;
+  }
+
+  input.value = '';
+}
+
+function handleDrop(role: UploadRole, event: DragEvent): void {
+  const file = event.dataTransfer?.files[0];
+
+  if (file) {
+    void uploadFile(role, file);
+  }
+}
+
+function removeUpload(role: UploadRole): void {
+  const target = imageUploads.value[role];
 
   if (target) {
     URL.revokeObjectURL(target.url);
   }
 
-  if (role === 'product') {
-    productImage.value = null;
-  } else {
-    modelImage.value = null;
-  }
+  imageUploads.value = {
+    ...imageUploads.value,
+    [role]: null,
+  };
 }
 
-function resetForm(): void {
-  if (productImage.value) {
-    URL.revokeObjectURL(productImage.value.url);
-  }
-
-  if (modelImage.value) {
-    URL.revokeObjectURL(modelImage.value.url);
-  }
-
-  productImage.value = null;
-  modelImage.value = null;
-  prompt.value = activeMode.value?.prompt ?? '';
-  selectedAmount.value = 1;
-  selectedRatio.value = '1:1';
-  selectedScene.value = scenePresets[0]?.value ?? 'studio-gray';
-  selectedSize.value = '2K';
-  uploadError.value = '';
+function isUploading(role: UploadRole): boolean {
+  return uploadingRole.value === role;
 }
 
 function buildPrompt(): string {
-  const mode = activeMode.value;
-  const scene = activeScene.value;
-  const parts = [
-    mode?.prompt,
-    prompt.value.trim() ? `补充要求：${prompt.value.trim()}` : '',
-    scene ? `场景氛围：${scene.label}，${scene.description}。` : '',
-    modeRequiresModel.value && modelImage.value ? '保留模特提供的姿态与人物比例。' : '',
-  ];
+  const parts = [activeTool.value.prompt];
 
-  return parts.filter(Boolean).join('\n');
+  if (isBackgroundTool.value) {
+    parts.push(
+      `商品类目：${backgroundCategory.value}。`,
+      `融合模式：${fusionMode.value}。`,
+      `输出分辨率：${backgroundResolution.value}。`,
+      '保持商品主体、品牌标识、材质和颜色准确。',
+    );
+  }
+
+  if (isPatternTool.value) {
+    parts.push(
+      `图案应用方式：${patternApplication.value}。`,
+      `服饰类目：${clothingCategory.value}。`,
+      `图案融合度：${patternStrength.value}。`,
+      `输出分辨率：${patternResolution.value}。`,
+      '保持服饰版型、褶皱、阴影和原始轮廓不变。',
+    );
+  }
+
+  if (prompt.value.trim()) {
+    parts.push(`额外需求：${prompt.value.trim()}。`);
+  }
+
+  return parts.join('\n');
+}
+
+function sourceRole(): UploadRole | null {
+  if (isBackgroundTool.value) {
+    return 'product';
+  }
+
+  if (isPatternTool.value) {
+    return 'clothing';
+  }
+
+  return null;
 }
 
 async function submitTask(): Promise<void> {
-  if (!canSubmit.value || !productImage.value) {
-    if (!productImage.value) {
-      uploadError.value = '请先上传商品素材';
-    }
+  if (!isAvailableTool.value) {
+    return;
+  }
+
+  if (missingUploadLabels.value.length > 0) {
+    uploadError.value = `请先上传${missingUploadLabels.value.join('和')}`;
+    return;
+  }
+
+  const primaryRole = sourceRole();
+  const primaryImage = primaryRole ? imageUploads.value[primaryRole] : null;
+
+  if (!primaryRole || !primaryImage) {
+    uploadError.value = '缺少主素材，请重新上传';
     return;
   }
 
@@ -294,24 +740,62 @@ async function submitTask(): Promise<void> {
   const createdWorks = await workspace.createGenerationWorks({
     amount: selectedAmount.value,
     extraParameters: {
-      mode: selectedMode.value,
-      scene: selectedScene.value,
-      sceneLabel: activeScene.value?.label,
-      sourceRole: modeRequiresModel.value ? 'product-and-model' : 'product',
-      modelSourceFileId: modelImage.value?.assetId,
+      backgroundCategory: isBackgroundTool.value ? backgroundCategory.value : undefined,
+      backgroundFileId: imageUploads.value.background?.assetId,
+      clothingCategory: isPatternTool.value ? clothingCategory.value : undefined,
+      fusionMode: isBackgroundTool.value ? fusionMode.value : undefined,
+      mode: activeTool.value.value,
+      outputResolution: isBackgroundTool.value
+        ? backgroundResolution.value
+        : patternResolution.value,
+      patternApplication: isPatternTool.value ? patternApplication.value : undefined,
+      patternFileId: imageUploads.value.pattern?.assetId,
+      patternStrength: isPatternTool.value ? patternStrength.value : undefined,
+      sourceRole: primaryRole,
     },
     model: 'commerce-visual-3',
-    modelLabel: activeMode.value?.label ?? '电商视觉',
+    modelLabel: activeTool.value.label,
     prompt: buildPrompt(),
     ratio: selectedRatio.value,
-    size: selectedSize.value,
-    sourceFileId: productImage.value.assetId,
+    size: isBackgroundTool.value ? backgroundResolution.value : patternResolution.value,
+    sourceFileId: primaryImage.assetId,
     toolKey: 'commerce',
   });
 
   if (createdWorks.length > 0) {
-    prompt.value = activeMode.value?.prompt ?? '';
+    historyOpen.value = true;
+    prompt.value = '';
   }
+}
+
+function resetForm(): void {
+  for (const role of Object.keys(imageUploads.value) as UploadRole[]) {
+    const target = imageUploads.value[role];
+
+    if (target) {
+      URL.revokeObjectURL(target.url);
+    }
+  }
+
+  imageUploads.value = {
+    background: null,
+    clothing: null,
+    model: null,
+    pattern: null,
+    product: null,
+  };
+  prompt.value = '';
+  uploadError.value = '';
+  previewSide.value = 'after';
+  backgroundCategory.value = backgroundCategories[0] ?? '服饰箱包';
+  fusionMode.value = fusionModes[0] ?? '自然融合';
+  backgroundResolution.value = '2K';
+  patternApplication.value = patternApplications[0] ?? '胸前图案';
+  clothingCategory.value = clothingCategories[0] ?? 'T 恤';
+  patternStrength.value = patternStrengths[0] ?? '自然贴合';
+  patternResolution.value = '2K';
+  selectedRatio.value = '1:1';
+  selectedAmount.value = 1;
 }
 
 function formatWorkTime(timestamp: number): string {
@@ -335,399 +819,572 @@ function workStatusLabel(status: DrawWorkStatus): string {
 }
 
 onMounted(() => {
-  prompt.value = activeMode.value?.prompt ?? '';
   void workspace.initialize();
 });
 
 onBeforeUnmount(() => {
-  if (productImage.value) {
-    URL.revokeObjectURL(productImage.value.url);
-  }
-
-  if (modelImage.value) {
-    URL.revokeObjectURL(modelImage.value.url);
+  for (const target of Object.values(imageUploads.value)) {
+    if (target) {
+      URL.revokeObjectURL(target.url);
+    }
   }
 });
 </script>
 
 <template>
-  <section class="commerce-view">
-    <header class="commerce-header">
-      <div class="commerce-header__copy">
-        <span>COMMERCE VISUAL STUDIO</span>
-        <h1>AI 电商工具</h1>
-        <p>从商品素材到多比例商拍图，统一完成主图、换景和模特展示。</p>
+  <section class="commerce-workbench">
+    <header class="commerce-workbench__header">
+      <div class="commerce-workbench__brand">
+        <span>
+          <ShoppingCartOutlined />
+        </span>
+        <div>
+          <strong>边界 AI 平台电商工具</strong>
+          <small>商品图、换景、试衣与视觉增强</small>
+        </div>
       </div>
-      <nav class="commerce-header__switch" aria-label="电商工具切换">
-        <RouterLink to="/draw">AI 绘画</RouterLink>
-        <RouterLink to="/retouch">智能修图</RouterLink>
-        <RouterLink to="/image-generation">图片生成</RouterLink>
-        <RouterLink class="active" to="/commerce">电商工具</RouterLink>
+
+      <nav class="commerce-workbench__breadcrumb" aria-label="当前位置">
+        <span>全部</span>
+        <RightOutlined />
+        <span>{{ activeTool.form === 'background' ? '商品换背景' : '商品替换' }}</span>
+        <RightOutlined />
+        <strong>{{ activeTool.label }}</strong>
       </nav>
+
+      <div class="commerce-workbench__actions">
+        <button type="button" @click="historyOpen = true">
+          <HistoryOutlined />
+          历史记录
+        </button>
+        <button type="button" @click="helpOpen = true">
+          <QuestionCircleOutlined />
+          帮助
+        </button>
+      </div>
     </header>
 
-    <div class="commerce-summary">
-      <div>
-        <PictureOutlined />
-        <span>
-          <strong>商品素材</strong>
-          <small>{{ productImage ? '已添加 1 张' : '等待上传' }}</small>
-        </span>
-      </div>
-      <div>
-        <BgColorsOutlined />
-        <span>
-          <strong>场景预设</strong>
-          <small>{{ activeScene?.label }}</small>
-        </span>
-      </div>
-      <div>
-        <ExperimentOutlined />
-        <span>
-          <strong>输出规格</strong>
-          <small>{{ selectedRatio }} · {{ selectedSize }}</small>
-        </span>
-      </div>
-      <div class="commerce-summary__balance">
-        <ThunderboltFilled />
-        <span>
-          <strong>{{ generationCost }} 积分</strong>
-          <small>本次预计消耗</small>
-        </span>
-      </div>
-    </div>
+    <label class="commerce-mobile-picker">
+      <span>选择电商工具</span>
+      <select v-model="selectedToolKey">
+        <option v-for="tool in commerceTools" :key="tool.value" :value="tool.value">
+          {{ tool.label }}
+        </option>
+      </select>
+    </label>
 
-    <div class="commerce-layout">
-      <aside class="commerce-params">
-        <section class="commerce-section">
-          <header>
-            <strong>创作方式</strong>
-            <span>{{ commerceModes.length }} 种流程</span>
-          </header>
-          <div class="commerce-mode-grid">
-            <button
-              v-for="mode in commerceModes"
-              :key="mode.value"
-              type="button"
-              :class="{ active: selectedMode === mode.value }"
-              @click="setMode(mode)"
-            >
-              <i :style="{ '--commerce-accent': mode.accent }">
-                <component :is="mode.icon" />
-              </i>
-              <span>
-                <strong>{{ mode.label }}</strong>
-                <small>{{ mode.description }}</small>
-              </span>
-              <CheckOutlined v-if="selectedMode === mode.value" />
-            </button>
-          </div>
-        </section>
-
-        <section class="commerce-section">
-          <header>
-            <strong>商品素材</strong>
-            <span>{{ uploadingRole === 'product' ? '上传中...' : '必填' }}</span>
-          </header>
-          <input
-            ref="productInput"
-            type="file"
-            accept="image/*"
-            hidden
-            :disabled="uploadingRole !== null"
-            @change="handleUpload('product', $event)"
-          />
-          <div v-if="productImage" class="commerce-upload-preview">
-            <img :src="productImage.url" :alt="productImage.name" />
-            <button type="button" aria-label="移除商品素材" @click="removeImage('product')">
-              <CloseOutlined />
-            </button>
-            <span>商品主体</span>
-          </div>
-          <button
-            v-else
-            type="button"
-            class="commerce-upload-empty"
-            :disabled="uploadingRole !== null"
-            @click="productInput?.click()"
-          >
-            <LoadingOutlined v-if="uploadingRole === 'product'" />
-            <UploadOutlined v-else />
-            <strong>{{ uploadingRole === 'product' ? '正在上传商品图' : '上传商品图' }}</strong>
-            <small>建议使用主体清晰、背景简洁的 JPG、PNG 或 WebP</small>
+    <div class="commerce-workbench__body">
+      <aside class="commerce-catalog commerce-panel">
+        <label class="commerce-catalog__search">
+          <SearchOutlined />
+          <input v-model="searchQuery" type="search" placeholder="搜索工具（50+ 智能体）" />
+          <button type="button" aria-label="刷新工具列表" @click="searchQuery = ''">
+            <ReloadOutlined />
           </button>
-        </section>
-
-        <section v-if="modeRequiresModel" class="commerce-section">
-          <header>
-            <strong>模特素材</strong>
-            <span>{{ uploadingRole === 'model' ? '上传中...' : '可选' }}</span>
-          </header>
-          <input
-            ref="modelInput"
-            type="file"
-            accept="image/*"
-            hidden
-            :disabled="uploadingRole !== null"
-            @change="handleUpload('model', $event)"
-          />
-          <div v-if="modelImage" class="commerce-upload-preview commerce-upload-preview--portrait">
-            <img :src="modelImage.url" :alt="modelImage.name" />
-            <button type="button" aria-label="移除模特素材" @click="removeImage('model')">
-              <CloseOutlined />
-            </button>
-            <span>模特参考</span>
-          </div>
-          <button
-            v-else
-            type="button"
-            class="commerce-upload-empty commerce-upload-empty--compact"
-            :disabled="uploadingRole !== null"
-            @click="modelInput?.click()"
-          >
-            <LoadingOutlined v-if="uploadingRole === 'model'" />
-            <UserOutlined v-else />
-            <strong>{{ uploadingRole === 'model' ? '正在上传模特图' : '添加模特参考' }}</strong>
-            <small>不上传时由系统生成自然姿态</small>
-          </button>
-        </section>
-
-        <label class="commerce-prompt">
-          <strong>画面要求</strong>
-          <span>
-            <textarea
-              v-model="prompt"
-              maxlength="1000"
-              placeholder="描述商品卖点、拍摄角度、光线、背景和氛围"
-            />
-            <small>{{ prompt.length }} / 1000</small>
-          </span>
         </label>
 
-        <section class="commerce-section">
-          <header>
-            <strong>场景预设</strong>
-            <span>{{ activeScene?.label }}</span>
-          </header>
-          <div class="commerce-scene-grid">
-            <button
-              v-for="scene in scenePresets"
-              :key="scene.value"
-              type="button"
-              :class="{ active: selectedScene === scene.value }"
-              @click="selectedScene = scene.value"
-            >
-              <i :style="{ '--scene-accent': scene.accent }" />
-              <span>{{ scene.label }}</span>
-            </button>
-          </div>
-        </section>
-
-        <section class="commerce-section commerce-section--split">
-          <header>
-            <strong>画面比例</strong>
-            <span>{{ selectedRatio }}</span>
-          </header>
-          <div class="commerce-option-grid">
-            <button
-              v-for="ratio in ratios"
-              :key="ratio"
-              type="button"
-              :class="{ active: selectedRatio === ratio }"
-              @click="selectedRatio = ratio"
-            >
-              {{ ratio }}
-            </button>
-          </div>
-        </section>
-
-        <section class="commerce-section commerce-section--split">
-          <header>
-            <strong>输出清晰度</strong>
-            <span>{{ selectedSize }}</span>
-          </header>
-          <div class="commerce-option-grid">
-            <button
-              v-for="size in sizes"
-              :key="size"
-              type="button"
-              :class="{ active: selectedSize === size }"
-              @click="selectedSize = size"
-            >
-              {{ size }}
-            </button>
-          </div>
-        </section>
-
-        <section class="commerce-section commerce-section--split">
-          <header>
-            <strong>生成数量</strong>
-            <span>每次最多 4 张</span>
-          </header>
-          <div class="commerce-option-grid">
-            <button
-              v-for="amount in amounts"
-              :key="amount"
-              type="button"
-              :class="{ active: selectedAmount === amount }"
-              @click="selectedAmount = amount"
-            >
-              {{ amount }} 张
-            </button>
-          </div>
-        </section>
-
-        <div class="commerce-submit">
+        <button
+          type="button"
+          class="commerce-catalog__all"
+          :class="{ active: selectedToolKey === '' }"
+          @click="searchQuery = ''"
+        >
           <span>
-            <ThunderboltFilled />
-            本次消耗 {{ generationCost }} 积分
+            <AppstoreOutlined />
           </span>
-          <button type="button" :disabled="!canSubmit" @click="submitTask">
-            <LoadingOutlined v-if="submitting" />
-            <ShoppingCartOutlined v-else />
-            {{ submitting ? '正在提交...' : '生成商拍图' }}
-          </button>
-          <button type="button" class="commerce-reset" @click="resetForm">
-            <ReloadOutlined />
-            重置当前设置
-          </button>
-          <small>当前余额 {{ sessionStore.points }} 积分</small>
+          <strong>全部</strong>
+          <small>{{ commerceTools.length }}</small>
+          <RightOutlined />
+        </button>
+
+        <div class="commerce-catalog__groups">
+          <section v-for="group in filteredGroups" :key="group.label">
+            <header>
+              <span>
+                <AppstoreOutlined />
+                {{ group.label }}
+              </span>
+              <RightOutlined />
+            </header>
+            <button
+              v-for="tool in group.items"
+              :key="tool.value"
+              type="button"
+              class="commerce-catalog__item"
+              :class="{
+                active: selectedToolKey === tool.value,
+                muted: tool.form === 'placeholder',
+              }"
+              @click="setTool(tool)"
+            >
+              <i :style="{ '--tool-accent': tool.accent }">
+                <component :is="tool.icon" />
+              </i>
+              <span>{{ tool.label }}</span>
+              <em v-if="tool.form === 'placeholder'">即将开放</em>
+              <RightOutlined />
+            </button>
+          </section>
+
+          <div v-if="filteredToolCount === 0" class="commerce-catalog__empty">
+            <SearchOutlined />
+            <strong>没有找到匹配工具</strong>
+            <span>尝试缩短关键词</span>
+          </div>
+        </div>
+
+        <div class="commerce-catalog__idea">
+          <span>
+            <BulbOutlined />
+          </span>
+          <div>
+            <strong>有想法？</strong>
+            <small>分享你的商品视觉需求</small>
+          </div>
+          <button type="button" disabled>提交想法</button>
         </div>
       </aside>
 
-      <main class="commerce-stage">
-        <header class="commerce-stage__header">
+      <main class="commerce-editor commerce-panel">
+        <header class="commerce-panel__header">
           <div>
-            <strong>画面预览</strong>
-            <span>先确认商品主体和场景方向，再提交生成</span>
+            <ExperimentOutlined />
+            <strong>操作面板</strong>
           </div>
-          <div class="commerce-stage__tabs">
-            <button
-              type="button"
-              :class="{ active: activePreview === 'preview' }"
-              @click="activePreview = 'preview'"
-            >
-              预览
+          <div class="commerce-editor__tools">
+            <button type="button" @click="resetForm">
+              <ReloadOutlined />
+              重置
             </button>
-            <button
-              type="button"
-              :class="{ active: activePreview === 'checklist' }"
-              @click="activePreview = 'checklist'"
-            >
-              检查项
+            <button type="button" @click="resetForm">
+              <CloseOutlined />
+              清除
             </button>
           </div>
         </header>
 
-        <div v-if="activePreview === 'preview'" class="commerce-stage__preview">
-          <div class="commerce-stage__paper" :style="{ '--stage-scene': activeScene?.accent }">
-            <span class="commerce-stage__paper-label">{{ activeMode?.label }}</span>
-            <div class="commerce-stage__photo">
-              <img v-if="productImage" :src="productImage.url" :alt="productImage.name" />
-              <div v-else class="commerce-stage__photo-empty">
-                <ShoppingCartOutlined />
-                <strong>商品主体预览</strong>
-                <span>上传商品图后，这里会显示构图位置</span>
-              </div>
+        <div v-if="isBackgroundTool" class="commerce-editor__content">
+          <section class="commerce-field">
+            <label>商品类目 <em>*</em></label>
+            <div class="commerce-choice-grid">
+              <button
+                v-for="category in backgroundCategories"
+                :key="category"
+                type="button"
+                :class="{ active: backgroundCategory === category }"
+                @click="backgroundCategory = category"
+              >
+                {{ category }}
+              </button>
             </div>
-            <div class="commerce-stage__safe-area" aria-hidden="true" />
-            <span class="commerce-stage__guide commerce-stage__guide--left">主体安全区</span>
-            <span class="commerce-stage__guide commerce-stage__guide--bottom">
-              {{ selectedRatio }} · {{ selectedSize }}
+          </section>
+
+          <label class="commerce-field">
+            <span>融合模式 <em>*</em></span>
+            <select v-model="fusionMode">
+              <option v-for="mode in fusionModes" :key="mode" :value="mode">{{ mode }}</option>
+            </select>
+          </label>
+
+          <label class="commerce-field">
+            <span>输出分辨率</span>
+            <select v-model="backgroundResolution">
+              <option
+                v-for="resolution in backgroundResolutions"
+                :key="resolution"
+                :value="resolution"
+              >
+                {{ resolution }}
+              </option>
+            </select>
+          </label>
+
+          <div
+            class="commerce-upload"
+            :class="{ filled: imageUploads.product }"
+            @dragover.prevent
+            @drop.prevent="handleDrop('product', $event)"
+          >
+            <div v-if="imageUploads.product" class="commerce-upload__preview">
+              <img :src="imageUploads.product.url" :alt="imageUploads.product.name" />
+              <button type="button" aria-label="移除商品图片" @click="removeUpload('product')">
+                <CloseOutlined />
+              </button>
+              <span>商品原图</span>
+            </div>
+            <button v-else type="button" @click="openUpload('product')">
+              <LoadingOutlined v-if="isUploading('product')" />
+              <UploadOutlined v-else />
+              <strong>{{ isUploading('product') ? '正在上传' : uploadMeta.product.label }}</strong>
+              <small>{{ uploadMeta.product.description }}</small>
+              <em>0 / 1</em>
+            </button>
+          </div>
+
+          <div
+            class="commerce-upload"
+            :class="{ filled: imageUploads.background }"
+            @dragover.prevent
+            @drop.prevent="handleDrop('background', $event)"
+          >
+            <div v-if="imageUploads.background" class="commerce-upload__preview">
+              <img :src="imageUploads.background.url" :alt="imageUploads.background.name" />
+              <button type="button" aria-label="移除目标背景图" @click="removeUpload('background')">
+                <CloseOutlined />
+              </button>
+              <span>目标背景</span>
+            </div>
+            <button v-else type="button" @click="openUpload('background')">
+              <LoadingOutlined v-if="isUploading('background')" />
+              <UploadOutlined v-else />
+              <strong>{{
+                isUploading('background') ? '正在上传' : uploadMeta.background.label
+              }}</strong>
+              <small>{{ uploadMeta.background.description }}</small>
+              <em>0 / 1</em>
+            </button>
+          </div>
+
+          <label class="commerce-field">
+            <span>额外需求</span>
+            <textarea
+              v-model="prompt"
+              maxlength="600"
+              placeholder="例如：背景保持简洁，商品下方增加自然投影"
+            />
+          </label>
+
+          <div class="commerce-presets">
+            <span>快捷要求</span>
+            <div>
+              <button
+                v-for="preset in promptPresets"
+                :key="preset"
+                type="button"
+                @click="setPromptPreset(preset)"
+              >
+                <PlusOutlined />
+                {{ preset }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="isPatternTool" class="commerce-editor__content">
+          <label class="commerce-field">
+            <span>图案应用方式 <em>*</em></span>
+            <select v-model="patternApplication">
+              <option
+                v-for="application in patternApplications"
+                :key="application"
+                :value="application"
+              >
+                {{ application }}
+              </option>
+            </select>
+          </label>
+
+          <section class="commerce-field">
+            <label>服饰类目 <em>*</em></label>
+            <div class="commerce-choice-grid commerce-choice-grid--clothing">
+              <button
+                v-for="category in clothingCategories"
+                :key="category"
+                type="button"
+                :class="{ active: clothingCategory === category }"
+                @click="clothingCategory = category"
+              >
+                {{ category }}
+              </button>
+            </div>
+          </section>
+
+          <label class="commerce-field">
+            <span>图案融合度 <em>*</em></span>
+            <select v-model="patternStrength">
+              <option v-for="strength in patternStrengths" :key="strength" :value="strength">
+                {{ strength }}
+              </option>
+            </select>
+          </label>
+
+          <label class="commerce-field">
+            <span>图片分辨率</span>
+            <select v-model="patternResolution">
+              <option
+                v-for="resolution in patternResolutions"
+                :key="resolution"
+                :value="resolution"
+              >
+                {{ resolution }}
+              </option>
+            </select>
+          </label>
+
+          <div
+            class="commerce-upload"
+            :class="{ filled: imageUploads.clothing }"
+            @dragover.prevent
+            @drop.prevent="handleDrop('clothing', $event)"
+          >
+            <div v-if="imageUploads.clothing" class="commerce-upload__preview">
+              <img :src="imageUploads.clothing.url" :alt="imageUploads.clothing.name" />
+              <button type="button" aria-label="移除基础服饰图片" @click="removeUpload('clothing')">
+                <CloseOutlined />
+              </button>
+              <span>基础服饰</span>
+            </div>
+            <button v-else type="button" @click="openUpload('clothing')">
+              <LoadingOutlined v-if="isUploading('clothing')" />
+              <UploadOutlined v-else />
+              <strong>{{
+                isUploading('clothing') ? '正在上传' : uploadMeta.clothing.label
+              }}</strong>
+              <small>{{ uploadMeta.clothing.description }}</small>
+              <em>0 / 1</em>
+            </button>
+          </div>
+
+          <div
+            class="commerce-upload"
+            :class="{ filled: imageUploads.pattern }"
+            @dragover.prevent
+            @drop.prevent="handleDrop('pattern', $event)"
+          >
+            <div v-if="imageUploads.pattern" class="commerce-upload__preview">
+              <img :src="imageUploads.pattern.url" :alt="imageUploads.pattern.name" />
+              <button type="button" aria-label="移除图案素材" @click="removeUpload('pattern')">
+                <CloseOutlined />
+              </button>
+              <span>图案素材</span>
+            </div>
+            <button v-else type="button" @click="openUpload('pattern')">
+              <LoadingOutlined v-if="isUploading('pattern')" />
+              <UploadOutlined v-else />
+              <strong>{{ isUploading('pattern') ? '正在上传' : uploadMeta.pattern.label }}</strong>
+              <small>{{ uploadMeta.pattern.description }}</small>
+              <em>0 / 1</em>
+            </button>
+          </div>
+
+          <label class="commerce-field">
+            <span>额外需求</span>
+            <textarea
+              v-model="prompt"
+              maxlength="600"
+              placeholder="例如：图案颜色降低一点，保留面料褶皱"
+            />
+          </label>
+        </div>
+
+        <div v-else class="commerce-editor__placeholder">
+          <span>
+            <ExperimentOutlined />
+          </span>
+          <strong>{{ activeTool.label }}</strong>
+          <p>{{ activeTool.description }}</p>
+          <small>该功能入口已保留，将在后续模块中接入完整流程。</small>
+        </div>
+
+        <div v-if="uploadError" class="commerce-editor__error" role="alert">
+          <span>{{ uploadError }}</span>
+          <button type="button" @click="uploadError = ''">
+            <CloseOutlined />
+          </button>
+        </div>
+
+        <footer v-if="isAvailableTool" class="commerce-editor__footer">
+          <div>
+            <ThunderboltFilled />
+            <span>
+              <strong>本次预计消耗 {{ generationCost }} 积分</strong>
+              <small>当前余额 {{ sessionStore.points }} 积分</small>
             </span>
           </div>
-          <div class="commerce-stage__scene-strip">
-            <span>场景</span>
-            <strong>{{ activeScene?.label }}</strong>
-            <i :style="{ '--scene-accent': activeScene?.accent }" />
-            <small>{{ activeScene?.description }}，保持商品细节和边缘干净。</small>
+          <button type="button" :disabled="!canSubmit" @click="submitTask">
+            <LoadingOutlined v-if="submitting" />
+            <SwapOutlined v-else />
+            {{ submitting ? '正在提交...' : '开始处理' }}
+          </button>
+        </footer>
+
+        <input ref="uploadInput" type="file" accept="image/*" hidden @change="handleUpload" />
+      </main>
+
+      <section class="commerce-preview commerce-panel">
+        <header class="commerce-panel__header">
+          <div>
+            <EyeOutlined />
+            <strong>效果展示</strong>
           </div>
+          <span>{{ previewSide === 'before' ? '1 / 2' : '2 / 2' }}</span>
+        </header>
+
+        <div class="commerce-preview__canvas">
+          <button
+            type="button"
+            class="commerce-preview__arrow commerce-preview__arrow--left"
+            aria-label="查看原始素材"
+            @click="previewSide = 'before'"
+          >
+            <RightOutlined />
+          </button>
+
+          <div class="commerce-preview__visual" :class="`is-${previewSide}`">
+            <img v-if="previewImage" :src="previewImage" :alt="previewTitle" />
+            <GalleryArtwork v-else :title="previewTitle" :variant="previewVariant" />
+            <span class="commerce-preview__before-label">BEFORE</span>
+            <span class="commerce-preview__after-label">AFTER</span>
+            <div class="commerce-preview__caption">
+              <strong>{{ previewTitle }}</strong>
+              <span>{{ previewDescription }}</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="commerce-preview__arrow commerce-preview__arrow--right"
+            aria-label="查看处理效果"
+            @click="previewSide = 'after'"
+          >
+            <RightOutlined />
+          </button>
         </div>
 
-        <div v-else class="commerce-checklist">
-          <article>
-            <span>01</span>
-            <div>
-              <strong>素材是否清晰</strong>
-              <p>商品主体、标签和边缘需要保持可识别，避免严重模糊或遮挡。</p>
-            </div>
-            <CheckOutlined v-if="productImage" />
-            <CloseOutlined v-else />
-          </article>
-          <article>
-            <span>02</span>
-            <div>
-              <strong>场景是否匹配</strong>
-              <p>当前选择 {{ activeScene?.label }}，适合 {{ activeScene?.description }} 氛围。</p>
-            </div>
-            <CheckOutlined />
-          </article>
-          <article>
-            <span>03</span>
-            <div>
-              <strong>输出比例是否完整</strong>
-              <p>当前输出 {{ selectedRatio }}，检查商品是否需要保留文案或边距。</p>
-            </div>
-            <CheckOutlined />
-          </article>
+        <div class="commerce-preview__status">
+          <span>
+            <CheckCircleOutlined />
+            {{ previewSideLabel }}
+          </span>
+          <strong>{{ activeTool.label }}</strong>
+          <small>{{ isAvailableTool ? '支持上传素材实时预览' : '示例效果预览' }}</small>
         </div>
 
-        <section class="commerce-quick-presets">
+        <section class="commerce-recommended">
           <header>
-            <div>
-              <strong>快捷描述</strong>
-              <span>快速补充拍摄方向</span>
-            </div>
-            <span>{{ promptPresets.length }} 个预设</span>
+            <span>
+              <StarOutlined />
+              推荐工具
+            </span>
           </header>
           <div>
-            <button
-              v-for="preset in promptPresets"
-              :key="preset.label"
-              type="button"
-              @click="setPromptPreset(preset)"
-            >
-              <PlusOutlined />
-              {{ preset.label }}
+            <button type="button" @click="selectedToolKey = 'image-cutout'">
+              <span class="is-blue">
+                <PictureOutlined />
+              </span>
+              <strong>商品抠图</strong>
+              <small>一键去除背景，保留商品主体</small>
+            </button>
+            <button type="button" @click="selectedToolKey = 'style-transfer'">
+              <span class="is-purple">
+                <AppstoreOutlined />
+              </span>
+              <strong>风格转换</strong>
+              <small>将商品图转换为不同艺术风格</small>
+            </button>
+            <button type="button" @click="selectedToolKey = 'image-upscale'">
+              <span class="is-green">
+                <ExperimentOutlined />
+              </span>
+              <strong>图片放大</strong>
+              <small>AI 无损放大，提升图片清晰度</small>
             </button>
           </div>
         </section>
-      </main>
+      </section>
 
-      <aside class="commerce-history">
+      <aside class="commerce-info commerce-panel">
+        <div class="commerce-info__title">
+          <span>
+            <component :is="activeTool.icon" />
+          </span>
+          <strong>{{ activeTool.label }}</strong>
+        </div>
+
+        <section>
+          <h2>功能介绍</h2>
+          <p>{{ activeTool.description }}支持多种商品类型，适用于电商展示和营销素材制作。</p>
+        </section>
+
+        <section>
+          <h2>使用步骤</h2>
+          <ol>
+            <li v-for="(step, index) in toolSteps" :key="step">
+              <span>{{ index + 1 }}</span>
+              {{ step }}
+            </li>
+          </ol>
+        </section>
+
+        <section>
+          <h2>使用技巧</h2>
+          <ul>
+            <li v-for="tip in toolTips" :key="tip">
+              <CheckCircleOutlined />
+              {{ tip }}
+            </li>
+          </ul>
+        </section>
+
+        <section class="commerce-info__notice">
+          <InfoCircleOutlined />
+          <span>
+            <strong>积分消耗说明</strong>
+            <small>生成一张图片需要 {{ IMAGE_TASK_POINTS_COST }} 积分</small>
+          </span>
+        </section>
+
+        <div class="commerce-info__support">
+          <span>
+            <ClockCircleOutlined />
+          </span>
+          <div>
+            <strong>需要帮助？</strong>
+            <small>可先使用历史记录查看处理状态。</small>
+          </div>
+          <button type="button" @click="helpOpen = true">联系支持</button>
+        </div>
+      </aside>
+    </div>
+
+    <div v-if="historyOpen" class="commerce-overlay" @click.self="historyOpen = false">
+      <aside class="commerce-drawer" aria-label="历史记录">
         <header>
           <div>
-            <strong>生成记录</strong>
-            <span>{{ visibleWorks.length }} 个任务</span>
+            <HistoryOutlined />
+            <span>
+              <strong>历史记录</strong>
+              <small>{{ visibleWorks.length }} 个电商任务</small>
+            </span>
           </div>
-          <button type="button" aria-label="刷新生成记录" @click="workspace.initialize()">
-            <ReloadOutlined />
+          <button type="button" aria-label="关闭历史记录" @click="historyOpen = false">
+            <CloseOutlined />
           </button>
         </header>
 
-        <div v-if="workspace.error" class="commerce-error" role="alert">
+        <div v-if="workspace.error" class="commerce-drawer__error">
           <span>{{ workspace.error.message }}</span>
           <button type="button" @click="workspace.clearError">关闭</button>
         </div>
 
-        <div v-if="visibleWorks.length > 0" class="commerce-work-list">
-          <article v-for="work in visibleWorks" :key="work.id" class="commerce-work-card">
-            <div class="commerce-work-card__visual">
+        <div v-if="visibleWorks.length > 0" class="commerce-history-list">
+          <article v-for="work in visibleWorks" :key="work.id">
+            <div>
               <img
                 v-if="work.status === 'done' && work.artworkUrl"
                 :src="work.artworkUrl"
                 :alt="work.prompt"
               />
-              <div v-else-if="work.status === 'failed'" class="commerce-work-card__state">
+              <div v-else-if="work.status === 'failed'" class="is-failed">
                 <CloseOutlined />
-                <strong>处理失败</strong>
+                <span>处理失败</span>
               </div>
-              <div v-else class="commerce-work-card__state commerce-work-card__state--loading">
+              <div v-else class="is-loading">
                 <LoadingOutlined />
-                <strong>{{ work.status === 'queued' ? '等待处理' : '生成中' }}</strong>
+                <span>{{ work.status === 'queued' ? '等待处理' : '生成中' }}</span>
               </div>
             </div>
-            <div class="commerce-work-card__copy">
+            <section>
               <header>
                 <strong>{{ work.modelLabel }}</strong>
                 <small>{{ formatWorkTime(work.createdAt) }}</small>
@@ -762,932 +1419,1443 @@ onBeforeUnmount(() => {
                   删除
                 </button>
               </footer>
-            </div>
+            </section>
           </article>
         </div>
 
-        <div v-else class="commerce-history__empty">
+        <div v-else class="commerce-drawer__empty">
           <span>
             <ShoppingCartOutlined />
           </span>
-          <strong>还没有商拍记录</strong>
-          <p>上传商品图并选择创作方式，生成结果会显示在这里。</p>
+          <strong>还没有电商生成记录</strong>
+          <p>完成一次背景融合或图案替换后，结果会显示在这里。</p>
         </div>
       </aside>
+    </div>
+
+    <div
+      v-if="helpOpen"
+      class="commerce-overlay commerce-overlay--center"
+      @click.self="helpOpen = false"
+    >
+      <section class="commerce-help" role="dialog" aria-modal="true" aria-label="电商工具帮助">
+        <header>
+          <div>
+            <QuestionCircleOutlined />
+            <strong>电商工具帮助</strong>
+          </div>
+          <button type="button" aria-label="关闭帮助" @click="helpOpen = false">
+            <CloseOutlined />
+          </button>
+        </header>
+        <div>
+          <article>
+            <span>01</span>
+            <div>
+              <strong>先选择左侧工具</strong>
+              <p>当前优先开放智能背景融合和服饰图案替换设计师，其余入口暂时保留。</p>
+            </div>
+          </article>
+          <article>
+            <span>02</span>
+            <div>
+              <strong>准备清晰素材</strong>
+              <p>商品主体、服饰边缘和图案分辨率越清晰，处理结果越稳定。</p>
+            </div>
+          </article>
+          <article>
+            <span>03</span>
+            <div>
+              <strong>提交后查看历史记录</strong>
+              <p>任务会在后台处理，完成后可收藏、下载、删除或对失败任务重试。</p>
+            </div>
+          </article>
+        </div>
+      </section>
     </div>
   </section>
 </template>
 
 <style scoped>
-.commerce-view {
-  min-height: calc(100vh - 56px);
-  padding: 28px 28px 54px;
+.commerce-workbench {
+  --commerce-blue: #2c76f0;
+  --commerce-border: #e4e8ed;
+  --commerce-muted: #8d98a6;
+  min-height: 760px;
+  padding: 12px 20px 38px;
   background:
-    linear-gradient(90deg, rgb(71 86 104 / 2%) 1px, transparent 1px),
-    linear-gradient(rgb(71 86 104 / 2%) 1px, transparent 1px), #f7f8fa;
-  background-size: 36px 36px;
+    linear-gradient(90deg, rgb(64 83 106 / 2%) 1px, transparent 1px),
+    linear-gradient(rgb(64 83 106 / 2%) 1px, transparent 1px), #fbfcfd;
+  background-size: 42px 42px;
 }
 
-.commerce-header,
-.commerce-summary,
-.commerce-layout {
-  width: min(100%, 1540px);
-  margin-right: auto;
-  margin-left: auto;
-}
-
-.commerce-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 17px;
-}
-
-.commerce-header__copy {
+.commerce-workbench__header {
   display: grid;
-  gap: 5px;
-}
-
-.commerce-header__copy > span {
-  color: #a45f38;
-  font-size: 9px;
-  font-weight: 850;
-  letter-spacing: 0.13em;
-}
-
-.commerce-header h1 {
-  margin: 0;
-  color: #20272e;
-  font-size: 28px;
-}
-
-.commerce-header p {
-  margin: 0;
-  color: #818b96;
-  font-size: 10px;
-}
-
-.commerce-header__switch {
-  display: flex;
-  padding: 3px;
-  border: 1px solid #e1e5e8;
-  border-radius: 8px;
-  background: rgb(255 255 255 / 84%);
-}
-
-.commerce-header__switch a {
-  display: inline-flex;
-  height: 31px;
+  min-height: 58px;
   align-items: center;
-  padding: 0 11px;
-  border-radius: 6px;
-  color: #68727e;
-  font-size: 9px;
-  font-weight: 700;
-  text-decoration: none;
+  gap: 18px;
+  grid-template-columns: minmax(220px, auto) minmax(0, 1fr) auto;
+  margin-bottom: 10px;
+  padding: 9px 13px;
+  border: 1px solid var(--commerce-border);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 8px 24px rgb(38 54 74 / 4%);
 }
 
-.commerce-header__switch a.active {
-  background: #242a31;
-  color: #fff;
-}
-
-.commerce-summary {
-  display: grid;
-  gap: 1px;
-  overflow: hidden;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-bottom: 14px;
-  border: 1px solid #e1e5e8;
-  border-radius: 9px;
-  background: #e7eaed;
-}
-
-.commerce-summary > div {
+.commerce-workbench__brand {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 9px;
-  padding: 11px 14px;
-  background: rgb(255 255 255 / 94%);
 }
 
-.commerce-summary > div > :deep(svg) {
+.commerce-workbench__brand > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
   flex: 0 0 auto;
-  color: #a7653d;
-  font-size: 14px;
+  place-items: center;
+  border-radius: 8px;
+  background: #2c76f0;
+  color: #fff;
+  font-size: 17px;
 }
 
-.commerce-summary span {
+.commerce-workbench__brand > div {
   display: grid;
   min-width: 0;
   gap: 2px;
 }
 
-.commerce-summary strong {
+.commerce-workbench__brand strong {
   overflow: hidden;
-  color: #3f4750;
+  color: #202b38;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commerce-workbench__brand small {
+  overflow: hidden;
+  color: #8c97a3;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commerce-workbench__breadcrumb {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: #8b96a4;
+  font-size: 9px;
+}
+
+.commerce-workbench__breadcrumb :deep(svg) {
+  flex: 0 0 auto;
+  font-size: 6px;
+}
+
+.commerce-workbench__breadcrumb strong {
+  overflow: hidden;
+  color: #4d5967;
   font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.commerce-summary small {
-  overflow: hidden;
-  color: #959da6;
-  font-size: 8px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.commerce-workbench__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.commerce-summary__balance > :deep(svg) {
-  color: #c07e2e !important;
+.commerce-workbench__actions button {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #6f7b89;
+  font-size: 9px;
+  cursor: pointer;
 }
 
-.commerce-layout {
+.commerce-workbench__actions button:hover {
+  border-color: #dfe5ec;
+  background: #f7f9fb;
+  color: #2c76f0;
+}
+
+.commerce-mobile-picker {
+  display: none;
+}
+
+.commerce-workbench__body {
   display: grid;
-  min-height: 700px;
   align-items: start;
-  gap: 14px;
-  grid-template-columns: 360px minmax(360px, 1fr) 330px;
+  gap: 10px;
+  grid-template-columns:
+    minmax(190px, 0.82fr) minmax(285px, 1.18fr) minmax(380px, 1.72fr)
+    minmax(190px, 0.78fr);
 }
 
-.commerce-params,
-.commerce-stage,
-.commerce-history {
+.commerce-panel {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid #e0e4e7;
+  border: 1px solid var(--commerce-border);
   border-radius: 10px;
   background: #fff;
-  box-shadow: 0 8px 28px rgb(34 47 63 / 5%);
+  box-shadow: 0 10px 28px rgb(35 51 71 / 5%);
 }
 
-.commerce-params {
-  display: grid;
-}
-
-.commerce-section,
-.commerce-prompt {
-  display: grid;
-  gap: 10px;
-  padding: 14px;
-  border-bottom: 1px solid #edf0f2;
-}
-
-.commerce-section header,
-.commerce-prompt > strong {
+.commerce-panel__header {
   display: flex;
+  min-height: 51px;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: #343c44;
+  padding: 0 13px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.commerce-panel__header > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: #455363;
+}
+
+.commerce-panel__header > div :deep(svg) {
+  color: #2c76f0;
+  font-size: 12px;
+}
+
+.commerce-panel__header strong {
+  font-size: 11px;
+}
+
+.commerce-panel__header > span {
+  color: #9aa4af;
+  font-size: 8px;
+}
+
+.commerce-catalog {
+  position: sticky;
+  top: 10px;
+  display: grid;
+  max-height: calc(100vh - 40px);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.commerce-catalog__search {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin: 11px 11px 8px;
+  padding: 0 8px;
+  border: 1px solid #e5e9ee;
+  border-radius: 7px;
+  background: #f9fafc;
+}
+
+.commerce-catalog__search :deep(svg) {
+  color: #9aa5b1;
   font-size: 10px;
 }
 
-.commerce-section header span {
-  color: #9aa2ab;
-  font-size: 8px;
-  font-weight: 500;
-}
-
-.commerce-mode-grid {
-  display: grid;
-  gap: 7px;
-}
-
-.commerce-mode-grid button {
-  position: relative;
-  display: grid;
+.commerce-catalog__search input {
   min-width: 0;
-  min-height: 62px;
-  align-items: start;
-  gap: 8px;
-  grid-template-columns: 29px minmax(0, 1fr) auto;
-  padding: 8px;
-  border: 1px solid #e5e8eb;
-  border-radius: 7px;
-  background: #fff;
-  color: #444d57;
+  height: 30px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #4d5967;
+  font-size: 8px;
+}
+
+.commerce-catalog__search input::placeholder {
+  color: #a9b1ba;
+}
+
+.commerce-catalog__search button {
+  display: grid;
+  width: 21px;
+  height: 21px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #93a0ad;
+  cursor: pointer;
+}
+
+.commerce-catalog__all,
+.commerce-catalog__item {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: #596676;
   text-align: left;
   cursor: pointer;
 }
 
-.commerce-mode-grid button:hover {
-  border-color: #d7c2b2;
+.commerce-catalog__all {
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
+  gap: 7px;
+  min-height: 37px;
+  padding: 0 12px;
+  border-bottom: 1px solid #eef1f4;
 }
 
-.commerce-mode-grid button.active {
-  border-color: #d1a98d;
-  background: #fffaf6;
-}
-
-.commerce-mode-grid i {
+.commerce-catalog__all > span {
   display: grid;
-  width: 29px;
-  height: 29px;
+  width: 23px;
+  height: 23px;
   place-items: center;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--commerce-accent) 11%, white);
-  color: var(--commerce-accent);
-}
-
-.commerce-mode-grid button > span {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.commerce-mode-grid strong {
-  font-size: 9px;
-}
-
-.commerce-mode-grid small {
-  display: -webkit-box;
-  overflow: hidden;
-  color: #929aa3;
-  font-size: 7px;
-  line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.commerce-mode-grid :deep(svg:last-child) {
-  color: #a7653d;
-  font-size: 8px;
-}
-
-.commerce-upload-empty {
-  display: grid;
-  min-height: 112px;
-  place-items: center;
-  align-content: center;
-  gap: 6px;
-  padding: 14px;
-  border: 1px dashed #d4d9dd;
-  border-radius: 8px;
-  background: #fafbfc;
-  color: #68727b;
-  cursor: pointer;
-}
-
-.commerce-upload-empty :deep(svg) {
-  color: #a7653d;
-  font-size: 18px;
-}
-
-.commerce-upload-empty strong {
+  border-radius: 6px;
+  background: #eef4ff;
+  color: #2c76f0;
   font-size: 10px;
 }
 
-.commerce-upload-empty small {
-  max-width: 230px;
-  color: #9ba3ab;
+.commerce-catalog__all strong {
+  font-size: 9px;
+}
+
+.commerce-catalog__all small {
+  color: #9aa5b1;
+  font-size: 7px;
+}
+
+.commerce-catalog__all :deep(svg:last-child),
+.commerce-catalog__item > :deep(svg:last-child) {
+  color: #a7b0ba;
+  font-size: 6px;
+}
+
+.commerce-catalog__groups {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 8px 10px;
+  scrollbar-color: #d8dee5 transparent;
+  scrollbar-width: thin;
+}
+
+.commerce-catalog__groups > section {
+  padding-top: 8px;
+}
+
+.commerce-catalog__groups > section > header {
+  display: flex;
+  height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  color: #768291;
   font-size: 8px;
+}
+
+.commerce-catalog__groups > section > header > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 750;
+}
+
+.commerce-catalog__groups > section > header :deep(svg) {
+  color: #8e9aa7;
+  font-size: 8px;
+}
+
+.commerce-catalog__item {
+  position: relative;
+  min-height: 35px;
+  gap: 7px;
+  grid-template-columns: 23px minmax(0, 1fr) auto auto;
+  padding: 4px 7px;
+  border-radius: 6px;
+}
+
+.commerce-catalog__item:hover {
+  background: #f6f8fb;
+}
+
+.commerce-catalog__item.active {
+  background: #eef4ff;
+  color: #2368dc;
+  font-weight: 760;
+}
+
+.commerce-catalog__item.active::before {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: #2c76f0;
+  content: '';
+}
+
+.commerce-catalog__item.muted {
+  color: #7f8a97;
+}
+
+.commerce-catalog__item > i {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--tool-accent) 11%, white);
+  color: var(--tool-accent);
+  font-size: 9px;
+}
+
+.commerce-catalog__item > span {
+  overflow: hidden;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commerce-catalog__item > em {
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: #f1f3f5;
+  color: #9aa3ad;
+  font-size: 6px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.commerce-catalog__empty {
+  display: grid;
+  place-items: center;
+  gap: 5px;
+  padding: 36px 12px;
+  color: #97a2ae;
+  text-align: center;
+}
+
+.commerce-catalog__empty :deep(svg) {
+  font-size: 18px;
+}
+
+.commerce-catalog__empty strong {
+  color: #697584;
+  font-size: 9px;
+}
+
+.commerce-catalog__empty span {
+  font-size: 7px;
+}
+
+.commerce-catalog__idea {
+  display: grid;
+  align-items: center;
+  gap: 7px;
+  grid-template-columns: 27px minmax(0, 1fr);
+  margin: 9px;
+  padding: 9px;
+  border: 1px solid #dce7fa;
+  border-radius: 8px;
+  background: #f5f8ff;
+}
+
+.commerce-catalog__idea > span {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 7px;
+  background: #2c76f0;
+  color: #fff;
+}
+
+.commerce-catalog__idea > div {
+  display: grid;
+  gap: 2px;
+}
+
+.commerce-catalog__idea strong {
+  color: #425166;
+  font-size: 8px;
+}
+
+.commerce-catalog__idea small {
+  color: #8a96a5;
+  font-size: 7px;
+}
+
+.commerce-catalog__idea button {
+  grid-column: 1 / -1;
+  height: 27px;
+  border: 0;
+  border-radius: 5px;
+  background: #2c76f0;
+  color: #fff;
+  font-size: 8px;
+}
+
+.commerce-catalog__idea button:disabled {
+  background: #c7d2e3;
+}
+
+.commerce-editor {
+  display: grid;
+  min-height: 720px;
+  align-content: start;
+}
+
+.commerce-editor__tools {
+  display: flex;
+  gap: 4px;
+}
+
+.commerce-editor__tools button {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #87929e;
+  font-size: 7px;
+  cursor: pointer;
+}
+
+.commerce-editor__tools button:hover {
+  background: #f3f6fa;
+  color: #2c76f0;
+}
+
+.commerce-editor__content {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+}
+
+.commerce-field {
+  display: grid;
+  gap: 6px;
+}
+
+.commerce-field > label,
+.commerce-field > span {
+  color: #4d5967;
+  font-size: 9px;
+  font-weight: 720;
+}
+
+.commerce-field em {
+  color: #f04f4f;
+  font-style: normal;
+}
+
+.commerce-field input,
+.commerce-field select,
+.commerce-field textarea {
+  width: 100%;
+  border: 1px solid #dfe4ea;
+  border-radius: 6px;
+  outline: 0;
+  background: #fff;
+  color: #4c5866;
+  font-size: 9px;
+}
+
+.commerce-field select {
+  height: 34px;
+  padding: 0 9px;
+}
+
+.commerce-field textarea {
+  min-height: 74px;
+  padding: 9px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.commerce-field input:focus,
+.commerce-field select:focus,
+.commerce-field textarea:focus {
+  border-color: #9dbef7;
+  box-shadow: 0 0 0 3px rgb(44 118 240 / 7%);
+}
+
+.commerce-choice-grid {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.commerce-choice-grid button {
+  min-width: 0;
+  height: 29px;
+  padding: 0 5px;
+  overflow: hidden;
+  border: 1px solid #dfe4ea;
+  border-radius: 5px;
+  background: #fff;
+  color: #627080;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.commerce-choice-grid button:hover {
+  border-color: #a9c4f3;
+}
+
+.commerce-choice-grid button.active {
+  border-color: #2c76f0;
+  background: #eef4ff;
+  color: #2368dc;
+  font-weight: 750;
+}
+
+.commerce-choice-grid--clothing {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.commerce-upload {
+  min-width: 0;
+}
+
+.commerce-upload > button {
+  display: grid;
+  width: 100%;
+  min-height: 104px;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  padding: 12px;
+  border: 1px dashed #ccd4de;
+  border-radius: 7px;
+  background: #fafbfd;
+  color: #6d7a89;
+  cursor: pointer;
+}
+
+.commerce-upload > button:hover {
+  border-color: #8fb2ef;
+  background: #f7faff;
+}
+
+.commerce-upload > button :deep(svg) {
+  color: #2c76f0;
+  font-size: 18px;
+}
+
+.commerce-upload > button strong {
+  font-size: 9px;
+}
+
+.commerce-upload > button small {
+  max-width: 220px;
+  color: #9ba5b0;
+  font-size: 7px;
   line-height: 1.5;
   text-align: center;
 }
 
-.commerce-upload-empty--compact {
-  min-height: 84px;
+.commerce-upload > button em {
+  color: #a8b1bb;
+  font-size: 7px;
+  font-style: normal;
 }
 
-.commerce-upload-preview {
+.commerce-upload__preview {
   position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
   overflow: hidden;
-  border: 1px solid #e2e6e9;
-  border-radius: 8px;
-  background: #f4f6f7;
+  border: 1px solid #dfe4ea;
+  border-radius: 7px;
+  background: #f2f5f8;
 }
 
-.commerce-upload-preview--portrait {
-  aspect-ratio: 4 / 5;
-}
-
-.commerce-upload-preview img {
+.commerce-upload__preview img {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
 
-.commerce-upload-preview > button {
+.commerce-upload__preview button {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 7px;
+  right: 7px;
   display: grid;
-  width: 27px;
-  height: 27px;
+  width: 25px;
+  height: 25px;
   place-items: center;
   border: 0;
-  border-radius: 7px;
-  background: rgb(28 34 40 / 74%);
+  border-radius: 6px;
+  background: rgb(34 45 58 / 75%);
   color: #fff;
   cursor: pointer;
 }
 
-.commerce-upload-preview > span {
+.commerce-upload__preview > span {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  bottom: 7px;
+  left: 7px;
   padding: 3px 6px;
   border-radius: 4px;
   background: rgb(255 255 255 / 88%);
-  color: #68727b;
+  color: #657281;
   font-size: 7px;
 }
 
-.commerce-prompt {
-  border-bottom: 1px solid #edf0f2;
-}
-
-.commerce-prompt > span {
-  position: relative;
-  display: block;
-}
-
-.commerce-prompt textarea {
-  display: block;
-  width: 100%;
-  min-height: 100px;
-  padding: 10px 10px 24px;
-  border: 1px solid #e1e5e8;
-  border-radius: 7px;
-  outline: 0;
-  color: #323a42;
-  font-size: 10px;
-  line-height: 1.7;
-  resize: vertical;
-}
-
-.commerce-prompt textarea:focus {
-  border-color: #cda98f;
-  box-shadow: 0 0 0 3px rgb(169 101 61 / 8%);
-}
-
-.commerce-prompt textarea::placeholder {
-  color: #a6adb4;
-}
-
-.commerce-prompt small {
-  position: absolute;
-  right: 9px;
-  bottom: 7px;
-  color: #abb2b9;
-  font-size: 7px;
-}
-
-.commerce-scene-grid {
+.commerce-presets {
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.commerce-scene-grid button {
-  display: grid;
-  justify-items: center;
-  gap: 5px;
-  padding: 7px 4px;
-  border: 1px solid #e4e8ea;
-  border-radius: 7px;
-  background: #fff;
-  color: #77818a;
-  font-size: 7px;
-  cursor: pointer;
+.commerce-presets > span {
+  color: #788491;
+  font-size: 8px;
 }
 
-.commerce-scene-grid button.active {
-  border-color: #cfa98e;
-  background: #fffaf6;
-  color: #8d5638;
-  font-weight: 750;
-}
-
-.commerce-scene-grid i {
-  display: block;
-  width: 32px;
-  height: 25px;
-  border: 1px solid rgb(63 74 84 / 8%);
-  border-radius: 5px;
-  background: var(--scene-accent);
-}
-
-.commerce-option-grid {
+.commerce-presets > div {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
-.commerce-option-grid button {
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid #e2e6e8;
-  border-radius: 6px;
+.commerce-presets button {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  gap: 3px;
+  padding: 0 7px;
+  border: 1px solid #dfe4ea;
+  border-radius: 5px;
   background: #fff;
-  color: #66717a;
-  font-size: 8px;
+  color: #687584;
+  font-size: 7px;
   cursor: pointer;
 }
 
-.commerce-option-grid button.active {
-  border-color: #c99e81;
-  background: #fff8f3;
-  color: #985b38;
-  font-weight: 750;
+.commerce-presets button:hover {
+  border-color: #9dbcf4;
+  color: #2c76f0;
 }
 
-.commerce-submit {
+.commerce-editor__placeholder {
   display: grid;
+  min-height: 500px;
+  place-items: center;
+  align-content: center;
   gap: 8px;
-  padding: 14px;
-  background: #fbfbfc;
+  padding: 30px;
+  color: #8f9aa6;
+  text-align: center;
 }
 
-.commerce-submit > span {
-  display: inline-flex;
+.commerce-editor__placeholder > span {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border-radius: 14px;
+  background: #eef4ff;
+  color: #2c76f0;
+  font-size: 23px;
+}
+
+.commerce-editor__placeholder strong {
+  color: #4a5664;
+  font-size: 12px;
+}
+
+.commerce-editor__placeholder p {
+  max-width: 280px;
+  margin: 0;
+  font-size: 8px;
+  line-height: 1.6;
+}
+
+.commerce-editor__placeholder small {
+  color: #a1abb5;
+  font-size: 7px;
+}
+
+.commerce-editor__error {
+  display: flex;
   align-items: center;
-  gap: 5px;
-  color: #a46d22;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 13px 10px;
+  padding: 8px 9px;
+  border: 1px solid #f1c8c4;
+  border-radius: 6px;
+  background: #fff5f4;
+  color: #a74239;
   font-size: 8px;
 }
 
-.commerce-submit > button:not(.commerce-reset) {
+.commerce-editor__error button {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.commerce-editor__footer {
+  display: grid;
+  gap: 8px;
+  margin-top: auto;
+  padding: 12px 13px;
+  border-top: 1px solid #edf0f3;
+  background: #fafbfd;
+}
+
+.commerce-editor__footer > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #c07c22;
+}
+
+.commerce-editor__footer > div :deep(svg) {
+  font-size: 13px;
+}
+
+.commerce-editor__footer > div span {
+  display: grid;
+  gap: 2px;
+}
+
+.commerce-editor__footer strong {
+  color: #6f5327;
+  font-size: 8px;
+}
+
+.commerce-editor__footer small {
+  color: #9a8a72;
+  font-size: 7px;
+}
+
+.commerce-editor__footer > button {
   display: inline-flex;
-  height: 39px;
+  height: 38px;
   align-items: center;
   justify-content: center;
   gap: 6px;
   border: 0;
   border-radius: 7px;
-  background: #242a31;
+  background: #2c76f0;
   color: #fff;
   font-size: 10px;
   font-weight: 780;
   cursor: pointer;
 }
 
-.commerce-submit > button:not(.commerce-reset):disabled {
-  background: #d6dbde;
+.commerce-editor__footer > button:hover {
+  background: #2368dc;
+}
+
+.commerce-editor__footer > button:disabled {
+  background: #d7dde5;
   cursor: not-allowed;
 }
 
-.commerce-reset {
-  display: inline-flex;
-  height: 31px;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  border: 1px solid #e0e4e7;
-  border-radius: 7px;
-  background: #fff;
-  color: #69737c;
-  font-size: 8px;
-  cursor: pointer;
-}
-
-.commerce-submit small {
-  color: #969fa5;
-  font-size: 7px;
-  text-align: right;
-}
-
-.commerce-stage {
+.commerce-preview {
   display: grid;
+  min-height: 720px;
   align-content: start;
 }
 
-.commerce-stage__header {
-  display: flex;
-  min-height: 58px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 16px;
-  border-bottom: 1px solid #edf0f2;
-}
-
-.commerce-stage__header > div:first-child {
-  display: grid;
-  gap: 3px;
-}
-
-.commerce-stage__header strong {
-  color: #303840;
-  font-size: 13px;
-}
-
-.commerce-stage__header span {
-  color: #969fa7;
-  font-size: 8px;
-}
-
-.commerce-stage__tabs {
-  display: flex;
-  padding: 2px;
-  border-radius: 7px;
-  background: #f1f3f5;
-}
-
-.commerce-stage__tabs button {
-  height: 28px;
-  padding: 0 11px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: #7c858d;
-  font-size: 8px;
-  cursor: pointer;
-}
-
-.commerce-stage__tabs button.active {
-  background: #fff;
-  color: #343c44;
-  font-weight: 750;
-  box-shadow: 0 2px 8px rgb(37 48 60 / 8%);
-}
-
-.commerce-stage__preview {
-  display: grid;
-  gap: 11px;
-  padding: 16px;
-}
-
-.commerce-stage__paper {
+.commerce-preview__canvas {
   position: relative;
-  display: grid;
   min-height: 520px;
-  overflow: hidden;
-  place-items: center;
-  border: 1px solid #e0e4e7;
-  border-radius: 9px;
-  background:
-    linear-gradient(90deg, rgb(42 52 62 / 5%) 1px, transparent 1px),
-    linear-gradient(rgb(42 52 62 / 5%) 1px, transparent 1px), var(--stage-scene);
-  background-size: 34px 34px;
+  padding: 25px 42px 20px;
 }
 
-.commerce-stage__paper::before {
-  position: absolute;
-  inset: 8%;
-  border: 1px solid rgb(255 255 255 / 64%);
-  border-radius: 8px;
-  content: '';
-}
-
-.commerce-stage__paper-label,
-.commerce-stage__guide {
-  position: absolute;
-  z-index: 2;
-  padding: 4px 7px;
-  border: 1px solid rgb(255 255 255 / 72%);
-  border-radius: 5px;
-  background: rgb(255 255 255 / 74%);
-  color: #606a73;
-  font-size: 7px;
-  backdrop-filter: blur(8px);
-}
-
-.commerce-stage__paper-label {
-  top: 18px;
-  left: 18px;
-}
-
-.commerce-stage__guide--left {
-  top: 50%;
-  left: 18px;
-  transform: rotate(-90deg) translateX(-50%);
-  transform-origin: left top;
-}
-
-.commerce-stage__guide--bottom {
-  right: 18px;
-  bottom: 18px;
-}
-
-.commerce-stage__photo {
+.commerce-preview__visual {
   position: relative;
-  z-index: 1;
-  display: grid;
-  width: min(62%, 360px);
-  aspect-ratio: 4 / 5;
-  place-items: center;
+  height: 470px;
   overflow: hidden;
-  border: 10px solid rgb(255 255 255 / 92%);
   border-radius: 8px;
-  background: rgb(248 249 250 / 92%);
-  box-shadow: 0 20px 50px rgb(34 45 57 / 16%);
+  background: #edf1f5;
 }
 
-.commerce-stage__photo > img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.commerce-stage__photo-empty {
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 7px;
-  color: #7b858d;
-  text-align: center;
-}
-
-.commerce-stage__photo-empty :deep(svg) {
-  color: #a7653d;
-  font-size: 26px;
-}
-
-.commerce-stage__photo-empty strong {
-  font-size: 10px;
-}
-
-.commerce-stage__photo-empty span {
-  max-width: 180px;
-  color: #9ca4ab;
-  font-size: 8px;
-  line-height: 1.5;
-}
-
-.commerce-stage__safe-area {
+.commerce-preview__visual::after {
   position: absolute;
-  top: 15%;
-  right: 19%;
-  bottom: 15%;
-  left: 19%;
-  border: 1px dashed rgb(122 92 73 / 22%);
-  border-radius: 8px;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 42%, rgb(20 29 40 / 65%) 100%);
+  content: '';
   pointer-events: none;
 }
 
-.commerce-stage__scene-strip {
-  display: grid;
-  align-items: center;
-  gap: 7px;
-  grid-template-columns: auto auto auto minmax(0, 1fr);
-  padding: 10px 12px;
-  border: 1px solid #e4e7ea;
-  border-radius: 8px;
-  background: #fbfbfc;
-}
-
-.commerce-stage__scene-strip > span {
-  color: #979fa7;
-  font-size: 8px;
-}
-
-.commerce-stage__scene-strip strong {
-  color: #4d5660;
-  font-size: 8px;
-}
-
-.commerce-stage__scene-strip i {
-  display: block;
-  width: 25px;
-  height: 20px;
-  border-radius: 4px;
-  background: var(--scene-accent);
-}
-
-.commerce-stage__scene-strip small {
-  color: #8e969e;
-  font-size: 8px;
-  line-height: 1.5;
-}
-
-.commerce-checklist {
-  display: grid;
-  gap: 9px;
-  padding: 16px;
-}
-
-.commerce-checklist article {
-  display: grid;
-  min-height: 92px;
-  align-items: start;
-  gap: 10px;
-  grid-template-columns: 31px minmax(0, 1fr) auto;
-  padding: 13px;
-  border: 1px solid #e4e7ea;
-  border-radius: 8px;
-  background: #fcfcfd;
-}
-
-.commerce-checklist article > span {
-  display: grid;
-  width: 31px;
-  height: 31px;
-  place-items: center;
-  border-radius: 7px;
-  background: #fff1e8;
-  color: #a7653d;
-  font-size: 9px;
-  font-weight: 850;
-}
-
-.commerce-checklist article > div {
-  display: grid;
-  gap: 5px;
-}
-
-.commerce-checklist strong {
-  color: #48515a;
-  font-size: 10px;
-}
-
-.commerce-checklist p {
-  margin: 0;
-  color: #8c959d;
-  font-size: 8px;
-  line-height: 1.6;
-}
-
-.commerce-checklist article > :deep(svg) {
-  color: #3b9b73;
-  font-size: 13px;
-}
-
-.commerce-checklist article > :deep(svg.anticon-close) {
-  color: #b65a4e;
-}
-
-.commerce-quick-presets {
-  display: grid;
-  gap: 10px;
-  padding: 0 16px 16px;
-}
-
-.commerce-quick-presets > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.commerce-quick-presets > header > div {
-  display: grid;
-  gap: 3px;
-}
-
-.commerce-quick-presets strong {
-  color: #48515a;
-  font-size: 10px;
-}
-
-.commerce-quick-presets span {
-  color: #9aa2a9;
-  font-size: 8px;
-}
-
-.commerce-quick-presets > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.commerce-quick-presets button {
-  display: inline-flex;
-  min-height: 30px;
-  align-items: center;
-  gap: 5px;
-  padding: 0 10px;
-  border: 1px solid #e1e5e8;
-  border-radius: 6px;
-  background: #fff;
-  color: #636d76;
-  font-size: 8px;
-  cursor: pointer;
-}
-
-.commerce-quick-presets button:hover {
-  border-color: #d0aa90;
-  color: #8f5739;
-}
-
-.commerce-history {
-  display: grid;
-  align-content: start;
-}
-
-.commerce-history > header {
-  display: flex;
-  min-height: 58px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 14px;
-  border-bottom: 1px solid #edf0f2;
-}
-
-.commerce-history > header > div {
-  display: grid;
-  gap: 3px;
-}
-
-.commerce-history > header strong {
-  color: #303840;
-  font-size: 13px;
-}
-
-.commerce-history > header span {
-  color: #969fa7;
-  font-size: 8px;
-}
-
-.commerce-history > header > button {
-  display: grid;
-  width: 29px;
-  height: 29px;
-  place-items: center;
-  border: 1px solid #e2e6e9;
-  border-radius: 7px;
-  background: #fff;
-  color: #707981;
-  cursor: pointer;
-}
-
-.commerce-error {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 12px 12px 0;
-  padding: 9px;
-  border: 1px solid #efc9c4;
-  border-radius: 7px;
-  background: #fff5f4;
-  color: #a64138;
-  font-size: 8px;
-}
-
-.commerce-error button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 8px;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-.commerce-work-list {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-}
-
-.commerce-work-card {
-  display: grid;
-  overflow: hidden;
-  grid-template-columns: 92px minmax(0, 1fr);
-  border: 1px solid #e2e6e9;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.commerce-work-card__visual {
-  position: relative;
-  min-height: 134px;
-  overflow: hidden;
-  background: #eef1f2;
-}
-
-.commerce-work-card__visual > img {
+.commerce-preview__visual img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.commerce-work-card__state {
-  display: grid;
+.commerce-preview__visual :deep(.gallery-artwork) {
   width: 100%;
   height: 100%;
-  place-items: center;
-  align-content: center;
-  gap: 6px;
-  color: #9c5b55;
-  font-size: 17px;
 }
 
-.commerce-work-card__state strong {
+.commerce-preview__visual.is-before {
+  filter: saturate(0.75);
+}
+
+.commerce-preview__before-label,
+.commerce-preview__after-label {
+  position: absolute;
+  bottom: 86px;
+  z-index: 2;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+
+.commerce-preview__before-label {
+  left: 22px;
+}
+
+.commerce-preview__after-label {
+  right: 22px;
+}
+
+.commerce-preview__visual.is-before .commerce-preview__before-label,
+.commerce-preview__visual.is-after .commerce-preview__after-label {
+  text-shadow: 0 2px 12px rgb(0 0 0 / 30%);
+}
+
+.commerce-preview__visual.is-before .commerce-preview__after-label,
+.commerce-preview__visual.is-after .commerce-preview__before-label {
+  opacity: 0.38;
+}
+
+.commerce-preview__caption {
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+  left: 20px;
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+  color: #fff;
+}
+
+.commerce-preview__caption strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.commerce-preview__caption span {
+  color: rgb(255 255 255 / 80%);
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.commerce-preview__arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 4;
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(96 105 116 / 52%);
+  color: #fff;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.commerce-preview__arrow:hover {
+  background: rgb(70 82 95 / 78%);
+}
+
+.commerce-preview__arrow--left {
+  left: 15px;
+}
+
+.commerce-preview__arrow--left :deep(svg) {
+  transform: rotate(180deg);
+}
+
+.commerce-preview__arrow--right {
+  right: 15px;
+}
+
+.commerce-preview__status {
+  display: grid;
+  align-items: center;
+  gap: 5px 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin: 0 14px 13px;
+  padding: 9px 10px;
+  border: 1px solid #edf0f3;
+  border-radius: 7px;
+  background: #fafbfd;
+}
+
+.commerce-preview__status > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #2a9b6b;
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.commerce-preview__status strong {
+  overflow: hidden;
+  color: #52606f;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commerce-preview__status small {
+  color: #9aa4af;
   font-size: 7px;
 }
 
-.commerce-work-card__state--loading {
+.commerce-recommended {
+  padding: 0 14px 14px;
+}
+
+.commerce-recommended > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #596676;
+  font-size: 9px;
+  font-weight: 760;
+}
+
+.commerce-recommended > header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.commerce-recommended > header :deep(svg) {
+  color: #2c76f0;
+}
+
+.commerce-recommended > div {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.commerce-recommended button {
+  display: grid;
+  min-width: 0;
+  justify-items: start;
+  gap: 5px;
+  padding: 9px;
+  border: 1px solid #e6e9ed;
+  border-radius: 7px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.commerce-recommended button:hover {
+  border-color: #b9ccf0;
+}
+
+.commerce-recommended button > span {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 6px;
+}
+
+.commerce-recommended button > span.is-blue {
+  background: #e9f1ff;
+  color: #2c76f0;
+}
+
+.commerce-recommended button > span.is-purple {
+  background: #f0eaff;
+  color: #8c55d7;
+}
+
+.commerce-recommended button > span.is-green {
+  background: #e7f8ef;
+  color: #24875f;
+}
+
+.commerce-recommended strong {
+  overflow: hidden;
+  color: #4e5b69;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commerce-recommended small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #929ca7;
+  font-size: 7px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.commerce-info {
+  display: grid;
+  align-content: start;
+}
+
+.commerce-info__title {
+  display: grid;
+  min-height: 58px;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: 31px minmax(0, 1fr);
+  padding: 0 12px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.commerce-info__title > span {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef4ff;
+  color: #2c76f0;
+  font-size: 14px;
+}
+
+.commerce-info__title strong {
+  overflow: hidden;
+  color: #354351;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commerce-info section {
+  padding: 13px 12px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.commerce-info section h2 {
+  margin: 0 0 8px;
+  color: #455362;
+  font-size: 10px;
+}
+
+.commerce-info section p {
+  margin: 0;
+  color: #737f8d;
+  font-size: 8px;
+  line-height: 1.75;
+}
+
+.commerce-info section ol,
+.commerce-info section ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.commerce-info section li {
+  display: grid;
+  align-items: start;
+  gap: 7px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  color: #6f7b89;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.commerce-info section ol li > span {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: #eef4ff;
+  color: #2c76f0;
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.commerce-info section ul li {
+  display: flex;
+  gap: 5px;
+}
+
+.commerce-info section ul li :deep(svg) {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #2ba36f;
+  font-size: 8px;
+}
+
+.commerce-info__notice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 11px;
+  padding: 9px;
+  border: 1px solid #dce7fa;
+  border-radius: 7px;
+  background: #f5f8ff;
+}
+
+.commerce-info__notice :deep(svg) {
+  color: #2c76f0;
+}
+
+.commerce-info__notice span {
+  display: grid;
+  gap: 2px;
+}
+
+.commerce-info__notice strong {
+  color: #4c5c71;
+  font-size: 8px;
+}
+
+.commerce-info__notice small {
+  color: #8492a5;
+  font-size: 7px;
+}
+
+.commerce-info__support {
+  display: grid;
+  align-items: center;
+  gap: 7px;
+  grid-template-columns: 27px minmax(0, 1fr);
+  margin: 0 11px 11px;
+  padding: 9px;
+  border: 1px solid #e5e9ee;
+  border-radius: 7px;
+}
+
+.commerce-info__support > span {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 7px;
+  background: #f2f5f8;
+  color: #778594;
+}
+
+.commerce-info__support > div {
+  display: grid;
+  gap: 2px;
+}
+
+.commerce-info__support strong {
+  color: #4e5b69;
+  font-size: 8px;
+}
+
+.commerce-info__support small {
+  color: #929ca7;
+  font-size: 7px;
+}
+
+.commerce-info__support button {
+  grid-column: 1 / -1;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: #2c76f0;
+  color: #fff;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.commerce-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(22 30 40 / 26%);
+  backdrop-filter: blur(2px);
+}
+
+.commerce-overlay--center {
+  align-items: center;
+  justify-content: center;
+}
+
+.commerce-drawer {
+  display: grid;
+  width: min(440px, 94vw);
+  height: 100%;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  background: #fff;
+  box-shadow: -18px 0 45px rgb(23 33 45 / 15%);
+}
+
+.commerce-drawer > header,
+.commerce-help > header {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 15px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.commerce-drawer > header > div,
+.commerce-help > header > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.commerce-drawer > header > div > :deep(svg),
+.commerce-help > header > div > :deep(svg) {
+  color: #2c76f0;
+  font-size: 16px;
+}
+
+.commerce-drawer > header span {
+  display: grid;
+  gap: 2px;
+}
+
+.commerce-drawer > header strong,
+.commerce-help > header strong {
+  color: #374553;
+  font-size: 12px;
+}
+
+.commerce-drawer > header small {
+  color: #98a2ad;
+  font-size: 8px;
+}
+
+.commerce-drawer > header button,
+.commerce-help > header button {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  border: 1px solid #e2e7ec;
+  border-radius: 6px;
+  background: #fff;
+  color: #73808f;
+  cursor: pointer;
+}
+
+.commerce-drawer__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 11px 11px 0;
+  padding: 8px;
+  border: 1px solid #f1c8c4;
+  border-radius: 6px;
+  background: #fff5f4;
+  color: #a74239;
+  font-size: 8px;
+}
+
+.commerce-drawer__error button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.commerce-history-list {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.commerce-history-list article {
+  display: grid;
+  overflow: hidden;
+  grid-template-columns: 118px minmax(0, 1fr);
+  border: 1px solid #e2e7ec;
+  border-radius: 8px;
+}
+
+.commerce-history-list article > div {
+  min-height: 154px;
+  overflow: hidden;
+  background: #eef2f5;
+}
+
+.commerce-history-list article > div img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.commerce-history-list article > div.is-failed,
+.commerce-history-list article > div.is-loading {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  color: #b45249;
+  font-size: 18px;
+}
+
+.commerce-history-list article > div.is-failed span,
+.commerce-history-list article > div.is-loading span {
+  font-size: 8px;
+}
+
+.commerce-history-list article > div.is-loading {
+  color: #f3f7fd;
   background:
     linear-gradient(
       115deg,
       rgb(255 255 255 / 0%) 32%,
-      rgb(255 255 255 / 68%) 47%,
+      rgb(255 255 255 / 55%) 47%,
       rgb(255 255 255 / 0%) 62%
     ),
-    linear-gradient(145deg, #f0d9cb, #d8ae94 52%, #b77e5f);
+    #8ea8d6;
   background-size:
     240% 100%,
     100% 100%;
-  color: #fff;
   animation: commerce-loading 1.8s ease-in-out infinite;
 }
 
@@ -1701,14 +2869,14 @@ onBeforeUnmount(() => {
   }
 }
 
-.commerce-work-card__copy {
+.commerce-history-list article > section {
   display: grid;
   min-width: 0;
   align-content: start;
-  padding: 9px;
+  padding: 10px;
 }
 
-.commerce-work-card__copy > header {
+.commerce-history-list article > section > header {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -1716,262 +2884,361 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 
-.commerce-work-card__copy > header strong {
+.commerce-history-list article > section > header strong {
   overflow: hidden;
-  color: #4b545d;
-  font-size: 8px;
+  color: #4a5765;
+  font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.commerce-work-card__copy > header small {
-  color: #a0a8ae;
+.commerce-history-list article > section > header small {
+  color: #99a3ae;
   font-size: 7px;
   white-space: nowrap;
 }
 
-.commerce-work-card__copy > p {
+.commerce-history-list article p {
   display: -webkit-box;
   overflow: hidden;
   margin: 7px 0;
-  color: #69737c;
+  color: #707c89;
   font-size: 7px;
   line-height: 1.55;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
 }
 
-.commerce-work-card__copy > div {
+.commerce-history-list article section > div {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
 }
 
-.commerce-work-card__copy > div span,
-.commerce-work-card__copy > div em {
+.commerce-history-list article section > div span,
+.commerce-history-list article section > div em {
   padding: 2px 5px;
   border-radius: 4px;
-  background: #f2f4f5;
-  color: #838c94;
+  background: #f1f3f5;
+  color: #838e99;
   font-size: 7px;
   font-style: normal;
 }
 
-.commerce-work-card__copy > div em.done {
-  background: #e9f7f1;
-  color: #238467;
+.commerce-history-list article section > div em.done {
+  background: #e8f7f0;
+  color: #24835f;
 }
 
-.commerce-work-card__copy > div em.queued {
-  background: #f2f3f5;
-  color: #737c89;
-}
-
-.commerce-work-card__copy > div em.failed {
+.commerce-history-list article section > div em.failed {
   background: #fff0ee;
-  color: #bd4c42;
+  color: #b84b42;
 }
 
-.commerce-work-card__copy > footer {
-  display: grid;
-  gap: 4px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 8px;
+.commerce-history-list article footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
 }
 
-.commerce-work-card__copy > footer button {
+.commerce-history-list article footer button {
   display: inline-flex;
-  min-width: 0;
-  height: 27px;
+  min-height: 27px;
   align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 0 4px;
-  border: 1px solid #e0e4e7;
-  border-radius: 6px;
+  gap: 4px;
+  padding: 0 7px;
+  border: 1px solid #e1e6eb;
+  border-radius: 5px;
   background: #fff;
-  color: #626c73;
+  color: #677483;
   font-size: 7px;
   cursor: pointer;
 }
 
-.commerce-history__empty {
+.commerce-drawer__empty {
   display: grid;
-  min-height: 480px;
   place-items: center;
   align-content: center;
   gap: 8px;
-  padding: 26px;
+  padding: 30px;
   text-align: center;
 }
 
-.commerce-history__empty > span {
+.commerce-drawer__empty > span {
   display: grid;
-  width: 51px;
-  height: 51px;
+  width: 54px;
+  height: 54px;
   place-items: center;
-  border-radius: 13px;
-  background: #fff1e8;
-  color: #a7653d;
-  font-size: 20px;
+  border-radius: 14px;
+  background: #eef4ff;
+  color: #2c76f0;
+  font-size: 22px;
 }
 
-.commerce-history__empty strong {
-  color: #424a51;
+.commerce-drawer__empty strong {
+  color: #495664;
   font-size: 11px;
 }
 
-.commerce-history__empty p {
-  max-width: 200px;
+.commerce-drawer__empty p {
+  max-width: 230px;
   margin: 0;
-  color: #949ca2;
+  color: #949faa;
   font-size: 8px;
   line-height: 1.6;
 }
 
-@media (max-width: 1360px) {
-  .commerce-layout {
-    grid-template-columns: 330px minmax(350px, 1fr) 290px;
+.commerce-help {
+  width: min(520px, calc(100vw - 28px));
+  overflow: hidden;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgb(23 33 45 / 24%);
+}
+
+.commerce-help > div {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+}
+
+.commerce-help article {
+  display: grid;
+  align-items: start;
+  gap: 9px;
+  grid-template-columns: 29px minmax(0, 1fr);
+  padding: 11px;
+  border: 1px solid #e6eaee;
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.commerce-help article > span {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  border-radius: 7px;
+  background: #eef4ff;
+  color: #2c76f0;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.commerce-help article > div {
+  display: grid;
+  gap: 4px;
+}
+
+.commerce-help article strong {
+  color: #4a5765;
+  font-size: 9px;
+}
+
+.commerce-help article p {
+  margin: 0;
+  color: #7d8996;
+  font-size: 8px;
+  line-height: 1.6;
+}
+
+@media (max-width: 1380px) {
+  .commerce-workbench {
+    padding-right: 14px;
+    padding-left: 14px;
   }
 
-  .commerce-stage__paper {
-    min-height: 460px;
+  .commerce-workbench__body {
+    grid-template-columns:
+      minmax(185px, 0.78fr) minmax(275px, 1.14fr) minmax(350px, 1.62fr)
+      minmax(180px, 0.74fr);
+  }
+
+  .commerce-preview__canvas {
+    padding-right: 34px;
+    padding-left: 34px;
   }
 }
 
-@media (max-width: 1120px) {
-  .commerce-layout {
-    grid-template-columns: 320px minmax(0, 1fr);
+@media (max-width: 1180px) {
+  .commerce-workbench__body {
+    grid-template-columns: 205px 290px minmax(0, 1fr);
   }
 
-  .commerce-history {
-    grid-column: 1 / -1;
+  .commerce-info {
+    grid-column: 2 / 4;
   }
 
-  .commerce-work-list {
+  .commerce-info section {
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
+
+  .commerce-info section ol {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .commerce-history__empty {
-    min-height: 220px;
+  .commerce-info__notice,
+  .commerce-info__support {
+    align-self: start;
   }
 }
 
-@media (max-width: 860px) {
-  .commerce-view {
-    padding: 20px 14px 44px;
+@media (max-width: 920px) {
+  .commerce-workbench__header {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .commerce-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .commerce-header__switch {
-    width: 100%;
-    overflow-x: auto;
-  }
-
-  .commerce-header__switch a {
-    flex: 1 0 auto;
-    justify-content: center;
-  }
-
-  .commerce-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 760px) {
-  .commerce-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .commerce-stage {
-    order: 2;
-  }
-
-  .commerce-params {
-    order: 1;
-  }
-
-  .commerce-history {
-    order: 3;
-    grid-column: auto;
-  }
-
-  .commerce-work-list {
-    grid-template-columns: 1fr;
-  }
-
-  .commerce-stage__paper {
-    min-height: 380px;
-  }
-
-  .commerce-stage__photo {
-    width: min(68%, 280px);
-  }
-
-  .commerce-stage {
-    order: 1;
-  }
-
-  .commerce-params {
-    order: 2;
-  }
-}
-
-@media (max-width: 500px) {
-  .commerce-header h1 {
-    font-size: 23px;
-  }
-
-  .commerce-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .commerce-stage__header {
-    align-items: flex-start;
-    flex-direction: column;
-    padding-top: 13px;
-    padding-bottom: 13px;
-  }
-
-  .commerce-stage__tabs {
-    width: 100%;
-  }
-
-  .commerce-stage__tabs button {
-    flex: 1;
-  }
-
-  .commerce-stage__preview,
-  .commerce-checklist {
-    padding: 12px;
-  }
-
-  .commerce-stage__paper {
-    min-height: 320px;
-  }
-
-  .commerce-stage__photo {
-    width: 72%;
-  }
-
-  .commerce-stage__guide--left {
+  .commerce-workbench__breadcrumb {
     display: none;
   }
 
-  .commerce-stage__scene-strip {
-    grid-template-columns: auto auto 1fr;
+  .commerce-mobile-picker {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 10px;
+    padding: 11px;
+    border: 1px solid var(--commerce-border);
+    border-radius: 9px;
+    background: #fff;
   }
 
-  .commerce-stage__scene-strip small {
-    grid-column: 1 / -1;
+  .commerce-mobile-picker > span {
+    color: #5c6978;
+    font-size: 9px;
+    font-weight: 740;
   }
 
-  .commerce-mode-grid {
+  .commerce-mobile-picker select {
+    width: 100%;
+    height: 36px;
+    padding: 0 9px;
+    border: 1px solid #dfe4ea;
+    border-radius: 7px;
+    outline: 0;
+    background: #fff;
+    color: #4e5b69;
+    font-size: 9px;
+  }
+
+  .commerce-workbench__body {
     grid-template-columns: 1fr;
+  }
+
+  .commerce-catalog {
+    display: none;
+  }
+
+  .commerce-editor,
+  .commerce-preview,
+  .commerce-info {
+    grid-column: auto;
+  }
+
+  .commerce-editor,
+  .commerce-preview {
+    min-height: 0;
+  }
+
+  .commerce-preview__canvas {
+    min-height: 430px;
+  }
+
+  .commerce-preview__visual {
+    height: 390px;
+  }
+}
+
+@media (max-width: 640px) {
+  .commerce-workbench {
+    padding: 9px 9px 96px;
+  }
+
+  .commerce-workbench__header {
+    min-height: 54px;
+    gap: 8px;
+    padding: 8px 9px;
+  }
+
+  .commerce-workbench__brand > span {
+    width: 31px;
+    height: 31px;
+  }
+
+  .commerce-workbench__brand strong {
+    font-size: 11px;
+  }
+
+  .commerce-workbench__brand small {
+    max-width: 156px;
+  }
+
+  .commerce-workbench__actions button {
+    width: 29px;
+    height: 29px;
+    justify-content: center;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .commerce-workbench__actions button :deep(svg) {
+    font-size: 13px;
+  }
+
+  .commerce-choice-grid--clothing {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .commerce-preview__canvas {
+    min-height: 330px;
+    padding: 20px 31px 15px;
+  }
+
+  .commerce-preview__visual {
+    height: 300px;
+  }
+
+  .commerce-preview__caption strong {
+    font-size: 12px;
+  }
+
+  .commerce-preview__caption span {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .commerce-preview__before-label,
+  .commerce-preview__after-label {
+    bottom: 78px;
+    font-size: 13px;
+  }
+
+  .commerce-preview__arrow {
+    width: 28px;
+    height: 28px;
+  }
+
+  .commerce-preview__arrow--left {
+    left: 6px;
+  }
+
+  .commerce-preview__arrow--right {
+    right: 6px;
+  }
+
+  .commerce-recommended > div {
+    grid-template-columns: 1fr;
+  }
+
+  .commerce-info section ol {
+    grid-template-columns: 1fr;
+  }
+
+  .commerce-history-list article {
+    grid-template-columns: 92px minmax(0, 1fr);
   }
 }
 </style>
