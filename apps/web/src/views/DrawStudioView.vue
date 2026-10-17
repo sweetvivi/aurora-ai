@@ -60,6 +60,18 @@ interface ReferenceImage {
   url: string;
 }
 
+interface EffectTemplate {
+  category: string;
+  description: string;
+  id: string;
+  label: string;
+  mode: string;
+  prompt: string;
+  steps: string[];
+  tags: string[];
+  visualClass: string;
+}
+
 const navigation: NavigationItem[] = [
   { icon: HomeOutlined, label: '首页', to: '/' },
   { icon: PictureOutlined, label: '作品广场', to: '/draw' },
@@ -82,6 +94,96 @@ const topNavigation = ['做电商', '做视频', '拍写真', '搞设计'];
 const creationModes = ['文生图', '参考图重绘', '局部编辑', '商品图处理'];
 const ratios = ['智能比例', '1:1', '4:3', '3:4', '16:9', '9:16'];
 const amounts = [1, 2, 3, 4];
+const galleryFilters = [
+  '全部',
+  '写实',
+  '人物',
+  '头像',
+  '动漫',
+  '3D',
+  '国风',
+  '风景',
+  '建筑',
+  '其他',
+];
+const effectCategories = [
+  '全部',
+  '人像美化',
+  '场景优化',
+  '创意设计',
+  '风格迁移',
+  '图片修复',
+  'AI 绘画',
+];
+
+const effectTemplates: EffectTemplate[] = [
+  {
+    category: '人像美化',
+    description: '保留人物脸型与原始光线，自然替换发型、发色和发量。',
+    id: 'hair-style',
+    label: '发型变换',
+    mode: '参考图重绘',
+    prompt: '保留照片中的人物脸型、姿势和背景，将发型自然替换为柔和的大波浪卷发，发丝细节清晰。',
+    steps: ['上传一张清晰的人像照片', '描述想要替换的发型和发色'],
+    tags: ['发型', '换发'],
+    visualClass: 'portrait',
+  },
+  {
+    category: '人像美化',
+    description: '快速更换服装款式与颜色，并保持人物姿态和身体比例自然。',
+    id: 'outfit-change',
+    label: '服装换装',
+    mode: '参考图重绘',
+    prompt: '保持照片中的人物姿态、面部和背景不变，将服装替换为轻盈的碎花连衣裙，布料细节真实。',
+    steps: ['上传人物全身或半身照', '描述目标服装的款式与颜色'],
+    tags: ['换装', '服饰'],
+    visualClass: 'outfit',
+  },
+  {
+    category: '场景优化',
+    description: '识别天空区域并替换为蓝天白云、晚霞或电影感天空。',
+    id: 'sky-replace',
+    label: '天空替换',
+    mode: '参考图重绘',
+    prompt: '识别照片中的天空区域，替换为明亮的蓝天白云，保留山体、建筑和前景细节，光线自然统一。',
+    steps: ['上传包含天空的风景照片', '描述想要的天气和光线氛围'],
+    tags: ['天空', '替换'],
+    visualClass: 'sky',
+  },
+  {
+    category: '创意设计',
+    description: '为商品补充适配的广告场景，统一光影、材质与品牌氛围。',
+    id: 'product-scene',
+    label: '商品场景',
+    mode: '商品图处理',
+    prompt: '保留商品主体、包装文字和外观细节，放置到简洁明亮的现代商业摄影场景中，柔和棚拍光。',
+    steps: ['上传商品主体图片', '选择场景氛围并描述画面用途'],
+    tags: ['商品', '商拍'],
+    visualClass: 'product',
+  },
+  {
+    category: '风格迁移',
+    description: '把照片转换为动漫、水彩、插画或电影概念风格。',
+    id: 'anime-style',
+    label: '动漫风格',
+    mode: '参考图重绘',
+    prompt: '将上传照片转换为精致的日系动漫插画，保留人物特征和构图，线条干净、色彩通透。',
+    steps: ['上传需要转换的照片', '描述目标画风和色彩倾向'],
+    tags: ['动漫', '插画'],
+    visualClass: 'anime',
+  },
+  {
+    category: '图片修复',
+    description: '修复旧照片划痕、噪点和模糊，同时恢复自然的面部细节。',
+    id: 'old-photo',
+    label: '老照片修复',
+    mode: '参考图重绘',
+    prompt: '修复照片中的划痕、噪点和褪色，提升清晰度并恢复自然面部与衣物细节，不改变人物身份。',
+    steps: ['上传需要修复的旧照片', '选择修复强度与输出清晰度'],
+    tags: ['修复', '增强'],
+    visualClass: 'restore',
+  },
+];
 
 const creativeTypes: ToolItem[] = [
   {
@@ -255,6 +357,9 @@ const selectedAmount = ref(1);
 const selectedSize = ref('1K');
 const selectedMode = ref('文生图');
 const activeResultTab = ref<'gallery' | 'mine'>('gallery');
+const activeEffectCategory = ref('全部');
+const activeGalleryFilter = ref('全部');
+const selectedEffectId = ref('');
 const referenceImages = ref<ReferenceImage[]>([]);
 const referenceError = ref('');
 const referenceInput = ref<HTMLInputElement | null>(null);
@@ -280,15 +385,68 @@ const selectedModelLabel = computed(
 );
 
 const isGeneratingView = computed(() => route.query.view === 'generate');
+const isTemplateView = computed(() => route.query.view === 'templates');
 const generationCost = computed(() => selectedAmount.value * IMAGE_TASK_POINTS_COST);
 const generating = computed(() => workspace.generating || uploadingReference.value);
-const visibleWorks = computed(() => {
-  if (activeResultTab.value === 'gallery') {
-    return workspace.works.filter((work) => work.status === 'done');
+const filteredEffectTemplates = computed(() => {
+  if (activeEffectCategory.value === '全部') {
+    return effectTemplates;
   }
 
-  return workspace.works;
+  return effectTemplates.filter((item) => item.category === activeEffectCategory.value);
 });
+const visibleWorks = computed(() => {
+  const works =
+    activeResultTab.value === 'gallery'
+      ? workspace.works.filter((work) => work.status === 'done')
+      : [...workspace.works];
+
+  if (activeResultTab.value !== 'gallery' || activeGalleryFilter.value === '全部') {
+    return works;
+  }
+
+  return works.filter(
+    (work) => inferGalleryCategory(work.prompt, work.modelLabel) === activeGalleryFilter.value,
+  );
+});
+
+function inferGalleryCategory(prompt: string, modelLabel: string): string {
+  const content = `${prompt} ${modelLabel}`.toLowerCase();
+
+  if (/动漫|漫画|二次元|anime|插画/.test(content)) {
+    return '动漫';
+  }
+
+  if (/国风|水墨|工笔|汉服/.test(content)) {
+    return '国风';
+  }
+
+  if (/3d|三维|建模|黏土/.test(content)) {
+    return '3D';
+  }
+
+  if (/建筑|室内|空间|景观/.test(content)) {
+    return '建筑';
+  }
+
+  if (/风景|山川|雪山|海边|森林|湖边|天空|城市/.test(content)) {
+    return '风景';
+  }
+
+  if (/头像|证件照|肖像/.test(content)) {
+    return '头像';
+  }
+
+  if (/人物|女孩|男孩|女性|男性|模特|写真|服装/.test(content)) {
+    return '人物';
+  }
+
+  if (/写实|摄影|真实|高清/.test(content)) {
+    return '写实';
+  }
+
+  return '其他';
+}
 
 function syncGeneratorFromRoute(): void {
   const routePrompt = route.query.prompt;
@@ -342,6 +500,39 @@ function openGenerator(options: { auto?: boolean; mode?: string } = {}): void {
       view: 'generate',
     },
   });
+}
+
+function openTemplatePicker(): void {
+  void router.push({
+    name: 'draw',
+    query: {
+      amount: String(selectedAmount.value),
+      mode: selectedMode.value,
+      model: currentModel.value,
+      prompt: prompt.value.trim() || undefined,
+      ratio: selectedRatio.value,
+      size: selectedSize.value,
+      view: 'templates',
+    },
+  });
+}
+
+function applyEffectTemplate(template: EffectTemplate): void {
+  selectedEffectId.value = template.id;
+  selectedMode.value = template.mode;
+  prompt.value = template.prompt;
+
+  requestAnimationFrame(() => {
+    document.querySelector('.draw-template-composer')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  });
+}
+
+function usePromptInComposer(value: string): void {
+  prompt.value = value;
+  activeResultTab.value = 'mine';
 }
 
 async function startGeneration(): Promise<void> {
@@ -483,11 +674,16 @@ function generate(): void {
 watch(
   () => [route.query.view, route.query.start, route.query.prompt],
   () => {
-    if (!isGeneratingView.value) {
+    if (!isGeneratingView.value && !isTemplateView.value) {
       return;
     }
 
     syncGeneratorFromRoute();
+
+    if (!isGeneratingView.value) {
+      return;
+    }
+
     const token = `${String(route.query.start ?? '')}:${String(route.query.prompt ?? '')}`;
 
     if (
@@ -564,7 +760,7 @@ onBeforeUnmount(() => {
 
       <section class="draw-library__shortcut">
         <span>快速开始</span>
-        <button type="button" @click="openGenerator({ mode: '文生图' })">
+        <button type="button" @click="openTemplatePicker">
           <PictureOutlined />
           文生图
           <ArrowRightOutlined />
@@ -578,7 +774,139 @@ onBeforeUnmount(() => {
     </aside>
 
     <main class="draw-main">
-      <section v-if="isGeneratingView" class="draw-generator">
+      <section v-if="isTemplateView" class="draw-template-studio">
+        <header class="draw-template-studio__header">
+          <button type="button" class="draw-generator__back" @click="leaveGenerator">
+            <ArrowLeftOutlined />
+            返回创作中心
+          </button>
+          <strong>极光 AI 智能生图</strong>
+          <div>
+            <button type="button" @click="openGenerator({ mode: '参考图重绘' })">旧版绘图</button>
+            <button type="button" class="active">新版智能生图</button>
+          </div>
+        </header>
+
+        <div class="draw-template-studio__content">
+          <header class="draw-template-hero">
+            <span>
+              <PictureOutlined />
+            </span>
+            <h1>开始生成你的第一张图片吧</h1>
+            <p>输入创意描述，或从效果模板开始你的 AI 创作之旅</p>
+            <div>
+              <em>支持多种艺术风格</em>
+              <em>高清画质输出</em>
+              <em>快速生成</em>
+            </div>
+          </header>
+
+          <nav class="draw-template-categories" aria-label="效果分类">
+            <button
+              v-for="category in effectCategories"
+              :key="category"
+              type="button"
+              :class="{ active: activeEffectCategory === category }"
+              @click="activeEffectCategory = category"
+            >
+              {{ category }}
+            </button>
+          </nav>
+
+          <section class="draw-effect-grid">
+            <article
+              v-for="template in filteredEffectTemplates"
+              :key="template.id"
+              class="draw-effect-card"
+              :class="{ active: selectedEffectId === template.id }"
+            >
+              <div
+                class="draw-effect-card__visual"
+                :class="`draw-effect-card__visual--${template.visualClass}`"
+              >
+                <span>原图</span>
+                <i />
+                <em>效果图</em>
+              </div>
+              <div class="draw-effect-card__copy">
+                <header>
+                  <h2>{{ template.label }}</h2>
+                  <span>
+                    <em v-for="tag in template.tags" :key="tag">{{ tag }}</em>
+                  </span>
+                </header>
+                <p>{{ template.description }}</p>
+                <div class="draw-effect-card__steps">
+                  <strong>操作步骤：</strong>
+                  <span v-for="(step, index) in template.steps" :key="step">
+                    <i>{{ index + 1 }}</i>
+                    {{ step }}
+                  </span>
+                </div>
+              </div>
+              <button type="button" @click="applyEffectTemplate(template)">
+                {{ selectedEffectId === template.id ? '已应用，继续描述' : '使用该效果' }}
+              </button>
+            </article>
+          </section>
+        </div>
+
+        <form class="draw-template-composer" @submit.prevent="generate">
+          <button
+            type="button"
+            class="draw-template-composer__upload"
+            aria-label="上传参考图"
+            @click="openGenerator({ mode: '参考图重绘' })"
+          >
+            <PlusOutlined />
+            <span>上传图片</span>
+            <small>支持 10 张以内</small>
+          </button>
+          <label class="draw-template-composer__prompt">
+            <textarea
+              v-model="prompt"
+              maxlength="500"
+              placeholder="请详细描述您想要生成的图片，例如：一只可爱的小猫坐在樱花树下，春日阳光透过花瓣洒下，高清摄影风格，柔和光线..."
+            />
+            <small>{{ prompt.length }}/500</small>
+          </label>
+          <footer>
+            <label>
+              <select v-model="currentModel" aria-label="选择绘画模型">
+                <option v-for="model in models" :key="model.value" :value="model.value">
+                  {{ model.label }}
+                </option>
+              </select>
+              <DownOutlined />
+            </label>
+            <label>
+              <select v-model="selectedAmount" aria-label="选择生成数量">
+                <option v-for="amount in amounts" :key="amount" :value="amount">
+                  {{ amount }} 张
+                </option>
+              </select>
+              <DownOutlined />
+            </label>
+            <button type="button" @click="openGenerator({ mode: selectedMode })">高级设置</button>
+            <span>
+              <ThunderboltFilled />
+              {{ generationCost }} 积分
+            </span>
+            <button type="button">查看示例</button>
+            <button
+              class="draw-template-composer__submit"
+              type="submit"
+              :disabled="!prompt.trim() || generating"
+            >
+              <LoadingOutlined v-if="generating" />
+              <ThunderboltFilled v-else />
+              {{ generating ? '生成中' : '立即生成' }}
+            </button>
+          </footer>
+        </form>
+      </section>
+
+      <section v-else-if="isGeneratingView" class="draw-generator">
         <header class="draw-generator__header">
           <button type="button" class="draw-generator__back" @click="leaveGenerator">
             <ArrowLeftOutlined />
@@ -747,6 +1075,22 @@ onBeforeUnmount(() => {
               </em>
             </header>
 
+            <nav
+              v-if="activeResultTab === 'gallery'"
+              class="draw-generator__gallery-filters"
+              aria-label="作品分类"
+            >
+              <button
+                v-for="filter in galleryFilters"
+                :key="filter"
+                type="button"
+                :class="{ active: activeGalleryFilter === filter }"
+                @click="activeGalleryFilter = filter"
+              >
+                {{ filter }}
+              </button>
+            </nav>
+
             <div v-if="workspace.error" class="draw-generator__error" role="alert">
               <span>{{ workspace.error.message }}</span>
               <button type="button" @click="workspace.clearError">关闭</button>
@@ -796,6 +1140,10 @@ onBeforeUnmount(() => {
                 </div>
 
                 <footer v-if="work.status === 'done'">
+                  <button type="button" @click="usePromptInComposer(work.prompt)">
+                    <ThunderboltFilled />
+                    使用提示词
+                  </button>
                   <button
                     type="button"
                     :class="{ active: work.favorite }"
@@ -808,7 +1156,11 @@ onBeforeUnmount(() => {
                     <DownloadOutlined />
                     下载
                   </button>
-                  <button type="button" @click="workspace.removeWork(work.id)">
+                  <button
+                    type="button"
+                    class="draw-work-card__delete"
+                    @click="workspace.removeWork(work.id)"
+                  >
                     <DeleteOutlined />
                     删除
                   </button>
@@ -1337,6 +1689,526 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 
+.draw-template-studio {
+  position: relative;
+  min-height: calc(100vh - 56px);
+  padding-bottom: 144px;
+  background: #fbfcfd;
+}
+
+.draw-template-studio__header {
+  position: sticky;
+  top: 56px;
+  z-index: 8;
+  display: grid;
+  min-height: 58px;
+  align-items: center;
+  gap: 18px;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr);
+  padding: 0 22px;
+  border-bottom: 1px solid #e7eaee;
+  background: rgb(255 255 255 / 96%);
+  backdrop-filter: blur(10px);
+}
+
+.draw-template-studio__header > strong {
+  color: #23936f;
+  font-size: 18px;
+}
+
+.draw-template-studio__header > div {
+  display: flex;
+  justify-self: end;
+  gap: 8px;
+}
+
+.draw-template-studio__header > div button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #dfe4ea;
+  border-radius: 7px;
+  background: #fff;
+  color: #606a78;
+  font-size: 9px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.draw-template-studio__header > div button.active {
+  border-color: #a9ddcb;
+  background: #ebf9f4;
+  color: #25886a;
+}
+
+.draw-template-studio__content {
+  width: min(100%, 1220px);
+  margin: 0 auto;
+  padding: 34px 32px 0;
+}
+
+.draw-template-hero {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.draw-template-hero > span {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border-radius: 999px;
+  background: #e7f8f3;
+  color: #36a385;
+  font-size: 27px;
+}
+
+.draw-template-hero h1 {
+  margin: 20px 0 0;
+  color: #1e252e;
+  font-size: 24px;
+  font-weight: 850;
+}
+
+.draw-template-hero p {
+  margin: 9px 0 0;
+  color: #818a97;
+  font-size: 11px;
+}
+
+.draw-template-hero > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.draw-template-hero em {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid #d6f1e7;
+  border-radius: 999px;
+  background: #edf9f5;
+  color: #299271;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 720;
+}
+
+.draw-template-categories {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 31px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-width: none;
+}
+
+.draw-template-categories button {
+  display: inline-flex;
+  min-width: 104px;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 13px;
+  border: 1px solid #e1e5ea;
+  border-radius: 8px;
+  background: #fff;
+  color: #495360;
+  font-size: 9px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.draw-template-categories button.active {
+  border-color: transparent;
+  background: #a94ee8;
+  color: #fff;
+  box-shadow: 0 7px 18px rgb(137 62 200 / 18%);
+}
+
+.draw-effect-grid {
+  display: grid;
+  align-items: stretch;
+  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 23px;
+}
+
+.draw-effect-card {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border: 1px solid #e4e8ed;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgb(32 45 63 / 5%);
+}
+
+.draw-effect-card.active {
+  border-color: #a95ee2;
+  box-shadow: 0 0 0 2px rgb(169 94 226 / 9%);
+}
+
+.draw-effect-card__visual {
+  --effect-a: #d8d6dd;
+  --effect-b: #f2c5d5;
+  position: relative;
+  aspect-ratio: 1.75 / 1;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 22%, rgb(255 255 255 / 78%), transparent 19%),
+    linear-gradient(145deg, var(--effect-a), #f4f6f8 48%, var(--effect-b));
+}
+
+.draw-effect-card__visual::before {
+  position: absolute;
+  inset: 18% 12% 0;
+  border-radius: 46% 46% 0 0;
+  background:
+    linear-gradient(150deg, rgb(255 255 255 / 64%), transparent 28%),
+    linear-gradient(180deg, #efc4b0 0 12%, #303845 13% 28%, #e4a3b5 29% 100%);
+  box-shadow: 0 15px 25px rgb(39 49 66 / 13%);
+  content: '';
+}
+
+.draw-effect-card__visual > i {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 50%;
+  border-left: 3px solid rgb(255 255 255 / 86%);
+  background:
+    radial-gradient(circle at 61% 22%, rgb(255 255 255 / 70%), transparent 18%),
+    linear-gradient(
+      145deg,
+      var(--effect-b),
+      #fff 50%,
+      color-mix(in srgb, var(--effect-b) 62%, #ffe9c7)
+    );
+}
+
+.draw-effect-card__visual > i::after {
+  position: absolute;
+  inset: 16% 12% 0;
+  border-radius: 46% 46% 0 0;
+  background:
+    linear-gradient(150deg, rgb(255 255 255 / 65%), transparent 29%),
+    linear-gradient(180deg, #f2c9b5 0 12%, #6d4a52 13% 28%, var(--effect-b) 29% 100%);
+  box-shadow: 0 15px 25px rgb(39 49 66 / 12%);
+  content: '';
+}
+
+.draw-effect-card__visual--outfit {
+  --effect-a: #e8d7ca;
+  --effect-b: #9dd8c3;
+}
+
+.draw-effect-card__visual--sky {
+  --effect-a: #c4c9bf;
+  --effect-b: #79c7e6;
+}
+
+.draw-effect-card__visual--product {
+  --effect-a: #dbdce0;
+  --effect-b: #f0cf91;
+}
+
+.draw-effect-card__visual--anime {
+  --effect-a: #d6dbe5;
+  --effect-b: #cf9ce7;
+}
+
+.draw-effect-card__visual--restore {
+  --effect-a: #aca39a;
+  --effect-b: #e0c7a8;
+}
+
+.draw-effect-card__visual > span,
+.draw-effect-card__visual > em {
+  position: absolute;
+  top: 9px;
+  z-index: 2;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: rgb(32 37 47 / 78%);
+  color: #fff;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 780;
+}
+
+.draw-effect-card__visual > span {
+  left: 9px;
+}
+
+.draw-effect-card__visual > em {
+  right: 9px;
+  background: #ae55e0;
+}
+
+.draw-effect-card__copy {
+  display: grid;
+  align-content: start;
+  padding: 14px 15px 10px;
+}
+
+.draw-effect-card__copy > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.draw-effect-card__copy h2 {
+  margin: 0;
+  color: #252c35;
+  font-size: 14px;
+  font-weight: 820;
+}
+
+.draw-effect-card__copy > header > span {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.draw-effect-card__copy > header em {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: #f3e9fc;
+  color: #9c4fd2;
+  font-size: 7px;
+  font-style: normal;
+}
+
+.draw-effect-card__copy > p {
+  min-height: 34px;
+  margin: 9px 0 0;
+  color: #79828f;
+  font-size: 9px;
+  line-height: 1.65;
+}
+
+.draw-effect-card__steps {
+  display: grid;
+  gap: 4px;
+  margin-top: 11px;
+  color: #7a8491;
+  font-size: 8px;
+}
+
+.draw-effect-card__steps strong {
+  color: #5f6875;
+}
+
+.draw-effect-card__steps span {
+  display: grid;
+  align-items: start;
+  gap: 6px;
+  grid-template-columns: 15px minmax(0, 1fr);
+}
+
+.draw-effect-card__steps i {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border-radius: 999px;
+  background: #eff1f4;
+  color: #7a8490;
+  font-size: 7px;
+  font-style: normal;
+}
+
+.draw-effect-card > button {
+  height: 38px;
+  margin: 0 14px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #a854e2, #dd48d6);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 780;
+  cursor: pointer;
+}
+
+.draw-effect-card.active > button {
+  background: linear-gradient(90deg, #2d9f7d, #58bf8f);
+}
+
+.draw-template-composer {
+  position: fixed;
+  right: 26px;
+  bottom: 16px;
+  left: 506px;
+  z-index: 9;
+  display: grid;
+  min-height: 126px;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 0 12px;
+  width: min(calc(100% - 532px), 1180px);
+  margin: 0 auto;
+  padding: 13px 15px 12px;
+  border: 1px solid #d9dfe6;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 98%);
+  box-shadow: 0 16px 45px rgb(31 43 60 / 15%);
+  backdrop-filter: blur(12px);
+}
+
+.draw-template-composer__upload {
+  display: grid;
+  width: 82px;
+  height: 72px;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border: 1px dashed #b7dbce;
+  border-radius: 8px;
+  background: #f1faf7;
+  color: #3b9478;
+  cursor: pointer;
+}
+
+.draw-template-composer__upload :deep(svg) {
+  font-size: 17px;
+}
+
+.draw-template-composer__upload span {
+  font-size: 9px;
+  font-weight: 760;
+}
+
+.draw-template-composer__upload small {
+  color: #8aa89e;
+  font-size: 7px;
+}
+
+.draw-template-composer__prompt {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.draw-template-composer__prompt textarea {
+  width: 100%;
+  min-height: 70px;
+  padding: 7px 48px 22px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #343c47;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.7;
+  resize: none;
+}
+
+.draw-template-composer__prompt textarea::placeholder {
+  color: #a0a8b3;
+}
+
+.draw-template-composer__prompt small {
+  position: absolute;
+  right: 0;
+  bottom: 4px;
+  color: #8e97a3;
+  font-size: 8px;
+}
+
+.draw-template-composer > footer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.draw-template-composer > footer label {
+  position: relative;
+  display: flex;
+  width: 132px;
+  height: 34px;
+  align-items: center;
+  border: 1px solid #e0e4e9;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.draw-template-composer > footer label:nth-of-type(2) {
+  width: 78px;
+}
+
+.draw-template-composer > footer select {
+  width: 100%;
+  height: 100%;
+  padding: 0 25px 0 10px;
+  border: 0;
+  outline: 0;
+  appearance: none;
+  background: transparent;
+  color: #596273;
+  font-size: 9px;
+}
+
+.draw-template-composer > footer label :deep(svg) {
+  position: absolute;
+  right: 8px;
+  color: #969eaa;
+  font-size: 8px;
+  pointer-events: none;
+}
+
+.draw-template-composer > footer > button {
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid #e0e4e9;
+  border-radius: 7px;
+  background: #fff;
+  color: #65707e;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.draw-template-composer > footer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: #737d8a;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.draw-template-composer > footer > span :deep(svg) {
+  color: #df7f31;
+}
+
+.draw-template-composer > footer > button.draw-template-composer__submit {
+  min-width: 104px;
+  border-color: #2b9877;
+  background: #2b9877;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 780;
+}
+
+.draw-template-composer > footer > button.draw-template-composer__submit:disabled {
+  border-color: #d7dbe1;
+  background: #d7dbe1;
+  cursor: not-allowed;
+}
+
 .draw-generator {
   display: grid;
   height: calc(100vh - 56px);
@@ -1776,6 +2648,31 @@ onBeforeUnmount(() => {
   font-weight: 750;
 }
 
+.draw-generator__gallery-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.draw-generator__gallery-filters button {
+  height: 29px;
+  padding: 0 10px;
+  border: 1px solid #e0e5ea;
+  border-radius: 7px;
+  background: #fff;
+  color: #647080;
+  font-size: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.draw-generator__gallery-filters button.active {
+  border-color: #7352e8;
+  background: #7352e8;
+  color: #fff;
+}
+
 .draw-generator__error,
 .draw-composer__error {
   display: flex;
@@ -1988,7 +2885,7 @@ onBeforeUnmount(() => {
 .draw-work-card > footer {
   display: grid;
   gap: 5px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   padding: 8px;
   border-top: 1px solid #eef0f3;
 }
@@ -2022,6 +2919,10 @@ onBeforeUnmount(() => {
   border-color: #efd49a;
   background: #fffaf0;
   color: #bd7b13;
+}
+
+.draw-work-card > footer button.draw-work-card__delete {
+  color: #9a6260;
 }
 
 .draw-generator__empty {
@@ -2612,6 +3513,10 @@ onBeforeUnmount(() => {
     grid-template-columns: 300px minmax(0, 1fr);
   }
 
+  .draw-effect-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .draw-tool-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -2628,6 +3533,19 @@ onBeforeUnmount(() => {
 
   .draw-library {
     display: none;
+  }
+
+  .draw-template-studio__header {
+    grid-template-columns: minmax(145px, 1fr) auto;
+  }
+
+  .draw-template-studio__header > strong {
+    display: none;
+  }
+
+  .draw-template-composer {
+    left: 22px;
+    width: calc(100% - 44px);
   }
 
   .draw-main__inner {
@@ -2684,6 +3602,15 @@ onBeforeUnmount(() => {
     background: transparent;
     backdrop-filter: none;
   }
+
+  .draw-template-studio {
+    padding-bottom: 170px;
+  }
+
+  .draw-template-studio__content {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
 }
 
 @media (max-width: 760px) {
@@ -2698,10 +3625,102 @@ onBeforeUnmount(() => {
     padding-left: 13px;
   }
 
+  .draw-template-studio__header {
+    gap: 8px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .draw-template-studio__header > div {
+    gap: 5px;
+  }
+
+  .draw-template-studio__header > div button {
+    padding: 0 8px;
+    font-size: 8px;
+  }
+
+  .draw-template-studio__content {
+    padding: 24px 13px 0;
+  }
+
+  .draw-template-hero > span {
+    width: 58px;
+    height: 58px;
+    font-size: 22px;
+  }
+
+  .draw-template-hero h1 {
+    font-size: 21px;
+  }
+
+  .draw-template-categories {
+    justify-content: flex-start;
+    margin-right: -13px;
+    margin-left: -13px;
+    padding-right: 13px;
+    padding-left: 13px;
+  }
+
+  .draw-template-categories button {
+    min-width: max-content;
+  }
+
+  .draw-effect-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .draw-template-composer {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    min-height: 191px;
+    width: auto;
+    grid-template-columns: 62px minmax(0, 1fr);
+    padding: 10px;
+  }
+
+  .draw-template-composer__upload {
+    width: 62px;
+    height: 64px;
+  }
+
+  .draw-template-composer__prompt textarea {
+    min-height: 63px;
+    padding-right: 36px;
+  }
+
+  .draw-template-composer > footer {
+    flex-wrap: wrap;
+  }
+
+  .draw-template-composer > footer label {
+    width: calc(58% - 4px);
+  }
+
+  .draw-template-composer > footer label:nth-of-type(2) {
+    width: calc(42% - 4px);
+  }
+
+  .draw-template-composer > footer > span {
+    order: 4;
+    margin-left: 0;
+    padding-left: 4px;
+  }
+
+  .draw-template-composer > footer > button.draw-template-composer__submit {
+    flex: 1;
+    order: 5;
+  }
+
   .draw-main__navigation {
     min-height: 46px;
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  .draw-work-card > footer {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .draw-main__navigation nav {
