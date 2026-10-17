@@ -57,6 +57,7 @@
 - `node outputs/ui-reference/verify-catalog-charts.mjs` 通过，6358 条智能体目录、分页/空态、29 类图表、无错误状态和无横向溢出在桌面端与移动端均正常
 - `node outputs/ui-reference/verify-newdraw-templates.mjs` 通过，`/newdraw` 的 7 分类、17 模板、筛选、回填、示例弹窗、高级设置和顶部跳转在桌面端与移动端均正常
 - `node outputs/ui-reference/verify-showcase-assets.mjs` 通过，`/newdraw` 的 34 张预览图和图片生成页的 12 张示例图全部加载，无横向溢出
+- `node outputs/ui-reference/verify-commerce-studio.mjs` 通过，电商工具的空状态、必填参数、素材上传、替换/试穿任务和桌面/移动端布局均正常
 - 图片任务 E2E 覆盖十张输入、第十一张拒绝、越权文件拒绝和自由参数注入防护
 
 下一步：

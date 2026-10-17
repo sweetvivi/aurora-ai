@@ -73,6 +73,11 @@ interface UploadMeta {
   label: string;
 }
 
+interface PreviewExample {
+  after: string;
+  before: string;
+}
+
 const catalogGroups: CatalogGroup[] = [
   {
     label: '商品替换',
@@ -450,6 +455,48 @@ const tryOnResolutions = ['1K', '2K', '4K'];
 const ratios = ['1:1', '4:5', '3:4', '16:9', '9:16'];
 const amounts = [1, 2, 3, 4];
 const promptPresets = ['保持光线方向一致', '边缘融合自然', '突出商品材质', '留出文案空间'];
+const commercePreviewExamples: Record<string, PreviewExample> = {
+  'background-blend': {
+    after: '/showcase/product-v1.png',
+    before: '/showcase/product-v1.png',
+  },
+  'display-stand-replace': {
+    after: '/showcase/product-v1.png',
+    before: '/showcase/product-v1.png',
+  },
+  'pattern-replace': {
+    after: '/showcase/fashion-v1.png',
+    before: '/showcase/fashion-v1.png',
+  },
+  'component-replace': {
+    after: '/showcase/product-v1.png',
+    before: '/showcase/product-v1.png',
+  },
+  'package-replace': {
+    after: '/showcase/product-v1.png',
+    before: '/showcase/product-v1.png',
+  },
+  'material-replace': {
+    after: '/showcase/product-v1.png',
+    before: '/showcase/product-v1.png',
+  },
+  'image-cutout': {
+    after: '/showcase/portrait-v1.png',
+    before: '/showcase/portrait-v1.png',
+  },
+  'style-transfer': {
+    after: '/showcase/portrait-v1.png',
+    before: '/showcase/portrait-v1.png',
+  },
+  'image-upscale': {
+    after: '/showcase/portrait-v1.png',
+    before: '/showcase/portrait-v1.png',
+  },
+  'virtual-model': {
+    after: '/showcase/fashion-v1.png',
+    before: '/showcase/fashion-v1.png',
+  },
+};
 
 const uploadMeta: Record<UploadRole, UploadMeta> = {
   product: {
@@ -499,21 +546,21 @@ const uploadingRole = ref<UploadRole | null>(null);
 const selectedImageModel = computed(() => modelCatalog.modelsFor('image')[0] ?? null);
 const pendingUploadRole = ref<UploadRole | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
-const backgroundCategory = ref(backgroundCategories[0] ?? '服饰箱包');
-const fusionMode = ref(fusionModes[0] ?? '自然融合');
-const backgroundResolution = ref('2K');
-const patternApplication = ref(patternApplications[0] ?? '胸前图案');
-const clothingCategory = ref(clothingCategories[0] ?? 'T 恤');
-const patternStrength = ref(patternStrengths[0] ?? '自然贴合');
-const patternResolution = ref('2K');
-const replacementMode = ref(replacementModesByTool['package-replace']?.[0] ?? '包装整体');
-const replacementScope = ref(replacementScopes[0] ?? '自动识别');
-const replacementResolution = ref('2K');
-const retouchMode = ref(retouchModes[0] ?? '一键抠图');
-const retouchResolution = ref('2K');
-const tryOnPose = ref(tryOnPoses[0] ?? '正面站姿');
-const tryOnScene = ref(tryOnScenes[0] ?? '纯色棚拍');
-const tryOnResolution = ref('2K');
+const backgroundCategory = ref('');
+const fusionMode = ref('');
+const backgroundResolution = ref('');
+const patternApplication = ref('');
+const clothingCategory = ref('');
+const patternStrength = ref('');
+const patternResolution = ref('');
+const replacementMode = ref('');
+const replacementScope = ref('');
+const replacementResolution = ref('');
+const retouchMode = ref('');
+const retouchResolution = ref('');
+const tryOnPose = ref('');
+const tryOnScene = ref('');
+const tryOnResolution = ref('');
 const selectedRatio = ref('1:1');
 const selectedAmount = ref(1);
 const imageUploads = ref<Record<UploadRole, UploadState | null>>({
@@ -551,12 +598,16 @@ const filteredToolCount = computed(() =>
   filteredGroups.value.reduce((count, group) => count + group.items.length, 0),
 );
 const isToolSelected = computed(() => activeTool.value !== null);
-const isAvailableTool = computed(() => displayTool.value.form !== 'placeholder');
-const isBackgroundTool = computed(() => displayTool.value.form === 'background');
-const isPatternTool = computed(() => displayTool.value.form === 'pattern');
-const isReplaceTool = computed(() => displayTool.value.form === 'replace');
-const isRetouchTool = computed(() => displayTool.value.form === 'retouch');
-const isTryOnTool = computed(() => displayTool.value.form === 'try-on');
+const isAvailableTool = computed(
+  () => isToolSelected.value && displayTool.value.form !== 'placeholder',
+);
+const isBackgroundTool = computed(
+  () => isToolSelected.value && displayTool.value.form === 'background',
+);
+const isPatternTool = computed(() => isToolSelected.value && displayTool.value.form === 'pattern');
+const isReplaceTool = computed(() => isToolSelected.value && displayTool.value.form === 'replace');
+const isRetouchTool = computed(() => isToolSelected.value && displayTool.value.form === 'retouch');
+const isTryOnTool = computed(() => isToolSelected.value && displayTool.value.form === 'try-on');
 const activeReplacementModes = computed(
   () =>
     replacementModesByTool[displayTool.value.value] ?? replacementModesByTool['package-replace']!,
@@ -594,33 +645,122 @@ const missingUploadLabels = computed(() =>
     .filter((role) => !imageUploads.value[role])
     .map((role) => uploadMeta[role].label.replace('上传', '')),
 );
+const missingParameterLabels = computed(() => {
+  const missing: string[] = [];
+
+  if (isBackgroundTool.value) {
+    if (!backgroundCategory.value) {
+      missing.push('商品类目');
+    }
+    if (!fusionMode.value) {
+      missing.push('融合模式');
+    }
+  }
+
+  if (isPatternTool.value) {
+    if (!patternApplication.value) {
+      missing.push('图案应用方式');
+    }
+    if (!clothingCategory.value) {
+      missing.push('服饰类目');
+    }
+    if (!patternStrength.value) {
+      missing.push('图案融合度');
+    }
+  }
+
+  if (isReplaceTool.value) {
+    if (!replacementMode.value) {
+      missing.push('替换类型');
+    }
+    if (!replacementScope.value) {
+      missing.push('替换范围');
+    }
+  }
+
+  if (isRetouchTool.value && !retouchMode.value) {
+    missing.push('处理方式');
+  }
+
+  if (isTryOnTool.value) {
+    if (!tryOnPose.value) {
+      missing.push('展示姿态');
+    }
+    if (!tryOnScene.value) {
+      missing.push('目标场景');
+    }
+  }
+
+  return missing;
+});
+const selectedOutputResolution = computed(() => {
+  if (isBackgroundTool.value) {
+    return backgroundResolution.value;
+  }
+
+  if (isPatternTool.value) {
+    return patternResolution.value;
+  }
+
+  if (isReplaceTool.value) {
+    return replacementResolution.value;
+  }
+
+  if (isRetouchTool.value) {
+    return retouchResolution.value;
+  }
+
+  if (isTryOnTool.value) {
+    return tryOnResolution.value;
+  }
+
+  return '';
+});
+const latestCompletedWork = computed(() =>
+  visibleWorks.value.find(
+    (work) =>
+      work.status === 'done' && work.artworkUrl && work.parameters.mode === displayTool.value.value,
+  ),
+);
 const previewImage = computed(() => {
+  if (!isAvailableTool.value) {
+    return undefined;
+  }
+
+  const example = commercePreviewExamples[displayTool.value.value];
+
+  if (previewSide.value === 'after' && latestCompletedWork.value?.artworkUrl) {
+    return latestCompletedWork.value.artworkUrl;
+  }
+
   if (isBackgroundTool.value) {
     return previewSide.value === 'before'
-      ? imageUploads.value.product?.url
-      : imageUploads.value.background?.url;
+      ? (imageUploads.value.product?.url ?? example?.before)
+      : example?.after;
   }
 
   if (isPatternTool.value) {
     return previewSide.value === 'before'
-      ? imageUploads.value.clothing?.url
-      : imageUploads.value.pattern?.url;
+      ? (imageUploads.value.clothing?.url ?? example?.before)
+      : example?.after;
   }
 
   if (isReplaceTool.value) {
     return previewSide.value === 'before'
-      ? imageUploads.value.product?.url
-      : imageUploads.value.replacement?.url;
+      ? (imageUploads.value.product?.url ?? example?.before)
+      : example?.after;
   }
 
   if (isRetouchTool.value) {
-    return imageUploads.value.product?.url;
+    return previewSide.value === 'before'
+      ? (imageUploads.value.product?.url ?? example?.before)
+      : example?.after;
   }
 
   if (isTryOnTool.value) {
     return previewSide.value === 'before'
-      ? imageUploads.value.clothing?.url
-      : imageUploads.value.model?.url;
+      ? (imageUploads.value.clothing?.url ?? example?.before)
+      : example?.after;
   }
 
   return undefined;
@@ -670,7 +810,11 @@ const previewDescription = computed(() => {
 const generationCost = computed(() => selectedAmount.value * IMAGE_TASK_POINTS_COST);
 const submitting = computed(() => workspace.submitting || uploadingRole.value !== null);
 const canSubmit = computed(
-  () => isAvailableTool.value && missingUploadLabels.value.length === 0 && !submitting.value,
+  () =>
+    isAvailableTool.value &&
+    missingParameterLabels.value.length === 0 &&
+    missingUploadLabels.value.length === 0 &&
+    !submitting.value,
 );
 const visibleWorks = computed(() => workspace.works.filter((work) => work.tool === 'commerce'));
 const toolSteps = computed(() => {
@@ -765,11 +909,27 @@ const toolTips = computed(() => {
   return ['尚未开放的工具会保留和参考产品一致的入口位置'];
 });
 
+function clearParameters(): void {
+  backgroundCategory.value = '';
+  fusionMode.value = '';
+  backgroundResolution.value = '';
+  patternApplication.value = '';
+  clothingCategory.value = '';
+  patternStrength.value = '';
+  patternResolution.value = '';
+  replacementMode.value = '';
+  replacementScope.value = '';
+  replacementResolution.value = '';
+  retouchMode.value = '';
+  retouchResolution.value = '';
+  tryOnPose.value = '';
+  tryOnScene.value = '';
+  tryOnResolution.value = '';
+}
+
 function setTool(tool: CommerceTool): void {
   selectedToolKey.value = tool.value;
-  if (tool.form === 'replace') {
-    replacementMode.value = replacementModesByTool[tool.value]?.[0] ?? '包装整体';
-  }
+  clearParameters();
   prompt.value = '';
   previewSide.value = 'after';
   uploadError.value = '';
@@ -874,48 +1034,68 @@ function buildPrompt(): string {
   const parts = [displayTool.value.prompt];
 
   if (isBackgroundTool.value) {
-    parts.push(
-      `商品类目：${backgroundCategory.value}。`,
-      `融合模式：${fusionMode.value}。`,
-      `输出分辨率：${backgroundResolution.value}。`,
-      '保持商品主体、品牌标识、材质和颜色准确。',
-    );
+    if (backgroundCategory.value) {
+      parts.push(`商品类目：${backgroundCategory.value}。`);
+    }
+    if (fusionMode.value) {
+      parts.push(`融合模式：${fusionMode.value}。`);
+    }
+    if (backgroundResolution.value) {
+      parts.push(`输出分辨率：${backgroundResolution.value}。`);
+    }
+    parts.push('保持商品主体、品牌标识、材质和颜色准确。');
   }
 
   if (isPatternTool.value) {
-    parts.push(
-      `图案应用方式：${patternApplication.value}。`,
-      `服饰类目：${clothingCategory.value}。`,
-      `图案融合度：${patternStrength.value}。`,
-      `输出分辨率：${patternResolution.value}。`,
-      '保持服饰版型、褶皱、阴影和原始轮廓不变。',
-    );
+    if (patternApplication.value) {
+      parts.push(`图案应用方式：${patternApplication.value}。`);
+    }
+    if (clothingCategory.value) {
+      parts.push(`服饰类目：${clothingCategory.value}。`);
+    }
+    if (patternStrength.value) {
+      parts.push(`图案融合度：${patternStrength.value}。`);
+    }
+    if (patternResolution.value) {
+      parts.push(`输出分辨率：${patternResolution.value}。`);
+    }
+    parts.push('保持服饰版型、褶皱、阴影和原始轮廓不变。');
   }
 
   if (isReplaceTool.value) {
-    parts.push(
-      `替换类型：${replacementMode.value}。`,
-      `替换范围：${replacementScope.value}。`,
-      `输出分辨率：${replacementResolution.value}。`,
-      '保持商品原有轮廓、结构关系、品牌信息和透视，替换区域边缘与材质过渡自然。',
-    );
+    if (replacementMode.value) {
+      parts.push(`替换类型：${replacementMode.value}。`);
+    }
+    if (replacementScope.value) {
+      parts.push(`替换范围：${replacementScope.value}。`);
+    }
+    if (replacementResolution.value) {
+      parts.push(`输出分辨率：${replacementResolution.value}。`);
+    }
+    parts.push('保持商品原有轮廓、结构关系、品牌信息和透视，替换区域边缘与材质过渡自然。');
   }
 
   if (isRetouchTool.value) {
-    parts.push(
-      `处理方式：${retouchMode.value}。`,
-      `输出分辨率：${retouchResolution.value}。`,
-      '保持商品主体、品牌文字、材质和原始颜色准确。',
-    );
+    if (retouchMode.value) {
+      parts.push(`处理方式：${retouchMode.value}。`);
+    }
+    if (retouchResolution.value) {
+      parts.push(`输出分辨率：${retouchResolution.value}。`);
+    }
+    parts.push('保持商品主体、品牌文字、材质和原始颜色准确。');
   }
 
   if (isTryOnTool.value) {
-    parts.push(
-      `展示姿态：${tryOnPose.value}。`,
-      `目标场景：${tryOnScene.value}。`,
-      `输出分辨率：${tryOnResolution.value}。`,
-      '保持服饰版型、图案、材质和商品细节准确，手部和身体结构自然。',
-    );
+    if (tryOnPose.value) {
+      parts.push(`展示姿态：${tryOnPose.value}。`);
+    }
+    if (tryOnScene.value) {
+      parts.push(`目标场景：${tryOnScene.value}。`);
+    }
+    if (tryOnResolution.value) {
+      parts.push(`输出分辨率：${tryOnResolution.value}。`);
+    }
+    parts.push('保持服饰版型、图案、材质和商品细节准确，手部和身体结构自然。');
   }
 
   if (prompt.value.trim()) {
@@ -954,6 +1134,11 @@ async function submitTask(): Promise<void> {
     return;
   }
 
+  if (missingParameterLabels.value.length > 0) {
+    uploadError.value = `请先选择${missingParameterLabels.value.join('、')}`;
+    return;
+  }
+
   if (missingUploadLabels.value.length > 0) {
     uploadError.value = `请先上传${missingUploadLabels.value.join('和')}`;
     return;
@@ -984,13 +1169,7 @@ async function submitTask(): Promise<void> {
       clothingCategory: isPatternTool.value ? clothingCategory.value : undefined,
       fusionMode: isBackgroundTool.value ? fusionMode.value : undefined,
       mode: displayTool.value.value,
-      outputResolution: isBackgroundTool.value
-        ? backgroundResolution.value
-        : isPatternTool.value
-          ? patternResolution.value
-          : isReplaceTool.value
-            ? replacementResolution.value
-            : retouchResolution.value,
+      outputResolution: selectedOutputResolution.value || undefined,
       patternApplication: isPatternTool.value ? patternApplication.value : undefined,
       patternFileId: imageUploads.value.pattern?.assetId,
       patternStrength: isPatternTool.value ? patternStrength.value : undefined,
@@ -1011,15 +1190,7 @@ async function submitTask(): Promise<void> {
     prompt: buildPrompt(),
     ratio: selectedRatio.value,
     referenceFileIds: referenceFileId ? [referenceFileId] : undefined,
-    size: isBackgroundTool.value
-      ? backgroundResolution.value
-      : isPatternTool.value
-        ? patternResolution.value
-        : isReplaceTool.value
-          ? replacementResolution.value
-          : isRetouchTool.value
-            ? retouchResolution.value
-            : tryOnResolution.value,
+    size: selectedOutputResolution.value || '2K',
     sourceFileId: primaryImage.assetId,
     toolKey: 'commerce',
   });
@@ -1050,21 +1221,7 @@ function resetForm(): void {
   prompt.value = '';
   uploadError.value = '';
   previewSide.value = 'after';
-  backgroundCategory.value = backgroundCategories[0] ?? '服饰箱包';
-  fusionMode.value = fusionModes[0] ?? '自然融合';
-  backgroundResolution.value = '2K';
-  patternApplication.value = patternApplications[0] ?? '胸前图案';
-  clothingCategory.value = clothingCategories[0] ?? 'T 恤';
-  patternStrength.value = patternStrengths[0] ?? '自然贴合';
-  patternResolution.value = '2K';
-  replacementMode.value = replacementModesByTool['package-replace']?.[0] ?? '包装整体';
-  replacementScope.value = replacementScopes[0] ?? '自动识别';
-  replacementResolution.value = '2K';
-  retouchMode.value = retouchModes[0] ?? '一键抠图';
-  retouchResolution.value = '2K';
-  tryOnPose.value = tryOnPoses[0] ?? '正面站姿';
-  tryOnScene.value = tryOnScenes[0] ?? '纯色棚拍';
-  tryOnResolution.value = '2K';
+  clearParameters();
   selectedRatio.value = '1:1';
   selectedAmount.value = 1;
 }
@@ -1267,6 +1424,7 @@ onBeforeUnmount(() => {
           <label class="commerce-field">
             <span>融合模式 <em>*</em></span>
             <select v-model="fusionMode">
+              <option value="" disabled>请选择融合模式</option>
               <option v-for="mode in fusionModes" :key="mode" :value="mode">{{ mode }}</option>
             </select>
           </label>
@@ -1274,6 +1432,7 @@ onBeforeUnmount(() => {
           <label class="commerce-field">
             <span>输出分辨率</span>
             <select v-model="backgroundResolution">
+              <option value="">请选择输出分辨率（可选）</option>
               <option
                 v-for="resolution in backgroundResolutions"
                 :key="resolution"
@@ -1359,6 +1518,7 @@ onBeforeUnmount(() => {
           <label class="commerce-field">
             <span>图案应用方式 <em>*</em></span>
             <select v-model="patternApplication">
+              <option value="" disabled>请选择图案应用方式</option>
               <option
                 v-for="application in patternApplications"
                 :key="application"
@@ -1387,6 +1547,7 @@ onBeforeUnmount(() => {
           <label class="commerce-field">
             <span>图案融合度 <em>*</em></span>
             <select v-model="patternStrength">
+              <option value="" disabled>请选择图案融合度</option>
               <option v-for="strength in patternStrengths" :key="strength" :value="strength">
                 {{ strength }}
               </option>
@@ -1394,8 +1555,18 @@ onBeforeUnmount(() => {
           </label>
 
           <label class="commerce-field">
+            <span>额外需求</span>
+            <textarea
+              v-model="prompt"
+              maxlength="600"
+              placeholder="例如：图案颜色降低一点，保留面料褶皱"
+            />
+          </label>
+
+          <label class="commerce-field">
             <span>图片分辨率</span>
             <select v-model="patternResolution">
+              <option value="">请选择图片分辨率（可选）</option>
               <option
                 v-for="resolution in patternResolutions"
                 :key="resolution"
@@ -1451,21 +1622,13 @@ onBeforeUnmount(() => {
               <em>0 / 1</em>
             </button>
           </div>
-
-          <label class="commerce-field">
-            <span>额外需求</span>
-            <textarea
-              v-model="prompt"
-              maxlength="600"
-              placeholder="例如：图案颜色降低一点，保留面料褶皱"
-            />
-          </label>
         </div>
 
         <div v-else-if="isReplaceTool" class="commerce-editor__content">
           <label class="commerce-field">
             <span>替换类型 <em>*</em></span>
             <select v-model="replacementMode">
+              <option value="" disabled>请选择替换类型</option>
               <option v-for="mode in activeReplacementModes" :key="mode" :value="mode">
                 {{ mode }}
               </option>
@@ -1475,6 +1638,7 @@ onBeforeUnmount(() => {
           <label class="commerce-field">
             <span>替换范围 <em>*</em></span>
             <select v-model="replacementScope">
+              <option value="" disabled>请选择替换范围</option>
               <option v-for="scope in replacementScopes" :key="scope" :value="scope">
                 {{ scope }}
               </option>
@@ -1484,6 +1648,7 @@ onBeforeUnmount(() => {
           <label class="commerce-field">
             <span>输出分辨率</span>
             <select v-model="replacementResolution">
+              <option value="">请选择输出分辨率（可选）</option>
               <option
                 v-for="resolution in replacementResolutions"
                 :key="resolution"
@@ -1573,6 +1738,7 @@ onBeforeUnmount(() => {
           <label class="commerce-field">
             <span>处理方式 <em>*</em></span>
             <select v-model="retouchMode">
+              <option value="" disabled>请选择处理方式</option>
               <option v-for="mode in retouchModes" :key="mode" :value="mode">{{ mode }}</option>
             </select>
           </label>
@@ -1580,6 +1746,7 @@ onBeforeUnmount(() => {
           <label class="commerce-field">
             <span>输出分辨率</span>
             <select v-model="retouchResolution">
+              <option value="">请选择输出分辨率（可选）</option>
               <option
                 v-for="resolution in retouchResolutions"
                 :key="resolution"
@@ -1641,6 +1808,7 @@ onBeforeUnmount(() => {
           <label class="commerce-field">
             <span>展示姿态 <em>*</em></span>
             <select v-model="tryOnPose">
+              <option value="" disabled>请选择展示姿态</option>
               <option v-for="pose in tryOnPoses" :key="pose" :value="pose">{{ pose }}</option>
             </select>
           </label>
@@ -1648,6 +1816,7 @@ onBeforeUnmount(() => {
           <label class="commerce-field">
             <span>目标场景 <em>*</em></span>
             <select v-model="tryOnScene">
+              <option value="" disabled>请选择目标场景</option>
               <option v-for="scene in tryOnScenes" :key="scene" :value="scene">{{ scene }}</option>
             </select>
           </label>
@@ -1655,6 +1824,7 @@ onBeforeUnmount(() => {
           <label class="commerce-field">
             <span>输出分辨率</span>
             <select v-model="tryOnResolution">
+              <option value="">请选择输出分辨率（可选）</option>
               <option v-for="resolution in tryOnResolutions" :key="resolution" :value="resolution">
                 {{ resolution }}
               </option>
@@ -1748,18 +1918,42 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <footer v-if="isToolSelected && isAvailableTool" class="commerce-editor__footer">
+        <footer class="commerce-editor__footer">
           <div>
             <ThunderboltFilled />
             <span>
-              <strong>本次预计消耗 {{ generationCost }} 积分</strong>
-              <small>当前余额 {{ sessionStore.points }} 积分</small>
+              <strong>
+                {{
+                  isAvailableTool ? `本次预计消耗 ${generationCost} 积分` : '选择智能体后开始处理'
+                }}
+              </strong>
+              <small>
+                {{
+                  isAvailableTool
+                    ? `当前余额 ${sessionStore.points} 积分`
+                    : '从左侧工具列表中选择一个智能体'
+                }}
+              </small>
             </span>
           </div>
+          <p
+            v-if="isAvailableTool && missingParameterLabels.length > 0"
+            class="commerce-editor__suggestion"
+          >
+            <BulbOutlined />
+            请先选择{{ missingParameterLabels.join('、') }}
+          </p>
+          <p
+            v-else-if="isAvailableTool && missingUploadLabels.length > 0"
+            class="commerce-editor__suggestion"
+          >
+            <BulbOutlined />
+            请上传{{ missingUploadLabels.join('和') }}
+          </p>
           <button type="button" :disabled="!canSubmit" @click="submitTask">
             <LoadingOutlined v-if="submitting" />
             <SwapOutlined v-else />
-            {{ submitting ? '正在提交...' : '开始处理' }}
+            {{ submitting ? '正在提交...' : isAvailableTool ? '开始处理' : '请先选择智能体' }}
           </button>
         </footer>
 
@@ -2585,7 +2779,7 @@ onBeforeUnmount(() => {
 }
 
 .commerce-choice-grid--clothing {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .commerce-upload {
@@ -2714,7 +2908,7 @@ onBeforeUnmount(() => {
 
 .commerce-editor__placeholder {
   display: grid;
-  min-height: 500px;
+  min-height: 420px;
   place-items: center;
   align-content: center;
   gap: 8px;
@@ -2809,6 +3003,26 @@ onBeforeUnmount(() => {
 .commerce-editor__footer small {
   color: #9a8a72;
   font-size: 7px;
+}
+
+.commerce-editor__suggestion {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 0;
+  padding: 7px 8px;
+  border: 1px solid #f3dfb7;
+  border-radius: 6px;
+  background: #fffbf1;
+  color: #a86e1f;
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.commerce-editor__suggestion :deep(svg) {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  font-size: 9px;
 }
 
 .commerce-editor__footer > button {
