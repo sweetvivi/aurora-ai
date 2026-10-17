@@ -14,6 +14,7 @@ const props = withDefaults(
     darkBrand?: boolean;
     modelValue?: string;
     searchPlaceholder?: string;
+    showBrand?: boolean;
     showDownload?: boolean;
     wideSearch?: boolean;
   }>(),
@@ -21,6 +22,7 @@ const props = withDefaults(
     darkBrand: false,
     modelValue: undefined,
     searchPlaceholder: '搜索功能、模型、工具...(Ctrl+K)',
+    showBrand: true,
     showDownload: true,
     wideSearch: false,
   },
@@ -49,10 +51,11 @@ const searchValue = computed({
     class="global-topbar"
     :class="{
       'global-topbar--dark-brand': props.darkBrand,
+      'global-topbar--without-brand': !props.showBrand,
       'global-topbar--wide-search': props.wideSearch,
     }"
   >
-    <div class="global-topbar__brand">
+    <div v-if="props.showBrand" class="global-topbar__brand">
       <BrandMark :inverse="props.darkBrand" />
     </div>
 
@@ -111,6 +114,10 @@ const searchValue = computed({
 .global-topbar--dark-brand .global-topbar__brand {
   border-right-color: #262c37;
   background: #141922;
+}
+
+.global-topbar--without-brand {
+  padding-left: 14px;
 }
 
 .global-topbar__download,

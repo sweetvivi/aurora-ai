@@ -337,16 +337,6 @@ watch(
         <div v-if="messages.length === 0" class="agent-detail__welcome">
           <h1>你好，我是{{ agent.name }}</h1>
           <p>{{ agent.opening }}</p>
-          <div class="agent-detail__welcome-prompts">
-            <button
-              v-for="starter in agent.starterPrompts"
-              :key="starter"
-              type="button"
-              @click="useStarter(starter)"
-            >
-              {{ starter }}
-            </button>
-          </div>
         </div>
 
         <div v-else class="agent-detail__messages">
@@ -817,30 +807,6 @@ watch(
   color: #747d8b;
   font-size: 11px;
   line-height: 1.75;
-}
-
-.agent-detail__welcome-prompts {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 24px;
-}
-
-.agent-detail__welcome-prompts button {
-  height: 34px;
-  padding: 0 13px;
-  border: 1px solid #e1e5eb;
-  border-radius: 999px;
-  background: #fff;
-  color: #66707f;
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.agent-detail__welcome-prompts button:hover {
-  border-color: #b9cef7;
-  color: #3979ed;
 }
 
 .agent-detail__messages {

@@ -47,6 +47,9 @@
 - 页面：`apps/web/src/views/AgentDetailView.vue`
 - Store：`apps/web/src/stores/agent-workspace.ts`
 - 后端：`apps/api/src/chat/chat.service.ts`
+- 详情和创建页顶部栏：`/agents` 路由按参考产品隐藏顶部品牌区，左侧从“下载客户端”开始，避免压缩品牌文字时出现截断
+- 详情空态：移除参考产品没有的推荐问题胶囊，保留欢迎语、会话左栏和底部“新建对话 / 历史记录”操作
+- 创建页预览：未填写名称时只显示右侧空态，填写名称后再出现调试输入框
 - 请求契约：`streamChat` 新增可选 `systemPrompt`
 - 能力：智能体详情页使用与模型对话相同的 SSE 链路，支持流式增量、停止生成、错误状态、积分同步、会话 ID 和模型别名持久化
 - 角色隔离：智能体名称、分类、描述、instructions 和标签会组合成临时 system message；该消息不写入会话历史，也不改变共享聊天接口的存储结构

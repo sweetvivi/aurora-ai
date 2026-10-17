@@ -8,11 +8,12 @@ const route = useRoute();
 const shellTheme = computed(() =>
   route.path.startsWith('/agents') ? 'theme-blue' : 'theme-purple',
 );
+const showBrand = computed(() => !route.path.startsWith('/agents'));
 </script>
 
 <template>
   <div class="media-shell" :class="shellTheme">
-    <GlobalTopbar />
+    <GlobalTopbar :show-brand="showBrand" />
     <main class="media-shell__content">
       <RouterView />
     </main>

@@ -324,7 +324,7 @@ function sendPreview(): void {
             <MessageOutlined />
             <p>{{ previewReply }}</p>
           </div>
-          <div class="agent-preview-composer">
+          <div v-if="draft.name.trim()" class="agent-preview-composer">
             <input
               v-model="previewPrompt"
               placeholder="输入一句话调试当前智能体"
