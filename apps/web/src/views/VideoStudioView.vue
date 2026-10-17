@@ -3,11 +3,12 @@ import {
   CheckOutlined,
   ClockCircleOutlined,
   CloseOutlined,
+  CopyOutlined,
   DeleteOutlined,
   DownloadOutlined,
+  ExpandOutlined,
   LoadingOutlined,
   PlayCircleOutlined,
-  PlusOutlined,
   ReloadOutlined,
   SoundOutlined,
   StarOutlined,
@@ -16,16 +17,19 @@ import {
   VideoCameraOutlined,
 } from '@ant-design/icons-vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import GalleryArtwork from '@/components/GalleryArtwork.vue';
 
 type VideoMode = 'first-last-frame' | 'image-to-video' | 'text-to-video';
 type VideoTaskStatus = 'cancelled' | 'done' | 'failed' | 'generating' | 'queued';
+type GalleryTab = 'discover' | 'mine';
 
 interface VideoModel {
   accent: string;
   badge?: string;
   description: string;
   label: string;
+  short: string;
   value: string;
 }
 
@@ -50,33 +54,113 @@ interface SourceFrame {
   url: string;
 }
 
+interface ShowcaseItem {
+  duration: number;
+  model: string;
+  prompt: string;
+  ratio: string;
+  title: string;
+  variant: number;
+}
+
 const STORAGE_KEY = 'aurora-video-tasks-v1';
 
-const modes: { label: string; value: VideoMode }[] = [
-  { label: '文生视频', value: 'text-to-video' },
-  { label: '图生视频', value: 'image-to-video' },
-  { label: '首尾帧', value: 'first-last-frame' },
+const modes: { description: string; label: string; value: VideoMode }[] = [
+  { description: '用文字描述镜头', label: '文生视频', value: 'text-to-video' },
+  { description: '上传图片生成视频', label: '图生视频', value: 'image-to-video' },
+  { description: '控制首尾画面', label: '首尾帧', value: 'first-last-frame' },
 ];
 
 const models: VideoModel[] = [
   {
-    accent: '#526fe8',
+    accent: '#7c72ff',
     badge: '推荐',
-    description: '画面稳定，适合广告和人物镜头',
+    description: '新一代多模态视频模型，适合电影感镜头与商业内容。',
     label: '极光影像 3.0',
+    short: '极',
     value: 'aurora-video-3',
   },
   {
-    accent: '#8a62d6',
-    description: '电影感镜头与自然运动',
+    accent: '#e5689a',
+    badge: '新',
+    description: '节奏自然，适合人物、产品和短视频叙事。',
     label: '光影电影 2.4',
+    short: '光',
     value: 'cinema-motion-2',
   },
   {
-    accent: '#218b79',
-    description: '产品展示与商业场景',
+    accent: '#21a77c',
+    description: '稳定构图与商业场景表现，适合电商和广告。',
     label: '商业镜头 2.1',
+    short: '商',
     value: 'commerce-shot-2',
+  },
+];
+
+const showcaseItems: ShowcaseItem[] = [
+  {
+    duration: 5,
+    model: 'Runway',
+    prompt: '篝火旁缓慢旋转的深色瓶身，火光映照玻璃质感，镜头轻微推进。',
+    ratio: '16:9',
+    title: '篝火产品镜头',
+    variant: 0,
+  },
+  {
+    duration: 10,
+    model: 'Sora 2',
+    prompt: '黑白夜景，人群靠近镜头后自然停顿，电影级手持镜头。',
+    ratio: '16:9',
+    title: '街角夜景',
+    variant: 1,
+  },
+  {
+    duration: 6,
+    model: 'Runway',
+    prompt: '两匹马沿草地奔跑，镜头从侧后方平稳跟随，天空有柔软云层。',
+    ratio: '16:9',
+    title: '草原奔跑',
+    variant: 2,
+  },
+  {
+    duration: 5,
+    model: 'Sora 2',
+    prompt: '童话草地上的男孩与宠物奔跑，色彩明快，脚踏式镜头。',
+    ratio: '16:9',
+    title: '动画草地',
+    variant: 3,
+  },
+  {
+    duration: 4,
+    model: 'Pika',
+    prompt: '人物在泳池边跃起后转体入水，阳光穿过水花，镜头拉远。',
+    ratio: '16:9',
+    title: '水面跃动',
+    variant: 4,
+  },
+  {
+    duration: 7,
+    model: 'CogVideo',
+    prompt: '复古舞者在镜面舞台上旋转，灯光跟随身体动作移动。',
+    ratio: '16:9',
+    title: '镜面舞台',
+    variant: 5,
+  },
+  {
+    duration: 8,
+    model: 'Sora 2',
+    prompt: '一列地铁穿过雨夜城市，霓虹倒影在车窗上快速掠过。',
+    ratio: '16:9',
+    title: '雨夜列车',
+    variant: 6,
+  },
+  {
+    duration: 6,
+    model: 'Runway',
+    prompt: '镜头贴着冰川缓慢前移，光线从山脊后方穿透雾层。',
+    ratio: '16:9',
+    title: '冰川航拍',
+    variant: 7,
   },
 ];
 
@@ -90,6 +174,7 @@ const promptPresets = [
   '云层流动，镜头从远景拉近',
 ];
 
+const activeGalleryTab = ref<GalleryTab>('discover');
 const mode = ref<VideoMode>('text-to-video');
 const selectedModel = ref(models[0]?.value ?? 'aurora-video-3');
 const selectedRatio = ref('16:9');
@@ -114,18 +199,13 @@ const activeTasks = computed(() =>
 const needsSource = computed(() => mode.value !== 'text-to-video');
 const requiredFrameCount = computed(() => (mode.value === 'first-last-frame' ? 2 : 1));
 const canSubmit = computed(() => {
-  if (activeTasks.value.length > 0) {
-    return false;
-  }
-
-  if (!prompt.value.trim()) {
+  if (activeTasks.value.length > 0 || !prompt.value.trim()) {
     return false;
   }
 
   return !needsSource.value || sourceFrames.value.length === requiredFrameCount.value;
 });
-const hasSource = computed(() => sourceFrames.value.length > 0);
-const sourceReplacementIndex = computed(() => sourceFrames.value.length);
+const imageHistory = computed(() => tasks.value.filter((task) => task.status === 'done').length);
 
 function loadStoredTasks(): void {
   try {
@@ -280,6 +360,7 @@ function submitTask(): void {
   };
 
   tasks.value = [task, ...tasks.value];
+  activeGalleryTab.value = 'mine';
   persistTasks();
   prompt.value = '';
   beginProgress(task.id);
@@ -295,6 +376,7 @@ function retryTask(taskId: string): void {
   task.createdAt = Date.now();
   task.progress = 2;
   task.status = 'queued';
+  activeGalleryTab.value = 'mine';
   persistTasks();
   beginProgress(task.id);
 }
@@ -336,6 +418,22 @@ function reuseTask(task: VideoTask): void {
   selectedRatio.value = task.ratio;
   selectedDuration.value = task.duration;
   selectedResolution.value = task.resolution;
+  window.scrollTo({ behavior: 'smooth', top: 0 });
+}
+
+function reuseShowcase(item: ShowcaseItem): void {
+  prompt.value = item.prompt;
+  selectedRatio.value = item.ratio;
+  selectedDuration.value = item.duration;
+  const model =
+    models.find((entry) => entry.label.includes(item.model) || entry.value.includes(item.model)) ??
+    models[item.variant % models.length];
+
+  if (model) {
+    selectedModel.value = model.value;
+  }
+
+  activeGalleryTab.value = 'mine';
   window.scrollTo({ behavior: 'smooth', top: 0 });
 }
 
@@ -403,25 +501,67 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="video-studio">
-    <header class="video-header">
-      <div class="video-header__copy">
-        <span>VIDEO STUDIO</span>
-        <h1>视频生成</h1>
-        <p>从文字或参考画面生成连贯镜头，支持横屏、竖屏和方形视频。</p>
+    <header class="video-toolbar">
+      <div class="video-toolbar__brand">
+        <span class="video-toolbar__mark">
+          <VideoCameraOutlined />
+        </span>
+        <strong>视频创作</strong>
       </div>
-      <nav class="video-header__switch" aria-label="视频工具切换">
+      <nav class="video-toolbar__nav" aria-label="创作工具切换">
+        <RouterLink class="active" to="/video">AI 视频</RouterLink>
         <RouterLink to="/draw">AI 绘画</RouterLink>
-        <RouterLink to="/image-generation">图片生成</RouterLink>
-        <RouterLink class="active" to="/video">视频生成</RouterLink>
+        <RouterLink to="/chat">超级对话</RouterLink>
+        <RouterLink to="/music">AI 音乐</RouterLink>
       </nav>
+      <div class="video-toolbar__status">
+        <span>
+          <ClockCircleOutlined />
+          本地演示模式
+        </span>
+        <RouterLink to="/map">工作台</RouterLink>
+      </div>
     </header>
 
-    <div class="video-layout">
-      <aside class="video-panel">
-        <section class="video-section">
+    <div class="video-workbench">
+      <aside class="video-model-rail" aria-label="视频模型">
+        <span class="video-model-rail__label">模型</span>
+        <button
+          v-for="model in models"
+          :key="model.value"
+          type="button"
+          :class="{ active: selectedModel === model.value }"
+          :title="model.label"
+          @click="selectedModel = model.value"
+        >
+          <i :style="{ '--model-accent': model.accent }">{{ model.short }}</i>
+          <span>{{ model.label }}</span>
+          <small v-if="model.badge">{{ model.badge }}</small>
+        </button>
+        <div class="video-model-rail__footer">
+          <SoundOutlined />
+          <span>音效</span>
+        </div>
+      </aside>
+
+      <aside class="video-control-panel">
+        <div class="video-control-panel__model">
+          <div>
+            <i :style="{ '--model-accent': activeModel?.accent }">
+              {{ activeModel?.short }}
+            </i>
+            <span>
+              <strong>{{ activeModel?.label }}</strong>
+              <small>{{ activeModel?.badge ?? '视频模型' }}</small>
+            </span>
+          </div>
+          <p>{{ activeModel?.description }}</p>
+        </div>
+
+        <section class="video-section video-section--modes">
           <header>
             <strong>生成方式</strong>
-            <span>选择一种镜头工作流</span>
+            <span>{{ modeLabel(mode) }}</span>
           </header>
           <div class="video-mode-grid">
             <button
@@ -432,7 +572,10 @@ onBeforeUnmount(() => {
               @click="changeMode(item.value)"
             >
               <PlayCircleOutlined />
-              <span>{{ item.label }}</span>
+              <span>
+                <strong>{{ item.label }}</strong>
+                <small>{{ item.description }}</small>
+              </span>
               <CheckOutlined v-if="mode === item.value" />
             </button>
           </div>
@@ -465,14 +608,11 @@ onBeforeUnmount(() => {
               class="video-source-empty"
               @click="sourceInput?.click()"
             >
-              <PlusOutlined />
+              <UploadOutlined />
               <strong>{{ sourceFrames.length === 0 ? '上传参考画面' : '补充尾帧' }}</strong>
               <small>JPG、PNG、WebP</small>
             </button>
           </div>
-          <p v-if="sourceReplacementIndex > 0" class="video-source-note">
-            已准备 {{ sourceReplacementIndex }} 张画面
-          </p>
         </section>
 
         <label class="video-prompt">
@@ -497,32 +637,6 @@ onBeforeUnmount(() => {
             {{ preset }}
           </button>
         </div>
-
-        <section class="video-section">
-          <header>
-            <strong>视频模型</strong>
-            <span>{{ models.length }} 个模型</span>
-          </header>
-          <div class="video-model-list">
-            <button
-              v-for="model in models"
-              :key="model.value"
-              type="button"
-              :class="{ active: selectedModel === model.value }"
-              @click="selectedModel = model.value"
-            >
-              <i :style="{ '--video-model-accent': model.accent }">
-                <VideoCameraOutlined />
-              </i>
-              <span>
-                <strong>{{ model.label }}</strong>
-                <small>{{ model.description }}</small>
-              </span>
-              <em v-if="model.badge">{{ model.badge }}</em>
-              <CheckOutlined v-if="selectedModel === model.value" />
-            </button>
-          </div>
-        </section>
 
         <section class="video-section video-section--options">
           <header>
@@ -581,36 +695,72 @@ onBeforeUnmount(() => {
           <button type="button" :disabled="!canSubmit" @click="submitTask">
             <LoadingOutlined v-if="activeTasks.length > 0" />
             <VideoCameraOutlined v-else />
-            {{ activeTasks.length > 0 ? '镜头生成中' : '生成视频' }}
+            {{ activeTasks.length > 0 ? '镜头生成中' : '立即生成' }}
           </button>
           <small v-if="formError" role="alert">{{ formError }}</small>
-          <small v-else>输出为演示任务，不会调用上游视频模型</small>
+          <small v-else>演示任务不调用上游视频模型</small>
         </div>
       </aside>
 
-      <main class="video-results">
-        <header class="video-results__header">
-          <div>
-            <strong>镜头记录</strong>
-            <span>{{ sortedTasks.length }} 个任务</span>
+      <main class="video-gallery">
+        <header class="video-gallery__header">
+          <div class="video-gallery__tabs">
+            <button
+              type="button"
+              :class="{ active: activeGalleryTab === 'discover' }"
+              @click="activeGalleryTab = 'discover'"
+            >
+              创意广场
+              <span>{{ showcaseItems.length }}</span>
+            </button>
+            <button
+              type="button"
+              :class="{ active: activeGalleryTab === 'mine' }"
+              @click="activeGalleryTab = 'mine'"
+            >
+              我的作品
+              <span>{{ imageHistory }}</span>
+            </button>
           </div>
-          <em v-if="activeTasks.length > 0">{{ activeTasks.length }} 个镜头处理中</em>
+          <p>注意：上传的素材和生成作品只保留 1 个月，请及时备份。</p>
         </header>
 
-        <div v-if="sortedTasks.length > 0" class="video-work-grid">
+        <div v-if="activeGalleryTab === 'discover'" class="video-showcase-grid">
+          <article v-for="item in showcaseItems" :key="item.title" class="video-showcase-card">
+            <div
+              class="video-showcase-card__visual"
+              :class="`ratio-${item.ratio.replace(':', '-')}`"
+            >
+              <GalleryArtwork :title="item.title" :variant="item.variant" />
+              <span class="video-showcase-card__model">{{ item.model }}</span>
+              <span class="video-showcase-card__duration">00:0{{ item.duration }}</span>
+              <button type="button" aria-label="放大预览">
+                <ExpandOutlined />
+              </button>
+              <div class="video-showcase-card__play">
+                <PlayCircleOutlined />
+              </div>
+            </div>
+            <footer>
+              <p>{{ item.prompt }}</p>
+              <button type="button" @click="reuseShowcase(item)">
+                <CopyOutlined />
+                复制
+              </button>
+            </footer>
+          </article>
+        </div>
+
+        <div v-else-if="sortedTasks.length > 0" class="video-showcase-grid">
           <article
             v-for="task in sortedTasks"
             :key="task.id"
-            class="video-work-card"
-            :class="`video-work-card--${task.status}`"
+            class="video-showcase-card video-showcase-card--task"
           >
-            <header>
-              <span>{{ task.modelLabel }}</span>
-              <small>{{ modeLabel(task.mode) }}</small>
-              <em :class="task.status">{{ statusLabel(task.status) }}</em>
-            </header>
-
-            <div class="video-work-card__visual" :class="`ratio-${task.ratio.replace(':', '-')}`">
+            <div
+              class="video-showcase-card__visual"
+              :class="`ratio-${task.ratio.replace(':', '-')}`"
+            >
               <GalleryArtwork
                 v-if="task.status === 'done'"
                 :title="task.prompt"
@@ -620,8 +770,8 @@ onBeforeUnmount(() => {
                 <CloseOutlined />
                 <strong>{{ statusLabel(task.status) }}</strong>
               </div>
-              <div v-else class="video-work-card__loading">
-                <span class="video-work-card__loading-ring">
+              <div v-else class="video-task-loading">
+                <span>
                   <LoadingOutlined />
                 </span>
                 <strong>{{ task.progress }}%</strong>
@@ -629,57 +779,56 @@ onBeforeUnmount(() => {
                   <span :style="{ width: `${task.progress}%` }" />
                 </i>
               </div>
-              <div v-if="task.status === 'done'" class="video-work-card__play">
+              <span class="video-showcase-card__model">{{ task.modelLabel }}</span>
+              <span class="video-showcase-card__duration"> 00:0{{ task.duration }} </span>
+              <div v-if="task.status === 'done'" class="video-showcase-card__play">
                 <PlayCircleOutlined />
               </div>
-              <div v-if="task.status === 'done'" class="video-work-card__timeline">
-                <span />
-                <small>00:0{{ task.duration }}</small>
+            </div>
+            <footer>
+              <p>{{ task.prompt }}</p>
+              <div class="video-task-actions">
+                <button
+                  v-if="task.status === 'done'"
+                  type="button"
+                  :class="{ active: task.favorite }"
+                  @click="toggleFavorite(task.id)"
+                >
+                  <StarOutlined />
+                </button>
+                <button
+                  v-if="task.status === 'done'"
+                  type="button"
+                  title="下载"
+                  @click="downloadStoryboard(task)"
+                >
+                  <DownloadOutlined />
+                </button>
+                <button v-if="task.status === 'done'" type="button" @click="reuseTask(task)">
+                  <ReloadOutlined />
+                </button>
+                <button
+                  v-if="task.status === 'cancelled' || task.status === 'failed'"
+                  type="button"
+                  @click="retryTask(task.id)"
+                >
+                  <ReloadOutlined />
+                </button>
+                <button
+                  v-if="task.status === 'cancelled' || task.status === 'failed'"
+                  type="button"
+                  @click="removeTask(task.id)"
+                >
+                  <DeleteOutlined />
+                </button>
+                <button
+                  v-if="task.status === 'queued' || task.status === 'generating'"
+                  type="button"
+                  @click="cancelTask(task.id)"
+                >
+                  <CloseOutlined />
+                </button>
               </div>
-            </div>
-
-            <p>{{ task.prompt }}</p>
-            <div class="video-work-card__meta">
-              <span>{{ task.duration }}s</span>
-              <span>{{ task.ratio }}</span>
-              <span>{{ task.resolution }}</span>
-            </div>
-
-            <footer v-if="task.status === 'done'">
-              <button
-                type="button"
-                :class="{ active: task.favorite }"
-                @click="toggleFavorite(task.id)"
-              >
-                <StarOutlined />
-                {{ task.favorite ? '已收藏' : '收藏' }}
-              </button>
-              <button type="button" @click="downloadStoryboard(task)">
-                <DownloadOutlined />
-                下载
-              </button>
-              <button type="button" @click="reuseTask(task)">
-                <ReloadOutlined />
-                再创作
-              </button>
-            </footer>
-
-            <footer v-else-if="task.status === 'cancelled' || task.status === 'failed'">
-              <button type="button" @click="retryTask(task.id)">
-                <ReloadOutlined />
-                重试
-              </button>
-              <button type="button" @click="removeTask(task.id)">
-                <DeleteOutlined />
-                删除
-              </button>
-            </footer>
-
-            <footer v-else>
-              <button type="button" @click="cancelTask(task.id)">
-                <CloseOutlined />
-                取消任务
-              </button>
             </footer>
           </article>
         </div>
@@ -690,10 +839,7 @@ onBeforeUnmount(() => {
           </span>
           <strong>还没有视频任务</strong>
           <p>选择生成方式并描述镜头，处理结果会显示在这里。</p>
-          <div>
-            <SoundOutlined />
-            支持镜头节奏、画面运动和音效描述
-          </div>
+          <button type="button" @click="activeGalleryTab = 'discover'">浏览创意广场</button>
         </div>
       </main>
     </div>
@@ -703,99 +849,258 @@ onBeforeUnmount(() => {
 <style scoped>
 .video-studio {
   min-height: calc(100vh - 56px);
-  padding: 28px 28px 56px;
-  background:
-    radial-gradient(circle at 14% -40px, rgb(80 103 232 / 9%), transparent 360px),
-    linear-gradient(180deg, #f7f8fc 0, #fff 360px);
+  overflow: hidden;
+  padding: 0 18px 28px;
+  background: radial-gradient(circle at 72% -10%, rgb(100 75 240 / 9%), transparent 360px), #08080a;
+  color: #f2f2f5;
 }
 
-.video-header {
+.video-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
-  width: min(100%, 1320px);
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  margin: 0 auto 22px;
+  min-height: 58px;
+  align-items: center;
+  gap: 28px;
+  margin: 0 -18px;
+  padding: 0 22px;
+  border-bottom: 1px solid #202127;
+  background: rgb(9 9 12 / 96%);
+  backdrop-filter: blur(18px);
 }
 
-.video-header__copy {
+.video-toolbar__brand,
+.video-toolbar__status,
+.video-toolbar__nav {
+  display: flex;
+  align-items: center;
+}
+
+.video-toolbar__brand {
+  flex: 0 0 auto;
+  gap: 9px;
+  color: #f1f1f4;
+}
+
+.video-toolbar__mark {
   display: grid;
-  gap: 5px;
-}
-
-.video-header__copy > span {
-  color: #526fe8;
-  font-size: 9px;
-  font-weight: 850;
-  letter-spacing: 0.13em;
-}
-
-.video-header h1 {
-  margin: 0;
-  color: #20272e;
-  font-size: 27px;
-}
-
-.video-header p {
-  margin: 0;
-  color: #818b96;
-  font-size: 10px;
-}
-
-.video-header__switch {
-  display: flex;
-  padding: 3px;
-  border: 1px solid #e2e5ec;
+  width: 29px;
+  height: 29px;
+  place-items: center;
   border-radius: 8px;
-  background: rgb(255 255 255 / 84%);
+  background: linear-gradient(145deg, #6454ef, #9d5df1);
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgb(104 76 230 / 28%);
 }
 
-.video-header__switch a {
+.video-toolbar__brand strong {
+  font-size: 13px;
+  font-weight: 780;
+}
+
+.video-toolbar__nav {
+  min-width: 0;
+  gap: 4px;
+}
+
+.video-toolbar__nav a {
   display: inline-flex;
-  height: 31px;
+  height: 34px;
   align-items: center;
   padding: 0 12px;
-  border-radius: 6px;
-  color: #68727e;
-  font-size: 9px;
+  border-radius: 7px;
+  color: #8f8f99;
+  font-size: 10px;
   font-weight: 700;
   text-decoration: none;
 }
 
-.video-header__switch a.active {
-  background: #20272e;
+.video-toolbar__nav a:hover {
+  background: #17171b;
   color: #fff;
 }
 
-.video-layout {
-  display: grid;
-  width: min(100%, 1320px);
-  align-items: start;
-  gap: 16px;
-  grid-template-columns: 390px minmax(0, 1fr);
-  margin: 0 auto;
+.video-toolbar__nav a.active {
+  background: #202027;
+  color: #b69cff;
 }
 
-.video-panel,
-.video-results {
-  border: 1px solid #e1e5ec;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 10px 34px rgb(33 45 75 / 6%);
+.video-toolbar__status {
+  gap: 12px;
+  margin-left: auto;
+  color: #85858f;
+  font-size: 9px;
 }
 
-.video-panel {
-  position: sticky;
-  top: 74px;
+.video-toolbar__status > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.video-toolbar__status a {
+  display: inline-flex;
+  height: 29px;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid #302c4d;
+  border-radius: 6px;
+  color: #c7b7ff;
+  text-decoration: none;
+}
+
+.video-workbench {
   display: grid;
+  min-height: calc(100vh - 114px);
+  grid-template-columns: 78px 310px minmax(0, 1fr);
+}
+
+.video-model-rail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  padding: 17px 8px;
+  border-right: 1px solid #1d1e23;
+  background: #0b0b0e;
+}
+
+.video-model-rail__label {
+  padding: 0 6px 9px;
+  color: #64646d;
+  font-size: 8px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+}
+
+.video-model-rail button {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: 4px;
+  padding: 7px 2px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #767680;
+  cursor: pointer;
+}
+
+.video-model-rail button:hover,
+.video-model-rail button.active {
+  background: #17171c;
+  color: #e7e7eb;
+}
+
+.video-model-rail button i {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--model-accent) 18%, #15151a);
+  color: var(--model-accent);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.video-model-rail button span {
+  width: 100%;
   overflow: hidden;
+  font-size: 7px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-model-rail button small {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: #7a66f4;
+  color: #fff;
+  font-size: 5px;
+  line-height: 1.3;
+}
+
+.video-model-rail__footer {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  margin-top: auto;
+  padding: 11px 2px 4px;
+  border-top: 1px solid #1e1f25;
+  color: #74747d;
+  font-size: 7px;
+}
+
+.video-control-panel {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  padding: 17px 15px 0;
+  border-right: 1px solid #1d1e23;
+  background: #0d0d10;
+}
+
+.video-control-panel__model {
+  padding: 12px;
+  border: 1px solid #26262d;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #19191e, #121216);
+}
+
+.video-control-panel__model > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.video-control-panel__model i {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--model-accent) 17%, #17171b);
+  color: var(--model-accent);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.video-control-panel__model > div > span {
+  display: grid;
+  gap: 2px;
+}
+
+.video-control-panel__model strong {
+  font-size: 11px;
+}
+
+.video-control-panel__model small {
+  color: #777780;
+  font-size: 7px;
+}
+
+.video-control-panel__model p {
+  margin: 9px 0 0;
+  color: #8a8a94;
+  font-size: 8px;
+  line-height: 1.6;
 }
 
 .video-section {
   display: grid;
-  gap: 10px;
-  padding: 15px;
-  border-bottom: 1px solid #edf0f4;
+  gap: 9px;
+  padding: 15px 0;
+  border-bottom: 1px solid #1d1e23;
 }
 
 .video-section > header,
@@ -803,58 +1108,76 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  color: #343c44;
-  font-size: 10px;
+  gap: 10px;
+  color: #d8d8dd;
+  font-size: 9px;
 }
 
 .video-section > header span {
-  color: #9aa2ab;
-  font-size: 8px;
+  color: #6f6f79;
+  font-size: 7px;
   font-weight: 500;
 }
 
 .video-mode-grid {
   display: grid;
-  gap: 7px;
+  gap: 5px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .video-mode-grid button {
   display: grid;
   min-width: 0;
-  min-height: 58px;
+  min-height: 52px;
   place-items: center;
   align-content: center;
-  gap: 5px;
-  border: 1px solid #e4e8ee;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #27272e;
   border-radius: 7px;
-  background: #fff;
-  color: #66717d;
-  font-size: 8px;
+  background: #121216;
+  color: #777780;
   cursor: pointer;
 }
 
-.video-mode-grid button :deep(svg:first-child) {
-  color: #7182d9;
-  font-size: 15px;
+.video-mode-grid button:hover,
+.video-mode-grid button.active {
+  border-color: #6d5be0;
+  background: #1b1930;
+  color: #bdaaff;
 }
 
-.video-mode-grid button :deep(svg:last-child) {
-  color: #526fe8;
+.video-mode-grid button > :deep(svg:first-child) {
+  font-size: 13px;
+}
+
+.video-mode-grid button > :deep(svg:last-child) {
+  position: absolute;
+  opacity: 0;
+}
+
+.video-mode-grid button > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.video-mode-grid strong {
   font-size: 7px;
 }
 
-.video-mode-grid button.active {
-  border-color: #9eacef;
-  background: #f1f3ff;
-  color: #354fc2;
-  font-weight: 760;
+.video-mode-grid small {
+  overflow: hidden;
+  max-width: 100%;
+  color: #70707a;
+  font-size: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .video-source-grid {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -862,11 +1185,11 @@ onBeforeUnmount(() => {
 .video-source-empty {
   position: relative;
   width: 100%;
-  min-height: 116px;
+  min-height: 96px;
   overflow: hidden;
-  border: 1px dashed #cfd6e3;
+  border: 1px dashed #373742;
   border-radius: 8px;
-  background: #f8f9fc;
+  background: #131317;
 }
 
 .video-source-frame img {
@@ -877,27 +1200,26 @@ onBeforeUnmount(() => {
 
 .video-source-frame span {
   position: absolute;
-  bottom: 7px;
-  left: 7px;
-  padding: 3px 6px;
-  border-radius: 5px;
-  background: rgb(23 29 42 / 72%);
+  bottom: 6px;
+  left: 6px;
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 65%);
   color: #fff;
-  font-size: 7px;
-  font-weight: 750;
+  font-size: 6px;
 }
 
 .video-source-frame button {
   position: absolute;
-  top: 7px;
-  right: 7px;
+  top: 6px;
+  right: 6px;
   display: grid;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   place-items: center;
   border: 0;
-  border-radius: 6px;
-  background: rgb(23 29 42 / 72%);
+  border-radius: 5px;
+  background: rgb(0 0 0 / 66%);
   color: #fff;
   cursor: pointer;
 }
@@ -906,35 +1228,29 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 6px;
-  color: #687585;
+  gap: 5px;
+  color: #8c8c96;
   cursor: pointer;
 }
 
 .video-source-empty :deep(svg) {
-  color: #5d70dc;
-  font-size: 17px;
+  color: #8d7bea;
+  font-size: 16px;
 }
 
 .video-source-empty strong {
-  font-size: 9px;
+  font-size: 8px;
 }
 
 .video-source-empty small {
-  color: #99a2ae;
-  font-size: 7px;
-}
-
-.video-source-note {
-  margin: 0;
-  color: #8490a0;
-  font-size: 8px;
+  color: #64646e;
+  font-size: 6px;
 }
 
 .video-prompt {
   display: grid;
-  gap: 9px;
-  padding: 15px 15px 10px;
+  gap: 8px;
+  padding: 15px 0 9px;
 }
 
 .video-prompt > span {
@@ -945,39 +1261,40 @@ onBeforeUnmount(() => {
 .video-prompt textarea {
   display: block;
   width: 100%;
-  min-height: 108px;
-  padding: 11px 11px 24px;
-  border: 1px solid #dfe4ec;
+  min-height: 96px;
+  padding: 10px 10px 23px;
+  border: 1px solid #2a2a31;
   border-radius: 7px;
   outline: 0;
-  color: #323a42;
-  font-size: 10px;
+  background: #121216;
+  color: #e7e7eb;
+  font-size: 9px;
   line-height: 1.7;
   resize: vertical;
 }
 
 .video-prompt textarea:focus {
-  border-color: #91a0ea;
-  box-shadow: 0 0 0 3px rgb(82 111 232 / 8%);
+  border-color: #705de8;
+  box-shadow: 0 0 0 3px rgb(112 93 232 / 12%);
 }
 
 .video-prompt textarea::placeholder {
-  color: #a7afb9;
+  color: #61616b;
 }
 
 .video-prompt small {
   position: absolute;
   right: 9px;
   bottom: 7px;
-  color: #abb2bc;
+  color: #6f6f79;
   font-size: 7px;
 }
 
 .video-presets {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   overflow-x: auto;
-  padding: 0 15px 14px;
+  padding-bottom: 11px;
   scrollbar-width: none;
 }
 
@@ -987,146 +1304,79 @@ onBeforeUnmount(() => {
 
 .video-presets button {
   min-width: max-content;
-  height: 26px;
+  height: 25px;
   padding: 0 8px;
-  border: 1px solid #e5e8ee;
+  border: 1px solid #292930;
   border-radius: 999px;
-  background: #fff;
-  color: #707a88;
+  background: #131317;
+  color: #85858f;
   font-size: 7px;
   cursor: pointer;
 }
 
 .video-presets button:hover {
-  border-color: #aeb8ec;
-  color: #5265cc;
-}
-
-.video-model-list {
-  display: grid;
-  gap: 7px;
-}
-
-.video-model-list button {
-  display: grid;
-  min-width: 0;
-  min-height: 54px;
-  align-items: center;
-  gap: 9px;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  padding: 8px;
-  border: 1px solid #e5e8ee;
-  border-radius: 7px;
-  background: #fff;
-  color: #46505a;
-  text-align: left;
-  cursor: pointer;
-}
-
-.video-model-list button.active {
-  border-color: #9eacef;
-  background: #f3f5ff;
-}
-
-.video-model-list i {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--video-model-accent) 11%, white);
-  color: var(--video-model-accent);
-}
-
-.video-model-list button > span {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-
-.video-model-list strong {
-  overflow: hidden;
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.video-model-list small {
-  overflow: hidden;
-  color: #929aa6;
-  font-size: 7px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.video-model-list em {
-  padding: 2px 5px;
-  border-radius: 4px;
-  background: #edf0ff;
-  color: #5265cc;
-  font-size: 7px;
-  font-style: normal;
-  font-weight: 750;
-}
-
-.video-model-list :deep(svg:last-child) {
-  color: #526fe8;
-  font-size: 8px;
+  border-color: #6558cf;
+  color: #c5b9ff;
 }
 
 .video-section--options {
-  gap: 12px;
+  gap: 10px;
 }
 
 .video-option-row {
   display: grid;
   align-items: center;
-  gap: 9px;
-  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 8px;
+  grid-template-columns: 38px minmax(0, 1fr);
 }
 
 .video-option-row > span {
-  color: #7c8795;
-  font-size: 8px;
+  color: #777780;
+  font-size: 7px;
 }
 
 .video-option-row > div {
   display: flex;
-  gap: 6px;
+  gap: 5px;
 }
 
 .video-option-row button {
   min-width: 0;
-  height: 28px;
+  height: 27px;
   flex: 1;
-  padding: 0 7px;
-  border: 1px solid #e1e6ed;
+  padding: 0 6px;
+  border: 1px solid #292930;
   border-radius: 6px;
-  background: #fff;
-  color: #65707c;
-  font-size: 8px;
+  background: #121216;
+  color: #7f7f89;
+  font-size: 7px;
   cursor: pointer;
 }
 
 .video-option-row button.active {
-  border-color: #9eacef;
-  background: #edf0ff;
-  color: #3f55c8;
+  border-color: #6d5be0;
+  background: #1a1830;
+  color: #c6b7ff;
   font-weight: 750;
 }
 
 .video-submit {
+  position: sticky;
+  bottom: 0;
   display: grid;
-  gap: 8px;
-  padding: 15px;
-  background: #fafbfe;
+  gap: 7px;
+  margin: 15px -15px 0;
+  padding: 14px 15px 16px;
+  border-top: 1px solid #25252c;
+  background: rgb(12 12 15 / 97%);
+  backdrop-filter: blur(12px);
 }
 
 .video-submit > span {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #a46d22;
+  color: #e8b34e;
   font-size: 8px;
 }
 
@@ -1137,193 +1387,233 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: 6px;
   border: 0;
-  border-radius: 7px;
-  background: #20272e;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #705cf1, #9665f3);
   color: #fff;
   font-size: 10px;
   font-weight: 780;
   cursor: pointer;
+  box-shadow: 0 12px 28px rgb(106 81 230 / 24%);
 }
 
 .video-submit > button:disabled {
-  background: #d6dae1;
+  background: #292930;
+  box-shadow: none;
+  color: #6d6d77;
   cursor: not-allowed;
 }
 
 .video-submit > small {
-  color: #919ba8;
+  color: #70707a;
   font-size: 7px;
   text-align: right;
 }
 
 .video-submit > small[role='alert'] {
-  color: #b44e45;
+  color: #f18e86;
 }
 
-.video-results {
+.video-gallery {
   min-width: 0;
-  overflow: hidden;
-  padding: 16px;
+  padding: 18px 22px 40px;
+  background:
+    linear-gradient(90deg, rgb(255 255 255 / 1.7%) 1px, transparent 1px),
+    linear-gradient(rgb(255 255 255 / 1.7%) 1px, transparent 1px), #08080a;
+  background-size: 28px 28px;
 }
 
-.video-results__header {
+.video-gallery__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 13px;
+  margin-bottom: 15px;
 }
 
-.video-results__header > div {
-  display: grid;
-  gap: 3px;
+.video-gallery__tabs {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.video-results__header strong {
-  color: #303840;
-  font-size: 14px;
+.video-gallery__tabs button {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: #75757f;
+  font-size: 10px;
+  font-weight: 730;
+  cursor: pointer;
 }
 
-.video-results__header span {
-  color: #969fa7;
+.video-gallery__tabs button.active {
+  border-color: #a78aff;
+  color: #f3f3f5;
+}
+
+.video-gallery__tabs button span {
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #23232a;
+  color: #8d8d97;
+  font-size: 6px;
+}
+
+.video-gallery__header p {
+  margin: 0;
+  color: #72727c;
   font-size: 8px;
 }
 
-.video-results__header em {
-  color: #526fe8;
-  font-size: 8px;
-  font-style: normal;
-  font-weight: 750;
+.video-showcase-grid {
+  display: grid;
+  gap: 13px;
+  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
 }
 
-.video-work-grid {
-  display: grid;
-  align-items: start;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-}
-
-.video-work-card {
-  display: grid;
+.video-showcase-card {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid #e1e5ec;
+  border: 1px solid #25252c;
   border-radius: 8px;
-  background: #fff;
+  background: #111115;
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease;
 }
 
-.video-work-card > header {
-  display: grid;
-  min-height: 38px;
-  align-items: center;
-  gap: 7px;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  padding: 0 10px;
-  border-bottom: 1px solid #eef0f4;
+.video-showcase-card:hover {
+  border-color: #48415f;
+  transform: translateY(-2px);
 }
 
-.video-work-card > header span {
-  overflow: hidden;
-  color: #46505a;
-  font-size: 8px;
-  font-weight: 740;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.video-work-card > header small {
-  color: #9ba3ae;
-  font-size: 7px;
-}
-
-.video-work-card > header em {
-  padding: 2px 5px;
-  border-radius: 999px;
-  background: #edf0ff;
-  color: #5265cc;
-  font-size: 7px;
-  font-style: normal;
-  font-weight: 750;
-}
-
-.video-work-card > header em.done {
-  background: #e9f7f1;
-  color: #238467;
-}
-
-.video-work-card > header em.cancelled,
-.video-work-card > header em.failed {
-  background: #fff0ee;
-  color: #bd4c42;
-}
-
-.video-work-card__visual {
+.video-showcase-card__visual {
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: #e9edf4;
+  background: #1b1b21;
 }
 
-.video-work-card__visual.ratio-9-16 {
+.video-showcase-card__visual.ratio-9-16 {
   aspect-ratio: 9 / 13;
 }
 
-.video-work-card__visual.ratio-1-1 {
+.video-showcase-card__visual.ratio-1-1 {
   aspect-ratio: 1 / 1;
 }
 
-.video-work-card__visual > :deep(svg) {
+.video-showcase-card__visual > :deep(svg),
+.video-showcase-card__visual > img {
   width: 100%;
   height: 100%;
+  object-fit: cover;
 }
 
-.video-work-card__visual > div:not(.video-work-card__play, .video-work-card__timeline) {
+.video-showcase-card__model,
+.video-showcase-card__duration {
+  position: absolute;
+  z-index: 2;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: rgb(10 10 13 / 76%);
+  color: #e6e6eb;
+  font-size: 7px;
+  backdrop-filter: blur(8px);
+}
+
+.video-showcase-card__model {
+  top: 7px;
+  left: 7px;
+}
+
+.video-showcase-card__duration {
+  bottom: 7px;
+  left: 7px;
+}
+
+.video-showcase-card__visual > button {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  z-index: 2;
+  display: grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(10 10 13 / 68%);
+  color: #e7e7eb;
+  cursor: pointer;
+}
+
+.video-showcase-card__play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 44%);
+  border-radius: 999px;
+  background: rgb(10 10 13 / 42%);
+  color: #fff;
+  font-size: 18px;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 140ms ease;
+  backdrop-filter: blur(8px);
+}
+
+.video-showcase-card:hover .video-showcase-card__play {
+  opacity: 1;
+}
+
+.video-task-loading {
   display: grid;
   width: 100%;
   height: 100%;
   place-items: center;
   align-content: center;
-  gap: 8px;
-  color: #7a5160;
+  gap: 7px;
+  background: linear-gradient(145deg, #5241bb, #874fd1);
+  color: #fff;
 }
 
-.video-work-card__visual > div:not(.video-work-card__play, .video-work-card__timeline) :deep(svg) {
-  font-size: 22px;
-}
-
-.video-work-card__visual strong {
-  font-size: 9px;
-}
-
-.video-work-card__loading {
-  background: linear-gradient(145deg, rgb(81 105 213 / 96%), rgb(119 90 201 / 92%)), #526fe8;
-  color: #fff !important;
-}
-
-.video-work-card__loading-ring {
+.video-task-loading > span {
   display: grid;
-  width: 45px;
-  height: 45px;
+  width: 38px;
+  height: 38px;
   place-items: center;
-  border: 1px solid rgb(255 255 255 / 32%);
-  border-radius: 50%;
-  background: rgb(255 255 255 / 12%);
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: 999px;
 }
 
-.video-work-card__loading-ring :deep(svg) {
-  animation: video-spin 1.1s linear infinite;
+.video-task-loading > span :deep(svg) {
+  animation: video-spin 1s linear infinite;
 }
 
-.video-work-card__loading i {
+.video-task-loading strong {
+  font-size: 8px;
+}
+
+.video-task-loading > i {
   display: block;
-  width: 58%;
+  width: 56%;
   height: 4px;
   overflow: hidden;
   border-radius: 999px;
   background: rgb(255 255 255 / 22%);
 }
 
-.video-work-card__loading i span {
+.video-task-loading > i span {
   display: block;
   height: 100%;
   border-radius: inherit;
@@ -1337,203 +1627,250 @@ onBeforeUnmount(() => {
   }
 }
 
-.video-work-card__play {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  display: grid;
-  width: 46px;
-  height: 46px;
-  place-items: center;
-  border: 1px solid rgb(255 255 255 / 58%);
-  border-radius: 50%;
-  background: rgb(21 28 45 / 43%);
-  color: #fff;
-  font-size: 23px;
-  transform: translate(-50%, -50%);
-  backdrop-filter: blur(6px);
-}
-
-.video-work-card__timeline {
-  position: absolute;
-  right: 10px;
-  bottom: 9px;
-  left: 10px;
+.video-showcase-card > footer {
   display: flex;
+  min-height: 55px;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  padding: 8px;
 }
 
-.video-work-card__timeline span {
-  display: block;
-  height: 3px;
-  flex: 1;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 55%);
-}
-
-.video-work-card__timeline small {
-  color: #fff;
-  font-size: 7px;
-  text-shadow: 0 1px 6px rgb(0 0 0 / 45%);
-}
-
-.video-work-card > p {
+.video-showcase-card > footer p {
   display: -webkit-box;
-  min-height: 48px;
   overflow: hidden;
+  flex: 1;
   margin: 0;
-  padding: 10px 10px 7px;
-  color: #4d5663;
-  font-size: 8px;
-  line-height: 1.6;
+  color: #aaaab3;
+  font-size: 7px;
+  line-height: 1.55;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.video-work-card__meta {
-  display: flex;
-  gap: 5px;
-  padding: 0 10px 10px;
-}
-
-.video-work-card__meta span {
-  padding: 2px 5px;
-  border-radius: 4px;
-  background: #f2f4f8;
-  color: #858e9a;
-  font-size: 7px;
-}
-
-.video-work-card > footer {
-  display: grid;
-  gap: 5px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: 8px;
-  border-top: 1px solid #eef0f4;
-}
-
-.video-work-card--cancelled > footer,
-.video-work-card--failed > footer,
-.video-work-card--generating > footer,
-.video-work-card--queued > footer {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.video-work-card--generating > footer,
-.video-work-card--queued > footer {
-  grid-template-columns: 1fr;
-}
-
-.video-work-card > footer button {
+.video-showcase-card > footer > button,
+.video-task-actions button {
   display: inline-flex;
-  min-width: 0;
-  height: 29px;
+  height: 26px;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 0 5px;
-  border: 1px solid #e0e4ea;
+  padding: 0 7px;
+  border: 1px solid #2b2b33;
   border-radius: 6px;
-  background: #fff;
-  color: #626c79;
+  background: #17171c;
+  color: #92929d;
   font-size: 7px;
   cursor: pointer;
 }
 
-.video-work-card > footer button.active {
-  border-color: #efd49a;
-  background: #fffaf0;
-  color: #bd7b13;
+.video-showcase-card > footer > button:hover,
+.video-task-actions button:hover {
+  border-color: #6657d2;
+  color: #d2c7ff;
+}
+
+.video-task-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.video-task-actions button {
+  width: 25px;
+  padding: 0;
+}
+
+.video-task-actions button.active {
+  border-color: #8f6f28;
+  color: #f1bc4d;
 }
 
 .video-empty {
   display: grid;
-  min-height: 540px;
+  min-height: 520px;
   place-items: center;
   align-content: center;
   gap: 8px;
-  border: 1px dashed #d9dfe9;
-  border-radius: 8px;
-  background:
-    linear-gradient(90deg, rgb(82 111 232 / 3%) 1px, transparent 1px),
-    linear-gradient(rgb(82 111 232 / 3%) 1px, transparent 1px), #fbfcfe;
-  background-size: 34px 34px;
+  border: 1px dashed #292931;
+  border-radius: 9px;
+  background: rgb(18 18 22 / 72%);
   text-align: center;
 }
 
 .video-empty > span {
   display: grid;
-  width: 58px;
-  height: 58px;
+  width: 56px;
+  height: 56px;
   place-items: center;
   border-radius: 15px;
-  background: #edf0ff;
-  color: #526fe8;
-  font-size: 23px;
+  background: #211d3a;
+  color: #a992ff;
+  font-size: 22px;
 }
 
 .video-empty strong {
-  color: #424a51;
+  color: #d9d9df;
   font-size: 12px;
 }
 
 .video-empty p {
   margin: 0;
-  color: #949ca2;
+  color: #74747e;
   font-size: 8px;
 }
 
-.video-empty > div {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.video-empty button {
+  height: 30px;
   margin-top: 5px;
-  padding: 6px 9px;
-  border: 1px solid #e5e8ef;
-  border-radius: 999px;
-  color: #7e8794;
-  font-size: 7px;
+  padding: 0 11px;
+  border: 1px solid #4f438e;
+  border-radius: 7px;
+  background: #1b1830;
+  color: #c4b6ff;
+  font-size: 8px;
+  cursor: pointer;
 }
 
-@media (max-width: 1060px) {
-  .video-layout {
-    grid-template-columns: 350px minmax(0, 1fr);
+@media (max-width: 1180px) {
+  .video-workbench {
+    grid-template-columns: 72px 285px minmax(0, 1fr);
+  }
+
+  .video-showcase-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
 }
 
-@media (max-width: 820px) {
-  .video-studio {
-    padding: 20px 14px 44px;
+@media (max-width: 900px) {
+  .video-toolbar {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 
-  .video-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .video-header__switch {
+  .video-toolbar__nav {
+    order: 3;
     width: 100%;
     overflow-x: auto;
   }
 
-  .video-header__switch a {
-    flex: 1 0 auto;
-    justify-content: center;
+  .video-toolbar__nav a {
+    flex: 0 0 auto;
   }
 
-  .video-layout {
-    grid-template-columns: 1fr;
+  .video-workbench {
+    grid-template-columns: 70px minmax(0, 1fr);
   }
 
-  .video-panel {
-    position: static;
+  .video-model-rail {
+    grid-row: 1 / span 2;
+  }
+
+  .video-control-panel {
+    border-right: 0;
+    border-bottom: 1px solid #1d1e23;
+  }
+
+  .video-gallery {
+    grid-column: 2;
   }
 }
 
-@media (max-width: 520px) {
-  .video-header h1 {
-    font-size: 23px;
+@media (max-width: 680px) {
+  .video-studio {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .video-toolbar {
+    margin-right: -10px;
+    margin-left: -10px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .video-toolbar__brand strong,
+  .video-toolbar__status > span {
+    display: none;
+  }
+
+  .video-toolbar__status {
+    margin-left: auto;
+  }
+
+  .video-workbench {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .video-model-rail {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+    overflow-x: auto;
+    padding: 8px 5px;
+    border-right: 0;
+    border-bottom: 1px solid #1d1e23;
+    scrollbar-width: none;
+  }
+
+  .video-model-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .video-model-rail__label,
+  .video-model-rail__footer {
+    display: none;
+  }
+
+  .video-model-rail button {
+    min-width: 59px;
+    padding: 5px 4px;
+  }
+
+  .video-control-panel {
+    padding-top: 12px;
+    border-bottom: 0;
+  }
+
+  .video-gallery {
+    padding: 15px 5px 34px;
+  }
+
+  .video-gallery__header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .video-showcase-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .video-showcase-card > footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .video-showcase-card > footer > button {
+    width: 100%;
+  }
+
+  .video-task-actions {
+    width: 100%;
+  }
+
+  .video-task-actions button {
+    flex: 1;
+  }
+}
+
+@media (max-width: 400px) {
+  .video-showcase-grid {
+    grid-template-columns: 1fr;
   }
 
   .video-mode-grid {
@@ -1541,22 +1878,14 @@ onBeforeUnmount(() => {
   }
 
   .video-mode-grid button {
-    min-height: 46px;
     grid-template-columns: auto 1fr auto;
     justify-items: start;
-    padding: 0 11px;
+    padding: 0 10px;
   }
 
-  .video-work-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .video-source-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .video-empty {
-    min-height: 380px;
+  .video-mode-grid button > :deep(svg:last-child) {
+    position: static;
+    opacity: 1;
   }
 }
 </style>
