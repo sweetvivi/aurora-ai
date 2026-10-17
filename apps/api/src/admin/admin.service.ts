@@ -20,13 +20,17 @@ import type { UpdateModelConfigDto } from './dto/update-model-config.dto';
 import type { UpdateProviderConfigDto } from './dto/update-provider-config.dto';
 import { ProviderProbeService } from './provider-probe.service';
 
-type Capability = 'chat' | 'embedding' | 'image' | 'video';
+type Capability = 'chat' | 'embedding' | 'image' | 'video' | 'vision';
 
-const capabilityToDatabase: Record<Capability, 'CHAT' | 'EMBEDDING' | 'IMAGE' | 'VIDEO'> = {
+const capabilityToDatabase: Record<
+  Capability,
+  'CHAT' | 'EMBEDDING' | 'IMAGE' | 'VIDEO' | 'VISION'
+> = {
   chat: 'CHAT',
   embedding: 'EMBEDDING',
   image: 'IMAGE',
   video: 'VIDEO',
+  vision: 'VISION',
 };
 
 const userSelect = {

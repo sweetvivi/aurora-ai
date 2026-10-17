@@ -85,7 +85,7 @@ export interface AdminProvider {
 
 export interface AdminModel {
   alias: string;
-  capabilities: Array<'CHAT' | 'EMBEDDING' | 'IMAGE' | 'VIDEO'>;
+  capabilities: Array<'CHAT' | 'EMBEDDING' | 'IMAGE' | 'VIDEO' | 'VISION'>;
   contextWindow: number | null;
   createdAt: string;
   displayName: string;
@@ -117,7 +117,7 @@ export interface ModuleDisplayConfig {
 }
 
 export interface AdminProviderProbeModel {
-  capabilities: Array<'chat' | 'embedding' | 'image' | 'video'>;
+  capabilities: Array<'chat' | 'embedding' | 'image' | 'video' | 'vision'>;
   displayName: string;
   providerModel: string;
   suggestedAlias: string;
@@ -150,7 +150,7 @@ export interface AuthResult {
 
 export interface ChatModel {
   alias: string;
-  capabilities: Array<'chat' | 'embedding' | 'image' | 'video'>;
+  capabilities: Array<'chat' | 'embedding' | 'image' | 'video' | 'vision'>;
   displayName: string;
 }
 
@@ -161,6 +161,13 @@ export interface FileAsset {
   mimeType: string;
   originalName: string;
   size: number;
+}
+
+export interface ConversationAttachment {
+  file: FileAsset;
+  fileId: string;
+  id: string;
+  sortOrder: number;
 }
 
 export type ImageTaskStatus = 'CANCELLED' | 'FAILED' | 'QUEUED' | 'RUNNING' | 'SUCCEEDED';
@@ -209,6 +216,7 @@ export interface ConversationSummary {
 }
 
 export interface ConversationMessage {
+  attachments?: ConversationAttachment[];
   content: string;
   createdAt: string;
   id: string;
@@ -507,7 +515,7 @@ export async function probeAdminProvider(
 }
 
 export async function fetchAdminModels(params: {
-  capability?: 'chat' | 'embedding' | 'image' | 'video';
+  capability?: 'chat' | 'embedding' | 'image' | 'video' | 'vision';
   enabled?: boolean;
   providerCode?: string;
   search?: string;
@@ -522,7 +530,7 @@ export async function fetchAdminModels(params: {
 
 export async function createAdminModel(input: {
   alias: string;
-  capabilities: Array<'chat' | 'embedding' | 'image' | 'video'>;
+  capabilities: Array<'chat' | 'embedding' | 'image' | 'video' | 'vision'>;
   contextWindow?: number;
   displayName: string;
   enabled: boolean;
@@ -536,7 +544,7 @@ export async function createAdminModel(input: {
 
 export async function importAdminDiscoveredModels(input: {
   models: Array<{
-    capabilities: Array<'chat' | 'embedding' | 'image' | 'video'>;
+    capabilities: Array<'chat' | 'embedding' | 'image' | 'video' | 'vision'>;
     displayName: string;
     enabled?: boolean;
     providerModel: string;
@@ -567,7 +575,7 @@ export async function importAdminDiscoveredModels(input: {
 export async function updateAdminModel(
   modelId: string,
   input: {
-    capabilities?: Array<'chat' | 'embedding' | 'image' | 'video'>;
+    capabilities?: Array<'chat' | 'embedding' | 'image' | 'video' | 'vision'>;
     contextWindow?: number;
     displayName?: string;
     enabled?: boolean;
@@ -819,6 +827,7 @@ export async function streamChat(
   input: {
     content: string;
     conversationId?: string;
+    fileIds?: string[];
     modelAlias?: string;
     systemPrompt?: string;
     temperature?: number;

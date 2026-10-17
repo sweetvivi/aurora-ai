@@ -237,6 +237,16 @@ AI 画布和电商工具复用同一异步图片任务 Store，并分别使用 `
 - `extraParameters` 写入 `replacementFileId`、`replacementMode`、`replacementResolution`、`replacementScope`、`mode` 和 `outputResolution`
 - 保留背景融合、图案替换、商品修图、抠图和试穿工具的原有提交流程
 
+### 对话图片附件与视觉模型
+
+- 数据模型：新增 `MessageAttachment` 和 `VISION` 能力，用户消息通过附件关联复用已有 `FileAsset`，不复制临时文件
+- 后端：`ChatService` 在积分冻结前校验附件归属、就绪状态、图片类型、每次最多 3 张和模型视觉能力；当前消息与最近 6 张历史图片会转换为 OpenAI-compatible 多模态 content parts
+- 历史恢复：会话详情只返回展示所需的文件元数据；前端用户消息显示最多 3 张缩略图，重新生成会携带原附件和文件 ID
+- 前端：`ChatComposer` 支持图片选择、预览、上传中、失败、移除和上传期间禁用发送；`MessageAttachments` 负责历史图片按需加载和 Object URL 释放
+- 响应式修复：上传完成的文件对象改为通过 Vue 响应式数组条目更新，避免界面一直显示“上传中”
+- 后台：模型能力选择新增“视觉”，模型能力标签在管理页面统一显示
+- 验收：`node outputs/ui-reference/verify-chat-attachments.mjs` 覆盖桌面端 `1440x1000` 和移动端 `390x844`，使用 Playwright Mock，不调用真实 Provider、不读取或输出 Key
+
 ## 4. 验证记录
 
 以下命令已通过：
@@ -252,14 +262,15 @@ pnpm test
 
 测试规模：
 
-- Web：9 个测试文件，35 项通过
-- API：18 个测试文件，68 项通过
+- Web：10 个测试文件，37 项通过
+- API：18 个测试文件，73 项通过
 
 页面验收脚本：
 
 ```text
 outputs/ui-reference/verify-m2-routes.mjs
 outputs/ui-reference/verify-chat-markdown.mjs
+outputs/ui-reference/verify-chat-attachments.mjs
 ```
 
 使用本地开发服务器 `http://127.0.0.1:5173/` 检查了以下路由的 `1440x1000` 桌面端和 `390x844` 移动端：

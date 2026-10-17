@@ -4,7 +4,7 @@ import { IsBoolean, IsIn, IsOptional, IsString, MaxLength } from 'class-validato
 export class ListModelConfigsQueryDto {
   @IsOptional()
   @IsIn(['chat', 'image', 'video', 'embedding'])
-  capability?: 'chat' | 'embedding' | 'image' | 'video';
+  capability?: 'chat' | 'embedding' | 'image' | 'video' | 'vision';
 
   @IsOptional()
   @IsString()

@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { ProbeProviderDto } from './dto/probe-provider.dto';
 
-type DetectedCapability = 'chat' | 'embedding' | 'image' | 'video';
+type DetectedCapability = 'chat' | 'embedding' | 'image' | 'video' | 'vision';
 
 export interface DiscoveredProviderModel {
   capabilities: DetectedCapability[];
@@ -199,7 +199,7 @@ export class ProviderProbeService {
       .filter((item): item is string => typeof item === 'string')
       .map((item) => item.toLowerCase())
       .filter((item): item is DetectedCapability =>
-        ['chat', 'embedding', 'image', 'video'].includes(item),
+        ['chat', 'embedding', 'image', 'video', 'vision'].includes(item),
       );
 
     return [...new Set(normalized)];

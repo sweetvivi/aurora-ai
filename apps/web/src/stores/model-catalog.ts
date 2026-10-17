@@ -18,12 +18,12 @@ interface ModelCatalogState {
 const fallbackModels: ModelCatalogItem[] = [
   {
     alias: 'openai-gpt-6-astra',
-    capabilities: ['chat'],
+    capabilities: ['chat', 'vision'],
     displayName: 'GPT-6 Astra',
   },
   {
     alias: 'openai-gpt-6-sol',
-    capabilities: ['chat'],
+    capabilities: ['chat', 'vision'],
     displayName: 'GPT-6 Sol',
   },
   {
@@ -177,5 +177,10 @@ export function normalizeModels(models: ChatModel[]): ModelCatalogItem[] {
 }
 
 function isSupportedCapability(capability: string): capability is ModelCapability {
-  return capability === 'chat' || capability === 'image' || capability === 'video';
+  return (
+    capability === 'chat' ||
+    capability === 'image' ||
+    capability === 'video' ||
+    capability === 'vision'
+  );
 }

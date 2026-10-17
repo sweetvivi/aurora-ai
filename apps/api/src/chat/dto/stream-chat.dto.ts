@@ -1,5 +1,16 @@
 import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class StreamChatDto {
   @IsOptional()
@@ -11,6 +22,14 @@ export class StreamChatDto {
   @MinLength(1)
   @MaxLength(20_000)
   content!: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(128, { each: true })
+  fileIds?: string[];
 
   @IsOptional()
   @IsString()

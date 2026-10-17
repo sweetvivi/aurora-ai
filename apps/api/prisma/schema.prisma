@@ -12,6 +12,7 @@ enum ProviderKind {
 
 enum ModelCapability {
   CHAT
+  VISION
   IMAGE
   VIDEO
   EMBEDDING
@@ -245,10 +246,25 @@ model Message {
   createdAt      DateTime      @default(now())
   conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments    MessageAttachment[]
 
   @@index([conversationId, createdAt])
   @@index([userId, createdAt])
   @@map("messages")
+}
+
+model MessageAttachment {
+  id        String   @id @default(cuid())
+  messageId String
+  fileId    String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  file      FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, fileId])
+  @@index([fileId])
+  @@map("message_attachments")
 }
 
 model ChatRequest {
@@ -291,6 +307,7 @@ model FileAsset {
   videoSourceTasks VideoTask[]     @relation("VideoTaskSourceFrame")
   videoLastFrameTasks VideoTask[]  @relation("VideoTaskLastFrame")
   videoResultTasks VideoTask[]     @relation("VideoTaskResult")
+  messageAttachments MessageAttachment[]
 
   @@index([userId, createdAt])
   @@map("file_assets")

@@ -43,6 +43,25 @@ export class ConversationsService {
     const conversation = await this.prismaService.conversation.findFirst({
       include: {
         messages: {
+          include: {
+            attachments: {
+              include: {
+                file: {
+                  select: {
+                    checksum: true,
+                    createdAt: true,
+                    id: true,
+                    mimeType: true,
+                    originalName: true,
+                    size: true,
+                  },
+                },
+              },
+              orderBy: {
+                sortOrder: 'asc',
+              },
+            },
+          },
           orderBy: { createdAt: 'asc' },
         },
       },
@@ -56,7 +75,18 @@ export class ConversationsService {
       throw this.notFound();
     }
 
-    return conversation;
+    return {
+      ...conversation,
+      messages: conversation.messages.map((message) => ({
+        ...message,
+        attachments: message.attachments.map((attachment) => ({
+          file: attachment.file,
+          fileId: attachment.fileId,
+          id: attachment.id,
+          sortOrder: attachment.sortOrder,
+        })),
+      })),
+    };
   }
 
   async getOwnedConversation(userId: string, conversationId: string): Promise<Conversation> {

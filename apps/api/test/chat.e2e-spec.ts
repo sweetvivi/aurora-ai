@@ -1,6 +1,6 @@
 import { ServiceUnavailableException, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
@@ -12,12 +12,23 @@ import type {
   StreamChatRequest,
 } from '../src/providers/llm-provider';
 import { LLM_PROVIDER } from '../src/providers/llm-provider';
+import {
+  STORAGE_ADAPTER,
+  type SaveFileInput,
+  type StorageAdapter,
+} from '../src/storage/storage.types';
+
+const PNG_BUFFER = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
 
 describe('chat and conversation endpoints', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let providerMode: 'failure' | 'success';
   let lastProviderRequest: StreamChatRequest | null;
+  const storage = new MemoryStorageAdapter();
 
   const provider: LlmProvider = {
     async *streamChat(input: StreamChatRequest): AsyncGenerator<StreamChatEvent> {
@@ -45,6 +56,8 @@ describe('chat and conversation endpoints', () => {
     })
       .overrideProvider(LLM_PROVIDER)
       .useValue(provider)
+      .overrideProvider(STORAGE_ADAPTER)
+      .useValue(storage)
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -61,6 +74,7 @@ describe('chat and conversation endpoints', () => {
         },
       },
     });
+    storage.clear();
     await app.close();
   });
 
@@ -77,12 +91,12 @@ describe('chat and conversation endpoints', () => {
       expect.arrayContaining([
         expect.objectContaining({
           alias: 'openai-gpt-6-astra',
-          capabilities: ['chat'],
+          capabilities: ['chat', 'vision'],
           displayName: 'GPT-6 Astra',
         }),
         expect.objectContaining({
           alias: 'openai-gpt-6-sol',
-          capabilities: ['chat'],
+          capabilities: ['chat', 'vision'],
           displayName: 'GPT-6 Sol',
         }),
         expect.objectContaining({
@@ -152,6 +166,284 @@ describe('chat and conversation endpoints', () => {
       id: conversationId,
       messages: [],
     });
+  });
+
+  it('sends an owned image attachment and restores it from conversation history', async () => {
+    providerMode = 'success';
+    lastProviderRequest = null;
+    const { accessToken } = await registerUser();
+    const fileId = await uploadImage(accessToken, 'reference.png');
+    const idempotencyKey = randomUUID();
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/chat/stream')
+      .set('authorization', `Bearer ${accessToken}`)
+      .set('idempotency-key', idempotencyKey)
+      .send({
+        content: '请描述这张图片',
+        fileIds: [fileId],
+        modelAlias: 'openai-gpt-6-astra',
+      })
+      .expect(200);
+
+    const meta = readEvent(response.text, 'meta') as {
+      conversationId: string;
+      requestId: string;
+    };
+
+    const firstProviderRequest = lastProviderRequest as StreamChatRequest | null;
+
+    expect(firstProviderRequest?.messages.at(-1)).toMatchObject({
+      content: [
+        {
+          text: '请描述这张图片',
+          type: 'text',
+        },
+        {
+          image_url: {
+            url: expect.stringMatching(/^data:image\/png;base64,/),
+          },
+          type: 'image_url',
+        },
+      ],
+      role: 'user',
+    });
+
+    const persistedMessage = await prisma.message.findFirstOrThrow({
+      include: {
+        attachments: true,
+      },
+      where: {
+        requestId: meta.requestId,
+        role: 'USER',
+      },
+    });
+
+    expect(persistedMessage.attachments).toHaveLength(1);
+    expect(persistedMessage.attachments[0]).toMatchObject({
+      fileId,
+      sortOrder: 0,
+    });
+
+    const detailResponse = await request(app.getHttpServer())
+      .get(`/api/v1/conversations/${meta.conversationId}`)
+      .set('authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(detailResponse.body.data.messages[0].attachments[0]).toMatchObject({
+      file: {
+        id: fileId,
+        mimeType: 'image/png',
+        originalName: 'reference.png',
+      },
+      fileId,
+      sortOrder: 0,
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/chat/stream')
+      .set('authorization', `Bearer ${accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        content: '再概括一下',
+        conversationId: meta.conversationId,
+        modelAlias: 'openai-gpt-6-astra',
+      })
+      .expect(200);
+
+    const secondProviderRequest = lastProviderRequest as StreamChatRequest | null;
+    const historicalImageMessage = secondProviderRequest?.messages.find(
+      (message) =>
+        Array.isArray(message.content) && message.content.some((part) => part.type === 'image_url'),
+    );
+
+    expect(historicalImageMessage).toMatchObject({
+      content: [
+        {
+          text: '请描述这张图片',
+          type: 'text',
+        },
+        {
+          type: 'image_url',
+        },
+      ],
+      role: 'user',
+    });
+  });
+
+  it('rejects missing, unavailable, or foreign attachments before reserving points', async () => {
+    const owner = await registerUser();
+    const otherUser = await registerUser();
+    const fileId = await uploadImage(owner.accessToken, 'owner.png');
+
+    const foreignResponse = await request(app.getHttpServer())
+      .post('/api/v1/chat/stream')
+      .set('authorization', `Bearer ${otherUser.accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        content: '分析图片',
+        fileIds: [fileId],
+        modelAlias: 'openai-gpt-6-astra',
+      })
+      .expect(404);
+
+    expect(foreignResponse.body.error.code).toBe('FILE_NOT_FOUND');
+
+    await prisma.fileAsset.update({
+      data: {
+        status: 'DELETED',
+      },
+      where: {
+        id: fileId,
+      },
+    });
+
+    const unavailableResponse = await request(app.getHttpServer())
+      .post('/api/v1/chat/stream')
+      .set('authorization', `Bearer ${owner.accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        content: '分析图片',
+        fileIds: [fileId],
+        modelAlias: 'openai-gpt-6-astra',
+      })
+      .expect(404);
+
+    expect(unavailableResponse.body.error.code).toBe('FILE_NOT_FOUND');
+
+    const missingResponse = await request(app.getHttpServer())
+      .post('/api/v1/chat/stream')
+      .set('authorization', `Bearer ${owner.accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        content: '分析图片',
+        fileIds: [randomUUID()],
+        modelAlias: 'openai-gpt-6-astra',
+      })
+      .expect(404);
+
+    expect(missingResponse.body.error.code).toBe('FILE_NOT_FOUND');
+
+    const ownerRecord = await prisma.user.findUniqueOrThrow({
+      where: {
+        email: owner.email,
+      },
+    });
+    const otherRecord = await prisma.user.findUniqueOrThrow({
+      where: {
+        email: otherUser.email,
+      },
+    });
+
+    expect(ownerRecord.pointsBalance).toBe(100);
+    expect(otherRecord.pointsBalance).toBe(100);
+    expect(
+      await prisma.chatRequest.count({
+        where: {
+          userId: {
+            in: [ownerRecord.id, otherRecord.id],
+          },
+        },
+      }),
+    ).toBe(0);
+  });
+
+  it('rejects image attachments for non-vision models and more than three files', async () => {
+    const { accessToken, email } = await registerUser();
+    const fileId = await uploadImage(accessToken, 'reference.png');
+
+    const nonVisionResponse = await request(app.getHttpServer())
+      .post('/api/v1/chat/stream')
+      .set('authorization', `Bearer ${accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        content: '分析图片',
+        fileIds: [fileId],
+        modelAlias: 'deepseek-v4-pro-0813',
+      })
+      .expect(409);
+
+    expect(nonVisionResponse.body.error.code).toBe('CHAT_MODEL_VISION_UNSUPPORTED');
+
+    const limitResponse = await request(app.getHttpServer())
+      .post('/api/v1/chat/stream')
+      .set('authorization', `Bearer ${accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        content: '分析图片',
+        fileIds: [randomUUID(), randomUUID(), randomUUID(), randomUUID()],
+        modelAlias: 'openai-gpt-6-astra',
+      })
+      .expect(400);
+
+    expect(limitResponse.body.error.code).toBe('BAD_REQUEST');
+
+    const user = await prisma.user.findUniqueOrThrow({
+      where: {
+        email,
+      },
+    });
+
+    expect(user.pointsBalance).toBe(100);
+    expect(
+      await prisma.chatRequest.count({
+        where: {
+          userId: user.id,
+        },
+      }),
+    ).toBe(0);
+  });
+
+  it('keeps attachment history consistent when the provider fails', async () => {
+    providerMode = 'failure';
+    const { accessToken, email } = await registerUser();
+    const fileId = await uploadImage(accessToken, 'failure.png');
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/chat/stream')
+      .set('authorization', `Bearer ${accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        content: '这张图是什么',
+        fileIds: [fileId],
+        modelAlias: 'openai-gpt-6-astra',
+      })
+      .expect(200);
+
+    const errorEvent = readEvent(response.text, 'error') as {
+      requestId: string;
+    };
+    const requestRecord = await prisma.chatRequest.findUniqueOrThrow({
+      where: {
+        id: errorEvent.requestId,
+      },
+    });
+    const userMessage = await prisma.message.findFirstOrThrow({
+      include: {
+        attachments: true,
+      },
+      where: {
+        requestId: errorEvent.requestId,
+        role: 'USER',
+      },
+    });
+    const assistantMessage = await prisma.message.findFirstOrThrow({
+      where: {
+        requestId: errorEvent.requestId,
+        role: 'ASSISTANT',
+      },
+    });
+    const user = await prisma.user.findUniqueOrThrow({
+      where: {
+        email,
+      },
+    });
+
+    expect(requestRecord.status).toBe('REFUNDED');
+    expect(user.pointsBalance).toBe(100);
+    expect(userMessage.attachments).toHaveLength(1);
+    expect(userMessage.attachments[0]?.fileId).toBe(fileId);
+    expect(assistantMessage.status).toBe('FAILED');
   });
 
   it('streams a completion, persists messages, and settles points once', async () => {
@@ -299,7 +591,55 @@ describe('chat and conversation endpoints', () => {
       email,
     };
   }
+
+  async function uploadImage(accessToken: string, filename: string): Promise<string> {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/files')
+      .set('authorization', `Bearer ${accessToken}`)
+      .attach('file', PNG_BUFFER, {
+        contentType: 'image/png',
+        filename,
+      })
+      .expect(201);
+
+    return response.body.data.id as string;
+  }
 });
+
+class MemoryStorageAdapter implements StorageAdapter {
+  private readonly files = new Map<string, Buffer>();
+
+  async save(input: SaveFileInput) {
+    const storageKey = `chat-test/${input.userId}/${randomUUID()}.${input.extension}`;
+    const buffer = Buffer.from(input.buffer);
+
+    this.files.set(storageKey, buffer);
+
+    return {
+      checksum: createHash('sha256').update(buffer).digest('hex'),
+      size: buffer.length,
+      storageKey,
+    };
+  }
+
+  async read(storageKey: string): Promise<Buffer> {
+    const buffer = this.files.get(storageKey);
+
+    if (!buffer) {
+      throw new Error(`Missing memory file: ${storageKey}`);
+    }
+
+    return Buffer.from(buffer);
+  }
+
+  async delete(storageKey: string): Promise<void> {
+    this.files.delete(storageKey);
+  }
+
+  clear(): void {
+    this.files.clear();
+  }
+}
 
 function readEvent(body: string, eventName: string): unknown {
   const block = body

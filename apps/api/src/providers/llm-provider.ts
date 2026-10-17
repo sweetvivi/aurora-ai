@@ -1,5 +1,18 @@
+export type ChatContentPart =
+  | {
+      text: string;
+      type: 'text';
+    }
+  | {
+      image_url: {
+        detail?: 'auto' | 'high' | 'low';
+        url: string;
+      };
+      type: 'image_url';
+    };
+
 export interface ChatMessage {
-  content: string;
+  content: ChatContentPart[] | string;
   role: 'assistant' | 'system' | 'user';
 }
 

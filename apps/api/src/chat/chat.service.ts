@@ -1,22 +1,32 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
+import type { FileAsset } from '@prisma/client';
 import type { Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import type { ChatMessage, LlmProvider, StreamChatEvent } from '../providers/llm-provider';
+import type {
+  ChatContentPart,
+  ChatMessage,
+  LlmProvider,
+  StreamChatEvent,
+} from '../providers/llm-provider';
 import { LLM_PROVIDER } from '../providers/llm-provider';
 import { ConversationsService } from '../conversations/conversations.service';
+import { FilesService } from '../files/files.service';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
 import { ModelRegistryService } from '../models/model-registry.service';
 import { PointsService } from '../points/points.service';
 
 const MAX_HISTORY_MESSAGES = 40;
+const MAX_HISTORY_IMAGE_ATTACHMENTS = 6;
 const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
+const MAX_MESSAGE_ATTACHMENTS = 3;
 const STREAM_HEARTBEAT_MS = 15_000;
 
 interface StreamChatInput {
   content: string;
   conversationId?: string;
+  fileIds?: string[];
   idempotencyKey: string;
   modelAlias?: string;
   systemPrompt?: string;
@@ -54,6 +64,7 @@ export class ChatService {
     @Inject(LLM_PROVIDER) private readonly llmProvider: LlmProvider,
     private readonly configService: ConfigService,
     private readonly conversationsService: ConversationsService,
+    private readonly filesService: FilesService,
     private readonly modelRegistryService: ModelRegistryService,
     private readonly pointsService: PointsService,
     private readonly prismaService: PrismaService,
@@ -130,12 +141,23 @@ export class ChatService {
   }
 
   private async prepare(input: StreamChatInput, idempotencyKey: string): Promise<PreparedChat> {
-    const conversation = input.conversationId
+    const fileIds = [...new Set((input.fileIds ?? []).map((fileId) => fileId.trim()))].filter(
+      Boolean,
+    );
+
+    if (fileIds.length > MAX_MESSAGE_ATTACHMENTS) {
+      throw new ConflictException({
+        code: 'ATTACHMENT_LIMIT_EXCEEDED',
+        message: `每条消息最多上传 ${MAX_MESSAGE_ATTACHMENTS} 张图片`,
+      });
+    }
+
+    const existingConversation = input.conversationId
       ? await this.conversationsService.getOwnedConversation(input.userId, input.conversationId)
-      : await this.conversationsService.create(input.userId, {});
+      : undefined;
     const requestedModelAlias =
       input.modelAlias ??
-      conversation.modelAlias ??
+      existingConversation?.modelAlias ??
       this.modelRegistryService.getDefaultChatModel().alias;
     const model = this.modelRegistryService.getByAlias(requestedModelAlias);
 
@@ -146,8 +168,49 @@ export class ChatService {
       });
     }
 
+    const attachmentAssets = await this.filesService.getOwnedAssets(input.userId, fileIds);
+
+    if (attachmentAssets.some((asset) => !asset.mimeType.startsWith('image/'))) {
+      throw new ConflictException({
+        code: 'CHAT_ATTACHMENT_UNSUPPORTED',
+        message: '当前仅支持在对话中发送图片附件',
+      });
+    }
+
+    if (attachmentAssets.length > 0 && !model.capabilities.includes('vision')) {
+      throw new ConflictException({
+        code: 'CHAT_MODEL_VISION_UNSUPPORTED',
+        message: '当前模型不支持图片，请切换到具有视觉能力的模型',
+      });
+    }
+
+    const attachmentParts: ChatContentPart[] = [];
+
+    for (const asset of attachmentAssets) {
+      const buffer = await this.filesService.readAssetContent(asset);
+
+      attachmentParts.push({
+        image_url: {
+          url: `data:${asset.mimeType};base64,${buffer.toString('base64')}`,
+        },
+        type: 'image_url',
+      });
+    }
+
+    const conversation =
+      existingConversation ?? (await this.conversationsService.create(input.userId, {}));
     const history = (
       await this.prismaService.message.findMany({
+        include: {
+          attachments: {
+            include: {
+              file: true,
+            },
+            orderBy: {
+              sortOrder: 'asc',
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
         take: MAX_HISTORY_MESSAGES,
         where: {
@@ -164,6 +227,37 @@ export class ChatService {
     const occurredAt = new Date();
     const content = input.content.trim();
     const systemPrompt = input.systemPrompt?.trim();
+    const recentHistoryAttachmentIds = collectRecentHistoryAttachmentIds(history);
+    const historyMessages: ChatMessage[] = [];
+
+    for (const message of history) {
+      const role = message.role.toLowerCase() as ChatMessage['role'];
+
+      if (role === 'user' && message.attachments.length > 0) {
+        const parts: ChatContentPart[] = [
+          {
+            text: message.content,
+            type: 'text',
+          },
+        ];
+
+        for (const attachment of message.attachments) {
+          if (recentHistoryAttachmentIds.has(attachment.id)) {
+            parts.push(await this.toImagePart(attachment.file));
+          }
+        }
+
+        historyMessages.push({
+          content: parts,
+          role,
+        });
+      } else {
+        historyMessages.push({
+          content: message.content,
+          role,
+        });
+      }
+    }
 
     if (!content) {
       throw new ConflictException({
@@ -197,6 +291,15 @@ export class ChatService {
             userId: input.userId,
           },
         });
+        if (fileIds.length > 0) {
+          await transaction.messageAttachment.createMany({
+            data: fileIds.map((fileId, sortOrder) => ({
+              fileId,
+              messageId: userMessageId,
+              sortOrder,
+            })),
+          });
+        }
         await transaction.message.create({
           data: {
             content: '',
@@ -261,12 +364,12 @@ export class ChatService {
               },
             ]
           : []),
-        ...history.map((message) => ({
-          content: message.content,
-          role: message.role.toLowerCase() as ChatMessage['role'],
-        })),
+        ...historyMessages,
         {
-          content,
+          content:
+            attachmentParts.length > 0
+              ? [{ text: content, type: 'text' as const }, ...attachmentParts]
+              : content,
           role: 'user',
         },
       ],
@@ -468,6 +571,17 @@ export class ChatService {
     return normalized.length > 36 ? `${normalized.slice(0, 36)}...` : normalized;
   }
 
+  private async toImagePart(asset: FileAsset): Promise<ChatContentPart> {
+    const buffer = await this.filesService.readAssetContent(asset);
+
+    return {
+      image_url: {
+        url: `data:${asset.mimeType};base64,${buffer.toString('base64')}`,
+      },
+      type: 'image_url',
+    };
+  }
+
   private classifyError(error: unknown, aborted = false): ClassifiedError {
     if (aborted) {
       return {
@@ -507,4 +621,26 @@ export class ChatService {
 
     return messages[code] ?? '对话生成失败，本次积分已退回';
   }
+}
+
+function collectRecentHistoryAttachmentIds(
+  history: Array<{
+    attachments: Array<{
+      id: string;
+    }>;
+  }>,
+): Set<string> {
+  const attachmentIds = new Set<string>();
+
+  for (const message of [...history].reverse()) {
+    for (const attachment of message.attachments) {
+      attachmentIds.add(attachment.id);
+
+      if (attachmentIds.size >= MAX_HISTORY_IMAGE_ATTACHMENTS) {
+        return attachmentIds;
+      }
+    }
+  }
+
+  return attachmentIds;
 }

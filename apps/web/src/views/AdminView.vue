@@ -43,7 +43,7 @@ import { resolveModuleIcon, useModuleCatalogStore } from '@/stores/module-catalo
 import { useModelCatalogStore } from '@/stores/model-catalog';
 
 type AdminTab = 'models' | 'modules' | 'overview' | 'providers' | 'users';
-type ModelCapability = 'chat' | 'embedding' | 'image' | 'video';
+type ModelCapability = 'chat' | 'embedding' | 'image' | 'video' | 'vision';
 
 const moduleCatalogStore = useModuleCatalogStore();
 const modelCatalogStore = useModelCatalogStore();
@@ -187,6 +187,7 @@ const providerOptions = computed(() =>
 
 const capabilityOptions: Array<{ label: string; value: ModelCapability }> = [
   { label: '对话', value: 'chat' },
+  { label: '视觉', value: 'vision' },
   { label: '图片', value: 'image' },
   { label: '视频', value: 'video' },
   { label: '向量', value: 'embedding' },
@@ -495,12 +496,13 @@ async function importSelectedModels(): Promise<void> {
   }
 }
 
-function capabilityLabel(capability: 'chat' | 'embedding' | 'image' | 'video'): string {
+function capabilityLabel(capability: 'chat' | 'embedding' | 'image' | 'video' | 'vision'): string {
   return {
     chat: '对话',
     embedding: '向量',
     image: '图片',
     video: '视频',
+    vision: '视觉',
   }[capability];
 }
 
@@ -996,11 +998,13 @@ onMounted(() => {
                     :color="
                       capability === 'CHAT'
                         ? 'blue'
-                        : capability === 'IMAGE'
-                          ? 'purple'
-                          : capability === 'VIDEO'
-                            ? 'orange'
-                            : 'default'
+                        : capability === 'VISION'
+                          ? 'green'
+                          : capability === 'IMAGE'
+                            ? 'purple'
+                            : capability === 'VIDEO'
+                              ? 'orange'
+                              : 'default'
                     "
                   >
                     {{
@@ -1430,11 +1434,13 @@ onMounted(() => {
                   :color="
                     capability === 'chat'
                       ? 'blue'
-                      : capability === 'image'
-                        ? 'purple'
-                        : capability === 'video'
-                          ? 'orange'
-                          : 'default'
+                      : capability === 'vision'
+                        ? 'green'
+                        : capability === 'image'
+                          ? 'purple'
+                          : capability === 'video'
+                            ? 'orange'
+                            : 'default'
                   "
                 >
                   {{ capabilityLabel(capability) }}

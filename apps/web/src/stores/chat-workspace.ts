@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import {
   ApiError,
   type ChatModel,
+  type ConversationAttachment,
   type ConversationMessage,
   type ConversationSummary,
   fetchConversation,
@@ -14,7 +15,12 @@ import { useSessionStore } from './session';
 export type ChatMessageStatus = 'COMPLETED' | 'FAILED' | 'PENDING' | 'STREAMING';
 export type ChatWorkspaceStatus = 'error' | 'idle' | 'loading' | 'ready' | 'streaming';
 
+export interface ChatAttachment extends ConversationAttachment {
+  previewUrl?: string;
+}
+
 export interface ChatThreadMessage {
+  attachments: ChatAttachment[];
   content: string;
   createdAt: string;
   id: string;
@@ -132,7 +138,14 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
         this.status = 'error';
       }
     },
-    async sendMessage(rawContent: string, options: { appendUser?: boolean } = {}): Promise<void> {
+    async sendMessage(
+      rawContent: string,
+      options: {
+        appendUser?: boolean;
+        attachments?: ChatAttachment[];
+        fileIds?: string[];
+      } = {},
+    ): Promise<void> {
       const content = rawContent.trim();
 
       if (!content || this.streaming) {
@@ -157,10 +170,13 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
       const createdAt = new Date().toISOString();
       const assistantMessageId = createLocalId('assistant');
       const balanceBeforeRequest = sessionStore.points;
+      const attachments = options.attachments ?? [];
+      const fileIds = options.fileIds ?? attachments.map((attachment) => attachment.fileId);
 
       this.error = null;
       const nextMessages: ChatThreadMessage[] = [
         {
+          attachments: [],
           content: '',
           createdAt,
           id: assistantMessageId,
@@ -171,6 +187,7 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
 
       if (options.appendUser !== false) {
         nextMessages.unshift({
+          attachments,
           content,
           createdAt,
           id: createLocalId('user'),
@@ -188,6 +205,7 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
           {
             content,
             conversationId: this.currentConversationId ?? undefined,
+            fileIds: fileIds.length > 0 ? fileIds : undefined,
             modelAlias: this.selectedModelAlias || undefined,
           },
           {
@@ -284,7 +302,11 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
       }
 
       this.messages.splice(lastUserIndex + 1);
-      await this.sendMessage(lastUserMessage.content, { appendUser: false });
+      await this.sendMessage(lastUserMessage.content, {
+        appendUser: false,
+        attachments: lastUserMessage.attachments,
+        fileIds: lastUserMessage.attachments.map((attachment) => attachment.fileId),
+      });
     },
     stopStreaming(): void {
       activeStreamController?.abort();
@@ -295,6 +317,9 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
 
 function mapConversationMessage(message: ConversationMessage): ChatThreadMessage {
   return {
+    attachments: (message.attachments ?? []).map((attachment) => ({
+      ...attachment,
+    })),
     content: message.content || (message.status === 'FAILED' ? '生成失败' : ''),
     createdAt: message.createdAt,
     id: message.id,

@@ -206,4 +206,47 @@ describe('OpenAI compatible chat provider', () => {
       },
     });
   });
+
+  it('forwards multimodal content parts in the OpenAI chat completions payload', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createStreamResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new OpenAiCompatibleProvider(
+      new ConfigService({
+        LLM_API_KEY: 'default-key',
+        LLM_BASE_URL: 'https://default.example/v1',
+      }),
+    );
+    const messages = [
+      {
+        content: [
+          {
+            text: '描述图片',
+            type: 'text' as const,
+          },
+          {
+            image_url: {
+              url: 'data:image/png;base64,AAAA',
+            },
+            type: 'image_url' as const,
+          },
+        ],
+        role: 'user' as const,
+      },
+    ];
+
+    for await (const _event of provider.streamChat({
+      messages,
+      model: 'provider-model',
+      providerCode: 'jiguang',
+    })) {
+      // Consume the stream so the request is sent.
+    }
+
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const requestBody = JSON.parse(String(requestInit.body)) as {
+      messages: unknown;
+    };
+
+    expect(requestBody.messages).toEqual(messages);
+  });
 });

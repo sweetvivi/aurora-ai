@@ -28,6 +28,7 @@ import { useRoute } from 'vue-router';
 import ChartThumbnail from '@/components/ChartThumbnail.vue';
 import ChatComposer from '@/components/ChatComposer.vue';
 import MarkdownMessage from '@/components/MarkdownMessage.vue';
+import MessageAttachments from '@/components/MessageAttachments.vue';
 import { useChatWorkspaceStore } from '@/stores/chat-workspace';
 import { useSessionStore } from '@/stores/session';
 
@@ -230,15 +231,24 @@ function useSuggestion(value: string): void {
   prompt.value = value;
 }
 
-async function sendMessage(): Promise<void> {
+async function sendMessage(payload: { fileIds: string[] } = { fileIds: [] }): Promise<void> {
   const content = prompt.value.trim();
 
   if (!content || streaming.value) {
     return;
   }
 
+  const attachments = composerInput.value?.takeReadyAttachments() ?? [];
+  const fileIds =
+    payload.fileIds.length > 0
+      ? payload.fileIds
+      : attachments.map((attachment) => attachment.fileId);
+
   prompt.value = '';
-  await chatStore.sendMessage(content);
+  await chatStore.sendMessage(content, {
+    attachments,
+    fileIds,
+  });
   await scrollToBottom();
 }
 
@@ -292,7 +302,10 @@ async function retryLastPrompt(): Promise<void> {
     return;
   }
 
-  await chatStore.sendMessage(lastUserMessage.content);
+  await chatStore.sendMessage(lastUserMessage.content, {
+    attachments: lastUserMessage.attachments,
+    fileIds: lastUserMessage.attachments.map((attachment) => attachment.fileId),
+  });
   await scrollToBottom();
 }
 
@@ -438,6 +451,7 @@ function formatConversationTime(value: string | null): string {
           <ChatComposer
             ref="composerInput"
             v-model="prompt"
+            :attachment-enabled="sessionStore.authenticated"
             :can-send="canSend"
             :error="error"
             :model-name="selectedModel?.displayName ?? '智能模式'"
@@ -517,6 +531,10 @@ function formatConversationTime(value: string | null): string {
             ]"
           >
             <span>{{ message.role === 'assistant' ? '极' : '我' }}</span>
+            <MessageAttachments
+              v-if="message.role === 'user' && message.attachments.length > 0"
+              :attachments="message.attachments"
+            />
             <MarkdownMessage
               v-if="message.role === 'assistant' && message.status === 'COMPLETED'"
               class="chat-message__markdown"
@@ -583,6 +601,7 @@ function formatConversationTime(value: string | null): string {
         v-if="hasMessages"
         ref="composerInput"
         v-model="prompt"
+        :attachment-enabled="sessionStore.authenticated"
         :can-send="canSend"
         :error="error"
         :model-name="selectedModel?.displayName ?? '智能模式'"
@@ -1148,6 +1167,17 @@ function formatConversationTime(value: string | null): string {
   grid-row: 1;
   justify-self: end;
   background: #edf3ff;
+}
+
+.chat-message--user > .message-attachments {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+}
+
+.chat-message--user > .message-attachments + p {
+  grid-row: 2;
+  margin-top: 8px;
 }
 
 .chat-message p {

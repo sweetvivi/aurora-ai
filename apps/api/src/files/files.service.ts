@@ -79,6 +79,33 @@ export class FilesService {
     return asset;
   }
 
+  async getOwnedAssets(userId: string, fileIds: string[]): Promise<FileAsset[]> {
+    const uniqueFileIds = [...new Set(fileIds)];
+
+    if (uniqueFileIds.length === 0) {
+      return [];
+    }
+
+    const assets = await this.prismaService.fileAsset.findMany({
+      where: {
+        id: { in: uniqueFileIds },
+        status: 'READY',
+        userId,
+      },
+    });
+    const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+    const orderedAssets = uniqueFileIds.map((fileId) => assetsById.get(fileId));
+
+    if (orderedAssets.some((asset) => !asset)) {
+      throw new NotFoundException({
+        code: 'FILE_NOT_FOUND',
+        message: '附件不存在、尚未就绪或无权访问',
+      });
+    }
+
+    return orderedAssets as FileAsset[];
+  }
+
   async getMetadata(userId: string, fileId: string) {
     return this.toFileDto(await this.getOwnedAsset(userId, fileId));
   }

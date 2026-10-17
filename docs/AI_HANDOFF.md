@@ -31,7 +31,7 @@
 ## 当前进度
 
 - 已完成：M0 工程基础、M1 核心业务闭环、M2 六个优先工具首版、AI 画布和电商工具首版，以及 M3 管理后台、厂商模型探测、运行时模型注册表和模块展示管理。
-- 本地验证：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过；API 18 个文件 68 项，Web 7 个文件 27 项；模块管理、厂商探测、后台布局、画布、对话、绘画和工具页面的桌面与移动端验收均通过。
+- 本地验证：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过；API 18 个文件 73 项，Web 10 个文件 37 项；模块管理、厂商探测、后台布局、画布、对话、图片附件、绘画和工具页面的桌面与移动端验收均通过。
 - 下一步：继续按参考产品精修模型对话、AI 绘画、超级智能体、智能修图、图片生成和视频生成，并深化 AI 画布与电商工具；真实付费接口继续使用 Mock 或请求拦截验证。
 - Git 续接：当前分支 `main`。每次接手先用 `git status --short --branch` 和 `git log --oneline -8` 核验最新状态，不依赖本文件中的旧提交哈希判断。
 

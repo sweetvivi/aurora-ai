@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/com
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
 
-export type ModelCapability = 'chat' | 'image' | 'video' | 'embedding';
+export type ModelCapability = 'chat' | 'embedding' | 'image' | 'video' | 'vision';
 
 export interface RegisteredModel {
   alias: string;
@@ -17,14 +17,14 @@ export interface RegisteredModel {
 export const DEFAULT_MODELS: RegisteredModel[] = [
   {
     alias: 'openai-gpt-6-astra',
-    capabilities: ['chat'],
+    capabilities: ['chat', 'vision'],
     displayName: 'GPT-6 Astra',
     providerCode: 'jiguang',
     providerModel: 'gpt-6-astra',
   },
   {
     alias: 'openai-gpt-6-sol',
-    capabilities: ['chat'],
+    capabilities: ['chat', 'vision'],
     displayName: 'GPT-6 Sol',
     providerCode: 'jiguang',
     providerModel: 'gpt-6-sol',

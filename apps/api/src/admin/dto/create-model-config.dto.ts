@@ -15,7 +15,7 @@ import {
   MinLength,
 } from 'class-validator';
 
-const capabilities = ['chat', 'image', 'video', 'embedding'] as const;
+const capabilities = ['chat', 'embedding', 'image', 'video', 'vision'] as const;
 
 export class CreateModelConfigDto {
   @IsString()
@@ -42,7 +42,7 @@ export class CreateModelConfigDto {
 
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(4)
+  @ArrayMaxSize(5)
   @ArrayUnique()
   @IsIn(capabilities, { each: true })
   capabilities!: Array<(typeof capabilities)[number]>;

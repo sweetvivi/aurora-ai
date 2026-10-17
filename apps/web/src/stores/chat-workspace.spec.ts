@@ -291,4 +291,116 @@ describe('chat workspace store', () => {
     expect(chatStore.messages.filter((message) => message.role === 'user')).toHaveLength(1);
     expect(apiMocks.streamChat).toHaveBeenCalledTimes(2);
   });
+
+  it('sends file ids and restores attachment metadata from conversation history', async () => {
+    let streamInput: unknown;
+
+    apiMocks.streamChat.mockImplementation(
+      async (
+        input: unknown,
+        handlers: {
+          onDone: (event: {
+            assistantMessageId: string;
+            balance: number;
+            requestId: string;
+            status: 'COMPLETED';
+          }) => void;
+          onMeta: (event: {
+            assistantMessageId: string;
+            balance: number;
+            conversationId: string;
+            modelAlias: string;
+            pointsCost: number;
+            requestId: string;
+          }) => void;
+        },
+      ) => {
+        streamInput = input;
+        handlers.onMeta({
+          assistantMessageId: 'assistant-attachment',
+          balance: 99,
+          conversationId: 'conversation-attachment',
+          modelAlias: 'openai-gpt-6-astra',
+          pointsCost: 1,
+          requestId: 'request-attachment',
+        });
+        handlers.onDone({
+          assistantMessageId: 'assistant-attachment',
+          balance: 99,
+          requestId: 'request-attachment',
+          status: 'COMPLETED',
+        });
+      },
+    );
+
+    const file = {
+      checksum: 'checksum',
+      createdAt: '2026-10-18T00:00:00.000Z',
+      id: 'file-1',
+      mimeType: 'image/png',
+      originalName: 'reference.png',
+      size: 128,
+    };
+    const localAttachment = {
+      file,
+      fileId: file.id,
+      id: 'local-attachment',
+      previewUrl: 'blob:preview',
+      sortOrder: 0,
+    };
+    const sessionStore = useSessionStore();
+
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+
+    const chatStore = useChatWorkspaceStore();
+
+    await chatStore.initialize();
+    await chatStore.sendMessage('请分析图片', {
+      attachments: [localAttachment],
+    });
+
+    expect(streamInput).toMatchObject({
+      fileIds: ['file-1'],
+    });
+    expect(chatStore.messages[0]?.attachments[0]).toMatchObject(localAttachment);
+
+    apiMocks.fetchConversation.mockResolvedValue({
+      createdAt: '2026-10-18T00:00:00.000Z',
+      id: 'conversation-history',
+      lastMessageAt: '2026-10-18T00:01:00.000Z',
+      messages: [
+        {
+          attachments: [
+            {
+              file,
+              fileId: file.id,
+              id: 'persisted-attachment',
+              sortOrder: 0,
+            },
+          ],
+          content: '请分析图片',
+          createdAt: '2026-10-18T00:01:00.000Z',
+          id: 'message-1',
+          role: 'USER',
+          status: 'COMPLETED',
+        },
+      ],
+      modelAlias: 'openai-gpt-6-astra',
+      title: '图片分析',
+      updatedAt: '2026-10-18T00:01:00.000Z',
+      userId: authenticatedUser.id,
+    });
+
+    await chatStore.openConversation('conversation-history');
+
+    expect(chatStore.messages[0]?.attachments[0]).toMatchObject({
+      file,
+      fileId: file.id,
+      id: 'persisted-attachment',
+      sortOrder: 0,
+    });
+  });
 });
