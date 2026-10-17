@@ -21,6 +21,8 @@ describe('application routes', () => {
     expect(router.resolve('/image-generation').matched[0]?.meta.shell).toBe('platform');
     expect(router.resolve('/canvas').matched[0]?.meta.shell).toBe('platform');
     expect(router.resolve('/commerce').matched[0]?.meta.shell).toBe('platform');
+    expect(router.resolve('/canvas').name).toBe('ai-canvas');
+    expect(router.resolve('/commerce').name).toBe('commerce-tools');
     expect(router.resolve('/image-tools').name).toBe('smart-retouch');
     expect(router.resolve('/agents/create').matched[0]?.meta.shell).toBe('platform');
     expect(router.resolve('/agents/code-mentor').matched[0]?.meta.shell).toBe('media');

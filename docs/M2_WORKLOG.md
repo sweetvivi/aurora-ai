@@ -5,13 +5,13 @@
 ## 1. 当前分支和基线
 
 - 工作目录：`C:\Users\Administrator\Desktop\project2`
-- 分支：`feature/m2-tool-suite`
+- 分支：`main`
 - 分支起始提交：`5ced005 docs: mark m1 synchronization complete`
-- 当前阶段：M2 工具套件首版前端和本地工作流实现
+- 当前阶段：M2 工具套件首版、AI 画布与电商工具工作台实现
 
 ## 2. 本批范围
 
-按用户确认的优先级，六个模块进入首版：
+按用户确认的优先级，以下模块进入本批：
 
 1. 模型对话
 2. AI 绘画
@@ -19,8 +19,10 @@
 4. 智能修图
 5. 图片生成
 6. 视频生成
+7. AI 画布
+8. 电商工具
 
-AI 画布和电商工具只保留入口与独立占位页。参考产品其他板块继续保留位置，不进入本批实现。
+参考产品其他板块继续保留位置，不进入本批实现。
 
 ## 3. 已实现内容
 
@@ -44,13 +46,26 @@ AI 画布和电商工具只保留入口与独立占位页。参考产品其他�
 - 能力：文生视频、图生视频、首尾帧、镜头描述、提示词预设、模型、比例、时长、清晰度、本地进度、取消、重试、收藏、故事板下载和再创作
 - 边界：当前是本地演示任务，不调用 Seedance，不消耗真实视频额度
 
+### AI 画布
+
+- 路由：`/canvas`
+- 页面：`apps/web/src/views/CanvasStudioView.vue`
+- 能力：节点添加、选择、拖拽、删除、复制和连线，图片/输出/提示词节点，画布平移缩放，工作流面板、素材库、图片/视频历史、灵感面板、底部生成区和本地持久化
+- 素材分类：全部、角色、场景、物品、风格、声音、其他
+
+### 电商工具
+
+- 路由：`/commerce`
+- 页面：`apps/web/src/views/CommerceWorkbenchView.vue`
+- 能力：商品主图、商品换背景、模特试穿、多比例商拍，商品和模特素材上传、场景预设、比例、清晰度、数量、预览检查、快捷描述、历史、收藏、下载、删除和重试
+
 ### 导航和入口
 
 - `apps/web/src/layouts/PlatformShell.vue`
 - `apps/web/src/views/HomeView.vue`
 - `apps/web/src/views/FeaturePlaceholderView.vue`
 
-主侧栏和首页按六个优先模块排序；AI 画布、电商工具进入导航并显示独立占位。
+主侧栏和首页按六个优先模块排序；AI 画布、电商工具进入导航并加载独立工作台。
 
 ### 共享图片任务
 
@@ -58,6 +73,8 @@ AI 画布和电商工具只保留入口与独立占位页。参考产品其他�
 - `apps/web/src/stores/draw-workspace.spec.ts`
 
 图片任务记录新增 `tool` 和 `parameters`，绘画、智能修图和图片生成共享后端异步任务状态机，同时按工具隔离记录、重试参数和页面显示。
+
+AI 画布和电商工具复用同一异步图片任务 Store，并分别使用 `canvas` 和 `commerce` 工具键隔离记录。
 
 ## 4. 验证记录
 
@@ -96,6 +113,19 @@ outputs/ui-reference/verify-m2-routes.mjs
 
 结果：全部页面无横向溢出、无页面脚本错误；截图保存在本地忽略目录 `outputs/ui-reference/`。
 
+补充验证：
+
+```text
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+node outputs/ui-reference/verify-m2-routes.mjs
+```
+
+AI 画布和电商工具页面已人工检查，桌面端和移动端保持同一工具信息层级，未触发真实生成任务。
+
 ## 5. 密钥和外部调用边界
 
 - 本批验证没有读取或输出真实密钥
@@ -106,11 +136,10 @@ outputs/ui-reference/verify-m2-routes.mjs
 
 ## 6. 已知遗留
 
-- AI 画布和电商工具仍是占位页
 - 视频生成尚未接真实 provider，下载结果为故事板文本，不是视频文件
-- 智能修图和图片生成当前依赖既有图片模型别名与 Mock 图片任务能力，真实生图 provider 仍需单独接入和验收
+- 智能修图、图片生成、AI 画布和电商工具当前依赖既有图片模型别名与 Mock 图片任务能力，真实生图 provider 仍需单独接入和验收
 - 参考产品仍有未排期板块，当前只保留入口位置
-- 本批在提交前的改动尚未推送
+- 本批已完成本地验证，提交和推送状态以 Git 日志为准
 
 ## 7. 中断恢复
 

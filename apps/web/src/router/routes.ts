@@ -82,7 +82,7 @@ export const appRoutes: RouteRecordRaw[] = [
       {
         path: 'canvas',
         name: 'ai-canvas',
-        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        component: () => import('@/views/CanvasStudioView.vue'),
         meta: {
           title: 'AI 画布',
         },
@@ -90,7 +90,7 @@ export const appRoutes: RouteRecordRaw[] = [
       {
         path: 'commerce',
         name: 'commerce-tools',
-        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        component: () => import('@/views/CommerceWorkbenchView.vue'),
         meta: {
           title: '电商工具',
         },
