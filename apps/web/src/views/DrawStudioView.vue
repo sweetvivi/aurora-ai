@@ -20,8 +20,10 @@ import {
   ReloadOutlined,
   SearchOutlined,
   ScissorOutlined,
+  ShopOutlined,
   StarOutlined,
   ThunderboltFilled,
+  VideoCameraOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -71,14 +73,11 @@ interface ReferenceImage {
 const navigation: NavigationItem[] = [
   { icon: HomeOutlined, label: '首页', to: '/' },
   { icon: PictureOutlined, label: '作品广场', to: '/draw' },
-  { icon: BgColorsOutlined, label: 'AI 绘画', to: '/draw' },
-  { icon: HighlightOutlined, label: '智能修图', to: '/image-tools' },
-  { icon: AppstoreOutlined, label: '图片工具', to: '/map' },
 ];
 
 const modelAccents = ['#7a5cff', '#ff7043', '#20a66a', '#2f8ddb', '#d05b9a', '#d69a2d'];
 
-const topNavigation = ['做电商', '拍写真', '搞设计'];
+const topNavigation = ['做电商', '做视频', '拍写真', '搞设计'];
 const creationModes = ['文生图', '参考图重绘', '局部编辑', '商品图处理'];
 const ratios = ['智能比例', '1:1', '4:3', '3:4', '16:9', '9:16'];
 const amounts = [1, 2, 3, 4];
@@ -109,10 +108,10 @@ const creativeTypes: ToolItem[] = [
   },
   {
     accent: '#15966e',
-    description: '一次探索多组画面方案，适合风格比较和批量内容生产。',
-    glyph: '批',
-    label: '批量创作',
-    tags: ['多图生成', '风格探索', '批量输出'],
+    description: '让图片动起来，生成产品短片和创意镜头。',
+    glyph: '视',
+    label: 'AI 视频',
+    tags: ['图生视频', '文生视频', '视频特效'],
   },
   {
     accent: '#e28732',
@@ -265,6 +264,8 @@ const imageToolGroups: { label: string; tools: ToolItem[] }[] = [
 
 const prompt = ref('');
 const libraryQuery = ref('');
+const drawLibraryCollapsed = ref(false);
+const libraryToolsOpen = ref(true);
 const modelCatalog = useModelCatalogStore();
 const currentModel = ref(modelCatalog.resolveAlias('image'));
 const selectedRatio = ref('智能比例');
@@ -310,6 +311,22 @@ const filteredModels = computed(() => {
   }
 
   return models.value.filter((model) => model.label.toLowerCase().includes(query));
+});
+const filteredImageToolGroups = computed(() => {
+  const query = libraryQuery.value.trim().toLowerCase();
+
+  if (!query) {
+    return imageToolGroups;
+  }
+
+  return imageToolGroups
+    .map((group) => ({
+      ...group,
+      tools: group.tools.filter((tool) =>
+        `${tool.label} ${tool.description}`.toLowerCase().includes(query),
+      ),
+    }))
+    .filter((group) => group.tools.length > 0);
 });
 
 const selectedModelLabel = computed(
@@ -461,6 +478,58 @@ function openGenerator(options: { auto?: boolean; mode?: string } = {}): void {
   });
 }
 
+function toggleDrawLibrary(): void {
+  drawLibraryCollapsed.value = !drawLibraryCollapsed.value;
+}
+
+function handleLibraryTool(item: ToolItem): void {
+  handleImageTool(item);
+
+  if (window.innerWidth < 980) {
+    drawLibraryCollapsed.value = true;
+  }
+}
+
+function handleCreativeTag(item: ToolItem, tag: string): void {
+  if (/视频/.test(tag)) {
+    void router.push('/video');
+    return;
+  }
+
+  if (/商品|电商/.test(tag)) {
+    void router.push('/commerce');
+    return;
+  }
+
+  if (/抠图/.test(tag)) {
+    openRetouch('cutout');
+    return;
+  }
+
+  if (/扩图|放大|裁剪/.test(tag)) {
+    openRetouch('upscale');
+    return;
+  }
+
+  if (/修复|重绘/.test(tag)) {
+    openRetouch('enhance');
+    return;
+  }
+
+  openGenerator({
+    mode: item.label === 'AI 绘画' || item.label === '批量创作' ? '文生图' : '参考图重绘',
+  });
+}
+
+function handleCommerceTag(item: ToolItem): void {
+  if (item.label === '商品场景图') {
+    void router.push('/commerce');
+    return;
+  }
+
+  openGenerator({ mode: '商品图处理' });
+}
+
 function openTemplateRetouch(): void {
   void router.push({ name: 'smart-retouch' });
 }
@@ -564,6 +633,7 @@ function leaveGenerator(): void {
 function handleTopNavigation(item: string): void {
   const destinations: Record<string, () => void> = {
     做电商: () => void router.push('/commerce'),
+    做视频: () => void router.push('/video'),
     拍写真: () => openRetouch('restyle'),
     搞设计: () => void router.push('/canvas'),
   };
@@ -582,8 +652,13 @@ function handleCreativeType(item: ToolItem): void {
     return;
   }
 
+  if (item.label === 'AI 视频') {
+    void router.push('/video');
+    return;
+  }
+
   openGenerator({
-    mode: item.label === 'AI 绘画' || item.label === '批量创作' ? '文生图' : '参考图重绘',
+    mode: item.label === 'AI 绘画' ? '文生图' : '参考图重绘',
   });
 }
 
@@ -880,7 +955,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="draw-studio" :class="{ 'draw-studio--template': isTemplateView }">
+  <div
+    class="draw-studio"
+    :class="{
+      'draw-studio--library-collapsed': drawLibraryCollapsed,
+      'draw-studio--template': isTemplateView,
+    }"
+  >
     <aside class="draw-library">
       <header class="draw-library__header">
         <span class="draw-library__mark">
@@ -890,7 +971,12 @@ onBeforeUnmount(() => {
           <strong>极光 AI 绘画</strong>
           <small>Draw Studio</small>
         </span>
-        <button type="button" aria-label="收起绘画侧栏">
+        <button
+          type="button"
+          :aria-label="drawLibraryCollapsed ? '展开绘画侧栏' : '收起绘画侧栏'"
+          :title="drawLibraryCollapsed ? '展开绘画侧栏' : '收起绘画侧栏'"
+          @click="toggleDrawLibrary"
+        >
           <DownOutlined />
         </button>
       </header>
@@ -901,7 +987,7 @@ onBeforeUnmount(() => {
       </label>
 
       <nav class="draw-library__navigation" aria-label="绘画工具导航">
-        <RouterLink v-for="item in navigation" :key="item.label" :to="item.to">
+        <RouterLink v-for="item in navigation" :key="item.label" :to="item.to" :title="item.label">
           <component :is="item.icon" />
           <span>{{ item.label }}</span>
         </RouterLink>
@@ -924,6 +1010,43 @@ onBeforeUnmount(() => {
           <em v-if="model.badge">{{ model.badge }}</em>
           <CheckOutlined v-if="currentModel === model.value" />
         </button>
+      </section>
+
+      <section class="draw-library__tools">
+        <button
+          type="button"
+          class="draw-library__tools-toggle"
+          :aria-expanded="libraryToolsOpen"
+          @click="libraryToolsOpen = !libraryToolsOpen"
+        >
+          <span>
+            <AppstoreOutlined />
+            图片创作工具
+          </span>
+          <DownOutlined :class="{ open: libraryToolsOpen }" />
+        </button>
+
+        <div
+          v-if="libraryToolsOpen && filteredImageToolGroups.length"
+          class="draw-library__tool-groups"
+        >
+          <section v-for="group in filteredImageToolGroups" :key="group.label">
+            <strong>{{ group.label }}</strong>
+            <button
+              v-for="tool in group.tools"
+              :key="tool.label"
+              type="button"
+              :title="tool.label"
+              @click="handleLibraryTool(tool)"
+            >
+              <i :style="{ '--tool-accent': tool.accent }">{{ tool.glyph }}</i>
+              <span>
+                {{ tool.label }}
+                <small>{{ tool.description }}</small>
+              </span>
+            </button>
+          </section>
+        </div>
       </section>
 
       <section class="draw-library__shortcut">
@@ -1551,7 +1674,17 @@ onBeforeUnmount(() => {
               type="button"
               @click="handleTopNavigation(item)"
             >
-              <component :is="item === '搞设计' ? HighlightOutlined : PictureOutlined" />
+              <component
+                :is="
+                  item === '做电商'
+                    ? ShopOutlined
+                    : item === '做视频'
+                      ? VideoCameraOutlined
+                      : item === '拍写真'
+                        ? PictureOutlined
+                        : HighlightOutlined
+                "
+              />
               {{ item }}
               <DownOutlined />
             </button>
@@ -1680,7 +1813,14 @@ onBeforeUnmount(() => {
                 <p>{{ item.description }}</p>
               </div>
               <footer>
-                <button v-for="tag in item.tags" :key="tag" type="button">{{ tag }}</button>
+                <button
+                  v-for="tag in item.tags"
+                  :key="tag"
+                  type="button"
+                  @click.stop="handleCreativeTag(item, tag)"
+                >
+                  {{ tag }}
+                </button>
               </footer>
             </article>
           </div>
@@ -1703,17 +1843,10 @@ onBeforeUnmount(() => {
                 <h3>{{ item.label }}</h3>
                 <p>{{ item.description }}</p>
                 <div>
-                  <button type="button">{{ item.tags[0] }}</button>
-                  <button
-                    type="button"
-                    @click="
-                      openGenerator({
-                        mode: item.label === 'AI 商品套图' ? '商品图处理' : '参考图重绘',
-                      })
-                    "
-                  >
-                    立即使用
+                  <button type="button" @click="handleCommerceTag(item)">
+                    {{ item.tags[0] }}
                   </button>
+                  <button type="button" @click="handleCommerceTag(item)">立即使用</button>
                 </div>
               </div>
               <div class="draw-commerce-card__preview" aria-hidden="true">
@@ -1945,6 +2078,10 @@ onBeforeUnmount(() => {
   min-height: calc(100vh - 56px);
   grid-template-columns: 240px minmax(0, 1fr);
   background: #fff;
+}
+
+.draw-studio--library-collapsed {
+  grid-template-columns: 64px minmax(0, 1fr);
 }
 
 .draw-studio--template {
@@ -2197,6 +2334,165 @@ onBeforeUnmount(() => {
 
 .draw-library__shortcut button:hover {
   background: #f5f7fa;
+}
+
+.draw-library__tools {
+  padding: 11px 10px 13px;
+  border-bottom: 1px solid #f0f1f4;
+}
+
+.draw-library__tools-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #596271;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.draw-library__tools-toggle:hover {
+  background: #f6f8fa;
+}
+
+.draw-library__tools-toggle > span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.draw-library__tools-toggle :deep(svg) {
+  font-size: 11px;
+}
+
+.draw-library__tools-toggle :deep(svg:last-child) {
+  color: #9aa2ae;
+  font-size: 8px;
+  transition: transform 160ms ease;
+}
+
+.draw-library__tools-toggle :deep(svg:last-child.open) {
+  transform: rotate(180deg);
+}
+
+.draw-library__tool-groups {
+  display: grid;
+  gap: 11px;
+  padding: 7px 0 0;
+}
+
+.draw-library__tool-groups section {
+  display: grid;
+  gap: 2px;
+}
+
+.draw-library__tool-groups section > strong {
+  padding: 0 9px 4px;
+  color: #9aa2ae;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.draw-library__tool-groups section > button {
+  display: grid;
+  min-width: 0;
+  min-height: 41px;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #5e6978;
+  text-align: left;
+  cursor: pointer;
+}
+
+.draw-library__tool-groups section > button:hover {
+  background: #f3faf7;
+  color: #23765f;
+}
+
+.draw-library__tool-groups button i {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--tool-accent) 10%, white);
+  color: var(--tool-accent);
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.draw-library__tool-groups button > span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draw-library__tool-groups button small {
+  overflow: hidden;
+  color: #a0a7b2;
+  font-size: 7px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draw-studio--library-collapsed .draw-library__header {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 0;
+}
+
+.draw-studio--library-collapsed .draw-library__mark,
+.draw-studio--library-collapsed .draw-library__header > span:nth-child(2),
+.draw-studio--library-collapsed .draw-library__search,
+.draw-studio--library-collapsed .draw-library__models,
+.draw-studio--library-collapsed .draw-library__tools,
+.draw-studio--library-collapsed .draw-library__shortcut {
+  display: none;
+}
+
+.draw-studio--library-collapsed .draw-library__header button {
+  width: 32px;
+  height: 32px;
+}
+
+.draw-studio--library-collapsed .draw-library__header button :deep(svg) {
+  transform: rotate(90deg);
+}
+
+.draw-studio--library-collapsed .draw-library__navigation {
+  gap: 5px;
+  padding: 11px 8px;
+}
+
+.draw-studio--library-collapsed .draw-library__navigation a {
+  min-height: 38px;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 0;
+}
+
+.draw-studio--library-collapsed .draw-library__navigation a span {
+  display: none;
 }
 
 .draw-main {
