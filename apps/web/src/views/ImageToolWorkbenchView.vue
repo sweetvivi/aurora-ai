@@ -4,6 +4,7 @@ import {
   CheckOutlined,
   CloseOutlined,
   CommentOutlined,
+  CopyOutlined,
   DeleteOutlined,
   DownOutlined,
   DownloadOutlined,
@@ -31,6 +32,7 @@ import type { FileAsset } from '@/app/api';
 import {
   IMAGE_TASK_POINTS_COST,
   useDrawWorkspaceStore,
+  type DrawWork,
   type DrawWorkStatus,
 } from '@/stores/draw-workspace';
 import { useSessionStore } from '@/stores/session';
@@ -151,6 +153,7 @@ const selectedOperation = ref(retouchOperations[0]?.value ?? 'enhance');
 const selectedRatio = ref('智能比例');
 const selectedSize = ref('2K');
 const retouchStrength = ref(65);
+const legacyGenerationMode = ref(false);
 const legacyRetouchMode = ref(false);
 const canvasZoom = ref(100);
 const selectedCanvasWorkId = ref('');
@@ -182,6 +185,20 @@ const generationCost = computed(() =>
   isGeneration.value ? selectedAmount.value * IMAGE_TASK_POINTS_COST : IMAGE_TASK_POINTS_COST,
 );
 const visibleWorks = computed(() => workspace.works.filter((work) => work.tool === toolKey.value));
+const generationGroups = computed(() => {
+  const groups = new Map<string, DrawWork[]>();
+
+  for (const work of visibleWorks.value) {
+    const date = new Date(work.createdAt);
+    const key = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+    const group = groups.get(key) ?? [];
+
+    group.push(work);
+    groups.set(key, group);
+  }
+
+  return [...groups.entries()].map(([label, works]) => ({ label, works }));
+});
 const latestCanvasWork = computed(() =>
   visibleWorks.value.find((work) => work.status === 'done' && work.artworkUrl),
 );
@@ -213,6 +230,7 @@ function resetLocalForm(): void {
   selectedRatio.value = '智能比例';
   selectedSize.value = '2K';
   retouchStrength.value = 65;
+  legacyGenerationMode.value = false;
   legacyRetouchMode.value = false;
   canvasZoom.value = 100;
   selectedCanvasWorkId.value = '';
@@ -230,6 +248,18 @@ function changeCanvasZoom(delta: number): void {
 
 function selectCanvasWork(workId: string): void {
   selectedCanvasWorkId.value = workId;
+}
+
+async function reuseGenerationPrompt(value: string): Promise<void> {
+  prompt.value = value;
+
+  const clipboard = navigator.clipboard;
+
+  if (clipboard) {
+    await clipboard.writeText(value).catch(() => undefined);
+  }
+
+  window.scrollTo({ behavior: 'smooth', top: document.body.scrollHeight });
 }
 
 async function handleSourceUpload(event: Event): Promise<void> {
@@ -355,7 +385,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section v-if="isGeneration || legacyRetouchMode" class="image-tool-view">
+  <section v-if="isGeneration ? legacyGenerationMode : legacyRetouchMode" class="image-tool-view">
     <header class="image-tool-header">
       <div class="image-tool-header__copy">
         <span>{{ isGeneration ? 'IMAGE CREATION' : 'SMART RETOUCH' }}</span>
@@ -656,6 +686,258 @@ onBeforeUnmount(() => {
         </div>
       </main>
     </div>
+  </section>
+
+  <section v-else-if="isGeneration" class="generation-studio">
+    <header class="generation-studio__header">
+      <div>
+        <span>AI PLATFORM</span>
+        <h1>智能生图</h1>
+      </div>
+      <nav aria-label="图片生成入口">
+        <RouterLink to="/draw">AI 绘画</RouterLink>
+        <button type="button" @click="legacyGenerationMode = true">旧文生图</button>
+        <RouterLink to="/retouch">新版修图</RouterLink>
+      </nav>
+    </header>
+
+    <div class="generation-studio__content">
+      <div class="generation-filter-bar">
+        <button type="button">
+          <ExperimentOutlined />
+          全部时间
+          <DownOutlined />
+        </button>
+        <span>批量操作</span>
+        <div>
+          <em v-if="workspace.generating">任务处理中</em>
+          <small>{{ visibleWorks.length }} 个作品</small>
+        </div>
+      </div>
+
+      <div v-if="workspace.error" class="generation-studio__error" role="alert">
+        <span>{{ workspace.error.message }}</span>
+        <button type="button" @click="workspace.clearError">关闭</button>
+      </div>
+
+      <div v-if="generationGroups.length > 0" class="generation-groups">
+        <section v-for="group in generationGroups" :key="group.label">
+          <header>
+            <h2>{{ group.label }}</h2>
+            <span>{{ group.works.length }} 张</span>
+          </header>
+          <div class="generation-work-grid">
+            <article
+              v-for="work in group.works"
+              :key="work.id"
+              class="generation-work-card"
+              :class="`generation-work-card--${work.status}`"
+            >
+              <div class="generation-work-card__visual">
+                <img
+                  v-if="work.status === 'done' && work.artworkUrl"
+                  :src="work.artworkUrl"
+                  :alt="work.prompt"
+                />
+                <div v-else-if="work.status === 'failed'" class="generation-work-card__state">
+                  <CloseOutlined />
+                  <strong>生成失败</strong>
+                </div>
+                <div
+                  v-else
+                  class="generation-work-card__state generation-work-card__state--loading"
+                >
+                  <LoadingOutlined />
+                  <strong>{{ work.status === 'queued' ? '等待生成' : '正在生成画面' }}</strong>
+                </div>
+                <span class="generation-work-card__badge">
+                  {{ work.status === 'done' ? '已完成' : workStatusLabel(work.status) }}
+                </span>
+                <span class="generation-work-card__cost">
+                  <ThunderboltFilled />
+                  {{ IMAGE_TASK_POINTS_COST }}积分
+                </span>
+                <span class="generation-work-card__size">{{ work.size }}</span>
+              </div>
+
+              <div class="generation-work-card__body">
+                <div class="generation-work-card__status">
+                  <span :class="work.status" />
+                  <strong>{{ workStatusLabel(work.status) }}</strong>
+                  <time>{{ formatWorkTime(work.createdAt) }}</time>
+                </div>
+                <div class="generation-work-card__prompt">
+                  <p>{{ work.prompt }}</p>
+                  <button
+                    type="button"
+                    aria-label="复制提示词并再次使用"
+                    title="复制提示词并再次使用"
+                    @click="reuseGenerationPrompt(work.prompt)"
+                  >
+                    <CopyOutlined />
+                  </button>
+                </div>
+                <small v-if="work.errorMessage" class="generation-work-card__error">
+                  {{ work.errorMessage }}
+                </small>
+                <div class="generation-work-card__meta">
+                  <span>
+                    <ExperimentOutlined />
+                    {{ work.modelLabel }}
+                  </span>
+                  <small>{{ work.ratio }} · {{ work.size }}</small>
+                </div>
+                <footer>
+                  <button
+                    v-if="work.status === 'done'"
+                    type="button"
+                    :class="{ active: work.favorite }"
+                    @click="workspace.toggleFavorite(work.id)"
+                  >
+                    <StarOutlined />
+                    {{ work.favorite ? '已收藏' : '收藏' }}
+                  </button>
+                  <button
+                    v-if="work.status === 'done'"
+                    type="button"
+                    @click="workspace.downloadWork(work.id)"
+                  >
+                    <DownloadOutlined />
+                    下载
+                  </button>
+                  <button v-else type="button" @click="workspace.retryWork(work.id)">
+                    <ReloadOutlined />
+                    重试
+                  </button>
+                  <button type="button" @click="workspace.removeWork(work.id)">
+                    <DeleteOutlined />
+                    删除
+                  </button>
+                </footer>
+              </div>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <div v-else class="generation-studio__empty">
+        <span><PictureOutlined /></span>
+        <strong>从一句画面描述开始</strong>
+        <p>生成结果会自动按月份整理在这里。</p>
+        <div>
+          <button
+            type="button"
+            @click="prompt = '夕阳下的海边公路，一辆复古汽车驶向远方，电影感构图'"
+          >
+            电影感公路
+          </button>
+          <button
+            type="button"
+            @click="prompt = '现代极简商品摄影，透明玻璃香水瓶，柔和棚拍光，高级质感'"
+          >
+            商品摄影
+          </button>
+          <button
+            type="button"
+            @click="prompt = '春日樱花树下的白猫，浅景深，柔和的清晨阳光，高清摄影'"
+          >
+            樱花白猫
+          </button>
+          <button type="button" @click="prompt = '未来城市悬浮交通，霓虹雨夜，广角概念场景'">
+            未来城市
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="generation-composer">
+      <input
+        ref="sourceInput"
+        type="file"
+        accept="image/*"
+        hidden
+        :disabled="uploading"
+        @change="handleSourceUpload"
+      />
+
+      <div v-if="sourceImage" class="generation-composer__source">
+        <img :src="sourceImage.url" :alt="sourceImage.name" />
+        <span>
+          <strong>{{ sourceImage.name }}</strong>
+          <small>参考图已就绪</small>
+        </span>
+        <button type="button" aria-label="移除参考图" @click="removeSource">
+          <CloseOutlined />
+        </button>
+      </div>
+
+      <label class="generation-composer__prompt">
+        <textarea
+          v-model="prompt"
+          maxlength="1000"
+          placeholder="请详细描述您想要生成的图片，例如：一只可爱的小猫坐在樱花树下，春日阳光透过花瓣洒下，高清摄影风格，柔和光线..."
+          @keydown.enter.exact.prevent="submitTask"
+        />
+        <small>{{ prompt.length }}/1000</small>
+      </label>
+
+      <div class="generation-composer__actions">
+        <div class="generation-composer__settings">
+          <button
+            type="button"
+            class="generation-composer__upload"
+            :disabled="uploading"
+            @click="sourceInput?.click()"
+          >
+            <LoadingOutlined v-if="uploading" />
+            <PlusOutlined v-else />
+            {{ uploading ? '上传中' : '上传图片' }}
+          </button>
+          <label>
+            <ExperimentOutlined />
+            <select v-model="selectedModel" aria-label="生成模型">
+              <option v-for="model in generationModels" :key="model.value" :value="model.value">
+                {{ model.label }}
+              </option>
+            </select>
+            <DownOutlined />
+          </label>
+          <label>
+            <PictureOutlined />
+            <select v-model.number="selectedAmount" aria-label="生成数量">
+              <option v-for="amount in amounts" :key="amount" :value="amount">
+                {{ amount }} 张
+              </option>
+            </select>
+            <DownOutlined />
+          </label>
+          <label>
+            <span class="generation-composer__ratio-mark" />
+            <select v-model="selectedRatio" aria-label="画面比例">
+              <option v-for="ratio in ratios" :key="ratio" :value="ratio">{{ ratio }}</option>
+            </select>
+            <DownOutlined />
+          </label>
+          <label>
+            <ScanOutlined />
+            <select v-model="selectedSize" aria-label="输出清晰度">
+              <option v-for="size in sizes" :key="size" :value="size">{{ size }}</option>
+            </select>
+            <DownOutlined />
+          </label>
+        </div>
+        <button
+          type="button"
+          class="generation-composer__submit"
+          :disabled="!canSubmit"
+          @click="submitTask"
+        >
+          <ThunderboltFilled />
+          <span>{{ submitting ? '正在提交' : '立即生成' }}</span>
+          <small>{{ generationCost }} 积分</small>
+        </button>
+      </div>
+    </footer>
   </section>
 
   <section v-else class="retouch-studio">
@@ -1600,6 +1882,720 @@ onBeforeUnmount(() => {
   font-size: 8px;
 }
 
+.generation-studio {
+  display: grid;
+  min-height: calc(100vh - 56px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background:
+    linear-gradient(rgb(39 91 127 / 4%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(39 91 127 / 4%) 1px, transparent 1px), #fbfcfd;
+  background-size: 42px 42px;
+  color: #28333d;
+}
+
+.generation-studio__header {
+  display: flex;
+  width: min(100%, 1320px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 auto;
+  padding: 30px 30px 20px;
+}
+
+.generation-studio__header > div {
+  display: flex;
+  align-items: baseline;
+  gap: 13px;
+}
+
+.generation-studio__header > div > span {
+  color: #258b70;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+}
+
+.generation-studio__header h1 {
+  margin: 0;
+  color: #26313a;
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.generation-studio__header nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.generation-studio__header nav a,
+.generation-studio__header nav button {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 13px;
+  border: 1px solid #e3e8e6;
+  border-radius: 8px;
+  background: #fff;
+  color: #48535d;
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.generation-studio__header nav a:last-child {
+  border-color: #8dcab7;
+  background: #eef9f5;
+  color: #247b63;
+}
+
+.generation-studio__content {
+  width: min(100%, 1320px);
+  min-height: 0;
+  margin: 0 auto;
+  padding: 0 30px 28px;
+}
+
+.generation-filter-bar {
+  display: flex;
+  min-height: 57px;
+  align-items: center;
+  gap: 16px;
+  padding: 9px 12px;
+  border: 1px solid #e4e9e7;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 88%);
+  box-shadow: 0 8px 24px rgb(35 54 48 / 4%);
+  backdrop-filter: blur(12px);
+}
+
+.generation-filter-bar > button {
+  display: inline-flex;
+  height: 35px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid #e2e7e5;
+  border-radius: 8px;
+  background: #fff;
+  color: #58636d;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.generation-filter-bar > button :deep(svg:first-child) {
+  color: #129065;
+}
+
+.generation-filter-bar > span {
+  color: #69737d;
+  font-size: 10px;
+}
+
+.generation-filter-bar > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.generation-filter-bar em {
+  display: inline-flex;
+  height: 27px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: #fff4e5;
+  color: #c77b17;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.generation-filter-bar small {
+  color: #9aa2a8;
+  font-size: 9px;
+}
+
+.generation-studio__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #efc8c3;
+  border-radius: 8px;
+  background: #fff5f4;
+  color: #a8433a;
+  font-size: 10px;
+}
+
+.generation-studio__error button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 9px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.generation-groups {
+  display: grid;
+  gap: 30px;
+  padding: 30px 0 8px;
+}
+
+.generation-groups > section {
+  display: grid;
+  gap: 14px;
+}
+
+.generation-groups > section > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.generation-groups h2 {
+  margin: 0;
+  color: #2c3741;
+  font-size: 19px;
+}
+
+.generation-groups > section > header span {
+  color: #9aa2a8;
+  font-size: 9px;
+}
+
+.generation-work-grid {
+  display: grid;
+  align-items: start;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.generation-work-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #dde5e2;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 9px 26px rgb(35 54 48 / 8%);
+}
+
+.generation-work-card__visual {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-bottom: 1px solid #edf1ef;
+  background: #eef2f1;
+}
+
+.generation-work-card__visual > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.generation-work-card__state {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  background: linear-gradient(145deg, #edf3f1, #dde8e4);
+  color: #8a5b57;
+}
+
+.generation-work-card__state :deep(svg) {
+  font-size: 22px;
+}
+
+.generation-work-card__state strong {
+  font-size: 10px;
+}
+
+.generation-work-card__state--loading {
+  background:
+    linear-gradient(
+      115deg,
+      rgb(255 255 255 / 0%) 30%,
+      rgb(255 255 255 / 74%) 48%,
+      rgb(255 255 255 / 0%) 66%
+    ),
+    linear-gradient(145deg, #a8d7c9, #67ad98);
+  background-size:
+    240% 100%,
+    100% 100%;
+  color: #fff;
+  animation: image-work-loading 1.8s ease-in-out infinite;
+}
+
+.generation-work-card__badge,
+.generation-work-card__cost,
+.generation-work-card__size {
+  position: absolute;
+  top: 9px;
+  display: inline-flex;
+  height: 23px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: rgb(10 17 23 / 84%);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 750;
+  backdrop-filter: blur(8px);
+}
+
+.generation-work-card__badge {
+  left: 9px;
+}
+
+.generation-work-card__badge::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #38cc87;
+  content: '';
+}
+
+.generation-work-card--failed .generation-work-card__badge::before {
+  background: #ef6559;
+}
+
+.generation-work-card--generating .generation-work-card__badge::before,
+.generation-work-card--queued .generation-work-card__badge::before {
+  background: #eea83a;
+}
+
+.generation-work-card__cost {
+  right: 9px;
+  padding: 0 7px;
+  background: rgb(40 19 54 / 88%);
+  color: #e8c9ff;
+}
+
+.generation-work-card__cost :deep(svg) {
+  color: #b968ff;
+}
+
+.generation-work-card__size {
+  top: auto;
+  right: 9px;
+  bottom: 9px;
+  background: rgb(14 19 24 / 82%);
+}
+
+.generation-work-card__body {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.generation-work-card__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.generation-work-card__status > span {
+  width: 14px;
+  height: 14px;
+  border: 3px solid #cceee0;
+  border-radius: 50%;
+  background: #1ebc75;
+}
+
+.generation-work-card__status > span.failed {
+  border-color: #f6d3d0;
+  background: #df5a4e;
+}
+
+.generation-work-card__status > span.queued,
+.generation-work-card__status > span.generating {
+  border-color: #f8e6c6;
+  background: #d99a35;
+}
+
+.generation-work-card__status strong {
+  color: #48535c;
+  font-size: 10px;
+}
+
+.generation-work-card__status time {
+  margin-left: auto;
+  color: #a1a8ae;
+  font-size: 8px;
+}
+
+.generation-work-card__prompt {
+  display: grid;
+  min-width: 0;
+  align-items: start;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.generation-work-card__prompt p {
+  display: -webkit-box;
+  min-height: 42px;
+  overflow: hidden;
+  margin: 0;
+  color: #59636d;
+  font-size: 10px;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.generation-work-card__prompt button {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 1px solid #e3e8e6;
+  border-radius: 6px;
+  background: #fff;
+  color: #6d7780;
+  cursor: pointer;
+}
+
+.generation-work-card__error {
+  overflow: hidden;
+  color: #b24a41;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.generation-work-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 9px;
+  border-top: 1px solid #eef1f0;
+}
+
+.generation-work-card__meta > span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: #4f5a63;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.generation-work-card__meta :deep(svg) {
+  color: #e0a22e;
+}
+
+.generation-work-card__meta small {
+  color: #9aa2a8;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.generation-work-card footer {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.generation-work-card footer button {
+  display: inline-flex;
+  min-width: 0;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid #e1e7e4;
+  border-radius: 7px;
+  background: #fff;
+  color: #606b73;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.generation-work-card footer button.active {
+  border-color: #ecd08f;
+  background: #fffaf0;
+  color: #bd7b13;
+}
+
+.generation-studio__empty {
+  display: grid;
+  min-height: 470px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.generation-studio__empty > span {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border: 1px solid #d8e9e3;
+  border-radius: 18px;
+  background: #f0faf7;
+  color: #2b9175;
+  font-size: 25px;
+}
+
+.generation-studio__empty strong {
+  margin-top: 5px;
+  color: #37434c;
+  font-size: 16px;
+}
+
+.generation-studio__empty p {
+  margin: 0;
+  color: #8b959c;
+  font-size: 10px;
+}
+
+.generation-studio__empty > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.generation-studio__empty button {
+  height: 31px;
+  padding: 0 11px;
+  border: 1px solid #dfe6e3;
+  border-radius: 999px;
+  background: #fff;
+  color: #5b6770;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.generation-composer {
+  position: sticky;
+  bottom: 12px;
+  z-index: 18;
+  display: grid;
+  width: min(calc(100% - 60px), 1320px);
+  gap: 10px;
+  justify-self: center;
+  margin: 0 auto 16px;
+  padding: 12px;
+  border: 1px solid #b9ddd1;
+  border-radius: 12px;
+  background: rgb(252 255 254 / 96%);
+  box-shadow:
+    0 18px 48px rgb(31 80 65 / 14%),
+    inset 0 0 0 1px rgb(255 255 255 / 78%);
+  backdrop-filter: blur(18px);
+}
+
+.generation-composer__source {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  grid-template-columns: 40px minmax(0, 1fr) 28px;
+  padding: 7px;
+  border: 1px solid #e0e9e6;
+  border-radius: 8px;
+  background: #f8fbfa;
+}
+
+.generation-composer__source img {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.generation-composer__source > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.generation-composer__source strong {
+  overflow: hidden;
+  color: #46535b;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.generation-composer__source small {
+  color: #8d979e;
+  font-size: 8px;
+}
+
+.generation-composer__source button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #879198;
+  cursor: pointer;
+}
+
+.generation-composer__prompt {
+  position: relative;
+  display: block;
+}
+
+.generation-composer__prompt textarea {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 52px 10px 10px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #3e4952;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.generation-composer__prompt textarea::placeholder {
+  color: #a6aeb4;
+}
+
+.generation-composer__prompt small {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  color: #a7aeb4;
+  font-size: 8px;
+}
+
+.generation-composer__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.generation-composer__settings {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.generation-composer__settings > button,
+.generation-composer__settings > label {
+  display: inline-flex;
+  height: 34px;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid #e0e7e4;
+  border-radius: 8px;
+  background: #fff;
+  color: #4d5962;
+  font-size: 9px;
+  font-weight: 680;
+}
+
+.generation-composer__settings > button {
+  cursor: pointer;
+}
+
+.generation-composer__settings :deep(svg) {
+  flex: 0 0 auto;
+  color: #4b6974;
+}
+
+.generation-composer__settings select {
+  min-width: 0;
+  max-width: 132px;
+  appearance: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.generation-composer__ratio-mark {
+  display: block;
+  width: 13px;
+  height: 10px;
+  border: 1.5px solid #4b6974;
+  border-radius: 1px;
+}
+
+.generation-composer__submit {
+  display: grid;
+  min-width: 166px;
+  height: 50px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 1px 7px;
+  grid-template-columns: auto auto;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 18%), transparent 42%),
+    linear-gradient(135deg, #51c9a0, #289b7a);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.generation-composer__submit :deep(svg) {
+  color: #fff;
+}
+
+.generation-composer__submit span {
+  white-space: nowrap;
+}
+
+.generation-composer__submit small {
+  grid-column: 1 / -1;
+  color: #dff9f0;
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.generation-composer__submit:disabled {
+  background: #cfd8d5;
+  color: #fff;
+  cursor: not-allowed;
+}
+
 .retouch-studio {
   display: grid;
   min-height: calc(100vh - 56px);
@@ -2391,6 +3387,10 @@ onBeforeUnmount(() => {
     gap: 14px;
     padding: 14px;
   }
+
+  .generation-work-grid {
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  }
 }
 
 @media (max-width: 820px) {
@@ -2437,6 +3437,52 @@ onBeforeUnmount(() => {
 
   .retouch-chat__empty {
     min-height: 280px;
+  }
+
+  .generation-studio__header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px 16px 16px;
+  }
+
+  .generation-studio__header nav {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .generation-studio__header nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .generation-studio__header nav a,
+  .generation-studio__header nav button {
+    flex: 0 0 auto;
+  }
+
+  .generation-studio__content {
+    padding: 0 16px 20px;
+  }
+
+  .generation-work-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+
+  .generation-composer {
+    bottom: 70px;
+    width: calc(100% - 24px);
+    margin-bottom: 12px;
+  }
+
+  .generation-composer__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .generation-composer__submit {
+    width: 100%;
   }
 }
 
@@ -2500,6 +3546,63 @@ onBeforeUnmount(() => {
 
   .retouch-composer__model select {
     max-width: 116px;
+  }
+
+  .generation-studio__header > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .generation-studio__header h1 {
+    font-size: 23px;
+  }
+
+  .generation-filter-bar {
+    gap: 8px;
+  }
+
+  .generation-filter-bar > span {
+    display: none;
+  }
+
+  .generation-filter-bar > div {
+    gap: 7px;
+  }
+
+  .generation-groups {
+    padding-top: 22px;
+  }
+
+  .generation-work-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .generation-studio__empty {
+    min-height: 390px;
+  }
+
+  .generation-composer {
+    width: calc(100% - 16px);
+    padding: 10px;
+  }
+
+  .generation-composer__settings {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .generation-composer__settings > button,
+  .generation-composer__settings > label {
+    width: 100%;
+  }
+
+  .generation-composer__settings > button {
+    justify-content: center;
+  }
+
+  .generation-composer__settings select {
+    max-width: 94px;
   }
 }
 </style>
