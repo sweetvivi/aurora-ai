@@ -1,31 +1,25 @@
 <script setup lang="ts">
 import {
   AppstoreOutlined,
-  AreaChartOutlined,
   ArrowUpOutlined,
   BarChartOutlined,
   BulbOutlined,
   CodeOutlined,
   CopyOutlined,
   DislikeOutlined,
-  DotChartOutlined,
   DownOutlined,
   EditOutlined,
   FilePptOutlined,
   FileTextOutlined,
-  HeatMapOutlined,
   HistoryOutlined,
   LikeOutlined,
-  LineChartOutlined,
   LoadingOutlined,
   MenuOutlined,
   MessageOutlined,
   MoreOutlined,
   PaperClipOutlined,
   PictureOutlined,
-  PieChartOutlined,
   PlusOutlined,
-  RadarChartOutlined,
   ReloadOutlined,
   SearchOutlined,
   StopOutlined,
@@ -35,6 +29,7 @@ import {
 import { storeToRefs } from 'pinia';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import ChartThumbnail from '@/components/ChartThumbnail.vue';
 import { useChatWorkspaceStore } from '@/stores/chat-workspace';
 import { useSessionStore } from '@/stores/session';
 
@@ -114,52 +109,64 @@ const capabilities = [
 
 const chartTemplates = [
   {
-    icon: LineChartOutlined,
     label: '折线图',
     prompt: '请把下面的数据整理成折线图分析，说明趋势、拐点和异常值。',
     preview: 'line',
   },
   {
-    icon: BarChartOutlined,
     label: '柱状图',
     prompt: '请把下面的数据整理成柱状图分析，对比类别差异并给出结论。',
     preview: 'bar',
   },
   {
-    icon: PieChartOutlined,
     label: '饼图',
     prompt: '请把下面的数据整理成占比分析，说明主要构成和变化原因。',
     preview: 'pie',
   },
   {
-    icon: DotChartOutlined,
     label: '散点图',
     prompt: '请把下面的数据整理成散点图分析，识别相关性和离群点。',
     preview: 'scatter',
   },
   {
-    icon: HeatMapOutlined,
     label: '热力图',
     prompt: '请把下面的数据整理成热力图分析，识别高峰、低谷和明显聚集区域。',
     preview: 'heat',
   },
   {
-    icon: AreaChartOutlined,
+    label: '气泡图',
+    prompt: '请把下面的数据整理成气泡图分析，同时比较数值、规模和分布关系。',
+    preview: 'bubble',
+  },
+  {
+    label: '词云',
+    prompt: '请把下面的文本整理成词云分析，提炼高频主题、关键词和语义关联。',
+    preview: 'word',
+  },
+  {
+    label: '桑基图',
+    prompt: '请把下面的数据整理成桑基图分析，说明不同节点之间的流向和转化关系。',
+    preview: 'sankey',
+  },
+  {
     label: '主题河流图',
     prompt: '请把下面的数据整理成主题河流图分析，展示多个主题随时间的占比变化。',
     preview: 'stream',
   },
   {
-    icon: RadarChartOutlined,
     label: '雷达图',
     prompt: '请把下面的数据整理成雷达图分析，对比各维度优势、短板和综合表现。',
     preview: 'radar',
   },
   {
-    icon: BarChartOutlined,
     label: '堆积柱状图',
     prompt: '请把下面的数据整理成堆积柱状图分析，说明总量和各组成部分的变化。',
     preview: 'stack',
+  },
+  {
+    label: '旭日图',
+    prompt: '请把下面的数据整理成旭日图分析，展示多层级分类的组成和占比关系。',
+    preview: 'sunburst',
   },
 ];
 
@@ -477,7 +484,7 @@ function formatConversationTime(value: string | null): string {
                 :class="`chat-chart-types__preview--${item.preview}`"
                 aria-hidden="true"
               >
-                <component :is="item.icon" />
+                <ChartThumbnail :type="item.preview" />
               </span>
               <strong>{{ item.label }}</strong>
             </button>
@@ -1070,7 +1077,7 @@ function formatConversationTime(value: string | null): string {
   display: grid;
   width: 100%;
   gap: 8px;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   margin-top: 10px;
 }
 
@@ -1089,17 +1096,12 @@ function formatConversationTime(value: string | null): string {
 .chat-chart-types__preview {
   display: grid;
   width: 100%;
-  aspect-ratio: 1.45;
+  aspect-ratio: 1.35;
   place-items: center;
   overflow: hidden;
   border: 1px solid #e4e8ef;
   border-radius: 7px;
-  background:
-    linear-gradient(rgb(255 255 255 / 78%), rgb(255 255 255 / 78%)),
-    repeating-linear-gradient(0deg, #dbe3ee 0 1px, transparent 1px 16px),
-    repeating-linear-gradient(90deg, #dbe3ee 0 1px, transparent 1px 18px);
-  color: #4c84ff;
-  font-size: 25px;
+  background: #fff;
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease,
@@ -1119,26 +1121,6 @@ function formatConversationTime(value: string | null): string {
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.chat-chart-types__preview--line,
-.chat-chart-types__preview--stream {
-  color: #4c84ff;
-}
-
-.chat-chart-types__preview--bar,
-.chat-chart-types__preview--stack {
-  color: #1eae7b;
-}
-
-.chat-chart-types__preview--pie,
-.chat-chart-types__preview--radar {
-  color: #d58a28;
-}
-
-.chat-chart-types__preview--scatter,
-.chat-chart-types__preview--heat {
-  color: #e36e45;
 }
 
 .chat-messages {
