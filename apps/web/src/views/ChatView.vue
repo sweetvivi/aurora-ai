@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   AppstoreOutlined,
-  ArrowUpOutlined,
   BarChartOutlined,
   BulbOutlined,
   CodeOutlined,
@@ -17,19 +16,17 @@ import {
   MenuOutlined,
   MessageOutlined,
   MoreOutlined,
-  PaperClipOutlined,
   PictureOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
-  StopOutlined,
-  ThunderboltFilled,
   VideoCameraOutlined,
 } from '@ant-design/icons-vue';
 import { storeToRefs } from 'pinia';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import ChartThumbnail from '@/components/ChartThumbnail.vue';
+import ChatComposer from '@/components/ChatComposer.vue';
 import { useChatWorkspaceStore } from '@/stores/chat-workspace';
 import { useSessionStore } from '@/stores/session';
 
@@ -42,7 +39,7 @@ const { conversations, error, messages, models, selectedModelAlias, status, stre
 const prompt = ref('');
 const search = ref('');
 const conversationArea = ref<HTMLElement | null>(null);
-const composerInput = ref<HTMLTextAreaElement | null>(null);
+const composerInput = ref<InstanceType<typeof ChatComposer> | null>(null);
 const historyOpen = ref(false);
 const copiedMessageId = ref('');
 const messageFeedback = ref<Record<string, '' | 'dislike' | 'like'>>({});
@@ -430,9 +427,26 @@ function formatConversationTime(value: string | null): string {
         </div>
 
         <div v-else-if="!hasMessages" class="chat-welcome">
-          <span class="chat-welcome__mark">极</span>
-          <h1>今天想从什么开始？</h1>
-          <p>选择一种常用能力，或直接在下方描述你的任务。</p>
+          <div class="chat-welcome__heading">
+            <h1>
+              您好，
+              <span>今天有什么我可以帮你的吗？</span>
+            </h1>
+          </div>
+
+          <ChatComposer
+            ref="composerInput"
+            v-model="prompt"
+            :can-send="canSend"
+            :error="error"
+            :model-name="selectedModel?.displayName ?? '智能模式'"
+            :placeholder="`给 ${selectedModel?.displayName ?? '当前模型'} 发消息`"
+            placement="welcome"
+            :streaming="streaming"
+            @retry="retryLastPrompt"
+            @send="sendMessage"
+            @stop="chatStore.stopStreaming"
+          />
 
           <div class="chat-capabilities" aria-label="常用能力">
             <button
@@ -554,61 +568,20 @@ function formatConversationTime(value: string | null): string {
         </div>
       </section>
 
-      <footer class="chat-composer">
-        <div v-if="error" class="chat-error">
-          <span>
-            <strong>{{ error.code === 'INSUFFICIENT_POINTS' ? '积分不足' : '生成未完成' }}</strong>
-            {{ error.message }}
-          </span>
-          <button v-if="error.recoverable" type="button" @click="retryLastPrompt">
-            <ReloadOutlined />
-            重试
-          </button>
-        </div>
-
-        <div class="chat-composer__inner">
-          <textarea
-            ref="composerInput"
-            v-model="prompt"
-            rows="3"
-            :disabled="streaming"
-            placeholder="输入问题，粘贴材料，或描述你希望完成的任务"
-            @keydown.ctrl.enter="sendMessage"
-          />
-          <div class="chat-composer__footer">
-            <div>
-              <button type="button" aria-label="上传附件">
-                <PaperClipOutlined />
-              </button>
-              <button type="button">
-                <ThunderboltFilled />
-                {{ selectedModel?.displayName ?? '智能模式' }}
-                <DownOutlined />
-              </button>
-            </div>
-            <button
-              v-if="streaming"
-              class="chat-composer__send chat-composer__send--stop"
-              type="button"
-              aria-label="停止生成"
-              @click="chatStore.stopStreaming"
-            >
-              <StopOutlined />
-            </button>
-            <button
-              v-else
-              class="chat-composer__send"
-              type="button"
-              :disabled="!canSend"
-              aria-label="发送消息"
-              @click="sendMessage"
-            >
-              <ArrowUpOutlined />
-            </button>
-          </div>
-        </div>
-        <small>内容由 AI 生成，请注意核验重要信息</small>
-      </footer>
+      <ChatComposer
+        v-if="hasMessages"
+        ref="composerInput"
+        v-model="prompt"
+        :can-send="canSend"
+        :error="error"
+        :model-name="selectedModel?.displayName ?? '智能模式'"
+        :placeholder="`给 ${selectedModel?.displayName ?? '当前模型'} 发消息`"
+        placement="docked"
+        :streaming="streaming"
+        @retry="retryLastPrompt"
+        @send="sendMessage"
+        @stop="chatStore.stopStreaming"
+      />
     </main>
   </div>
 </template>
@@ -796,8 +769,8 @@ function formatConversationTime(value: string | null): string {
 .chat-main {
   display: grid;
   min-width: 0;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  background: radial-gradient(circle at 50% 35%, rgb(240 245 255 / 70%), transparent 430px), #fff;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: #fff;
 }
 
 .chat-main__toolbar {
@@ -829,24 +802,6 @@ function formatConversationTime(value: string | null): string {
   background: #fff;
   color: #596273;
   cursor: pointer;
-}
-
-.chat-main__mark,
-.chat-welcome__mark {
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: linear-gradient(145deg, #68a2ff, #326de8);
-  color: #fff;
-  font-weight: 850;
-  box-shadow: 0 8px 18px rgb(76 132 255 / 22%);
-}
-
-.chat-main__mark {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-  font-size: 13px;
 }
 
 .chat-main__toolbar strong {
@@ -950,27 +905,26 @@ function formatConversationTime(value: string | null): string {
 
 .chat-welcome {
   display: grid;
-  max-width: 880px;
-  justify-items: center;
-  margin: 4vh auto 0;
-  text-align: center;
+  width: min(100%, 820px);
+  justify-items: stretch;
+  margin: 58px auto 30px;
 }
 
-.chat-welcome__mark {
-  width: 54px;
-  height: 54px;
-  font-size: 20px;
+.chat-welcome__heading {
+  margin-bottom: 20px;
 }
 
 .chat-welcome h1 {
-  margin: 20px 0 0;
+  margin: 0;
+  color: #313643;
   font-size: 25px;
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: left;
 }
 
-.chat-welcome > p {
-  margin: 9px 0 0;
-  color: #858e9c;
-  font-size: 12px;
+.chat-welcome h1 span {
+  display: block;
 }
 
 .chat-capabilities {
@@ -979,7 +933,7 @@ function formatConversationTime(value: string | null): string {
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  margin-top: 24px;
+  margin-top: 20px;
 }
 
 .chat-capabilities button {
@@ -1265,138 +1219,6 @@ function formatConversationTime(value: string | null): string {
   }
 }
 
-.chat-composer {
-  display: grid;
-  justify-items: center;
-  padding: 12px 24px 20px;
-}
-
-.chat-error {
-  display: flex;
-  width: min(100%, 820px);
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 9px;
-  padding: 9px 11px;
-  border: 1px solid #f1d4d1;
-  border-radius: 9px;
-  background: #fff8f7;
-  color: #9a554f;
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-.chat-error span {
-  min-width: 0;
-}
-
-.chat-error strong {
-  margin-right: 5px;
-}
-
-.chat-error button {
-  display: inline-flex;
-  height: 27px;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 4px;
-  padding: 0 8px;
-  border: 1px solid #edc5c0;
-  border-radius: 6px;
-  background: #fff;
-  color: #9a554f;
-  font-size: 9px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.chat-composer__inner {
-  width: min(100%, 820px);
-  padding: 11px 12px 9px;
-  border: 1px solid #dce1e8;
-  border-radius: 15px;
-  background: #fff;
-  box-shadow: 0 14px 34px rgb(36 54 86 / 8%);
-}
-
-.chat-composer textarea {
-  display: block;
-  width: 100%;
-  min-height: 62px;
-  padding: 2px 2px 8px;
-  border: 0;
-  outline: 0;
-  color: #2f3540;
-  font-size: 12px;
-  line-height: 1.7;
-  resize: none;
-}
-
-.chat-composer textarea:disabled {
-  color: #858d9a;
-  cursor: wait;
-}
-
-.chat-composer__footer {
-  display: flex;
-  min-height: 33px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.chat-composer__footer > div {
-  display: flex;
-  min-width: 0;
-  gap: 6px;
-}
-
-.chat-composer__footer button {
-  display: inline-flex;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: 7px;
-  background: #f5f6f8;
-  color: #687180;
-  font-size: 9px;
-  cursor: pointer;
-}
-
-.chat-composer__footer > div button:first-child {
-  width: 30px;
-  padding: 0;
-}
-
-.chat-composer__footer .chat-composer__send {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border-radius: 50%;
-  background: #4c84ff;
-  color: #fff;
-}
-
-.chat-composer__footer .chat-composer__send--stop {
-  background: #f1f2f4;
-  color: #4e5765;
-}
-
-.chat-composer__send:disabled {
-  background: #d6dbe3;
-  cursor: not-allowed;
-}
-
-.chat-composer > small {
-  margin-top: 8px;
-  color: #9da5b1;
-  font-size: 9px;
-}
-
 @media (max-width: 900px) {
   .chat-suggestions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1456,11 +1278,11 @@ function formatConversationTime(value: string | null): string {
   }
 
   .chat-welcome {
-    margin-top: 2vh;
+    margin-top: 36px;
   }
 
   .chat-welcome h1 {
-    font-size: 21px;
+    font-size: 22px;
   }
 
   .chat-suggestions {
@@ -1489,16 +1311,8 @@ function formatConversationTime(value: string | null): string {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .chat-composer {
-    padding: 10px 12px 16px;
-  }
-
   .chat-message__actions {
     flex-wrap: wrap;
-  }
-
-  .chat-error {
-    align-items: flex-start;
   }
 }
 </style>

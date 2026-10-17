@@ -24,7 +24,7 @@
 
 - M0：pnpm workspace、Vue 3 前端、NestJS 后端、PostgreSQL、Redis、Prisma、五套 Shell 和 GitHub Actions CI
 - M1：邮箱与开发登录、刷新令牌、积分账本、流式模型对话、会话历史、文件上传和图片任务异步状态机
-- 模型对话：8 个公开模型别名、DeepSeek/Qwen/GPT Provider 路由、SSE 增量、停止生成、会话恢复、错误退款和参考产品式空态能力卡片
+- 模型对话：8 个公开模型别名、DeepSeek/Qwen/GPT Provider 路由、SSE 增量、停止生成、会话恢复、错误退款，以及参考产品式欢迎语、内嵌输入框、能力入口、示例提示词和图表卡片
 - AI 绘画：新版智能生图模板、旧生成页、批量作品、详情层、跨模块编辑入口、下载、收藏、删除和重试
 - 超级智能体：预置与自建智能体、创建器、能力选择、真实 SSE 对话、历史记录抽屉
 - 智能修图：画布式工作台、处理方式快捷切换、原图/结果对比、任务记录和真实图片任务链路
@@ -43,6 +43,7 @@
 - `pnpm test`：API 17 个文件 63 项，Web 6 个文件 24 项
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-admin-provider-probe.mjs` 通过，桌面端和移动端无横向溢出，探测 Key 未出现在页面、响应或控制台
+- `node outputs/ui-reference/verify-chat-m1.mjs` 通过，对话空态、桌面成功流和移动端错误流保持正常
 - 图片任务 E2E 覆盖多参考图、越权文件拒绝和自由参数注入防护
 
 下一步：
