@@ -177,6 +177,22 @@ export interface SaveAgentInput {
   tags: string[];
 }
 
+export interface CanvasWorkflowRecord {
+  createdAt: string;
+  document: Record<string, unknown>;
+  id: string;
+  title: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface SaveCanvasWorkflowInput {
+  document: Record<string, unknown>;
+  id?: string;
+  title: string;
+  version?: number;
+}
+
 export interface FileAsset {
   checksum: string;
   createdAt: string;
@@ -693,6 +709,25 @@ export async function updateAgent(
 export async function publishAgent(agentId: string): Promise<PersistedAgent> {
   const response = await apiClient.post<ApiEnvelope<PersistedAgent>>(
     `/api/v1/agents/${encodeURIComponent(agentId)}/publish`,
+  );
+
+  return response.data.data;
+}
+
+export async function fetchCanvasWorkflows(): Promise<CanvasWorkflowRecord[]> {
+  const response = await apiClient.get<ApiEnvelope<{ items: CanvasWorkflowRecord[] }>>(
+    '/api/v1/canvas-workflows',
+  );
+
+  return response.data.data.items;
+}
+
+export async function saveCanvasWorkflow(
+  input: SaveCanvasWorkflowInput,
+): Promise<CanvasWorkflowRecord> {
+  const response = await apiClient.post<ApiEnvelope<CanvasWorkflowRecord>>(
+    '/api/v1/canvas-workflows',
+    input,
   );
 
   return response.data.data;

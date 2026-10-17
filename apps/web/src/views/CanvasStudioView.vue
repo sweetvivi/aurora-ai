@@ -36,8 +36,8 @@ import {
   ZoomOutOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { fetchFileBlob } from '@/app/api';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { fetchCanvasWorkflows, fetchFileBlob, saveCanvasWorkflow } from '@/app/api';
 import GalleryArtwork from '@/components/GalleryArtwork.vue';
 import {
   IMAGE_TASK_POINTS_COST,
@@ -46,6 +46,7 @@ import {
   type DrawWorkStatus,
 } from '@/stores/draw-workspace';
 import { useModelCatalogStore } from '@/stores/model-catalog';
+import { parseLocalCanvasWorkflow, serializeLocalCanvasWorkflow } from '@/utils/canvas-persistence';
 
 type CanvasNodeKind = 'image' | 'output' | 'prompt' | 'video';
 type CanvasNodeStatus = 'done' | 'failed' | 'generating' | 'idle' | 'queued';
@@ -94,7 +95,7 @@ interface CanvasAsset {
   previewUrl?: string;
 }
 
-interface CanvasWorkflow {
+interface CanvasWorkflowTemplate {
   description: string;
   id: string;
   name: string;
@@ -184,7 +185,7 @@ const batchFilters: { label: string; value: BatchFilter }[] = [
   { label: '全部', value: 'all' },
 ];
 
-const workflowTemplates: CanvasWorkflow[] = [
+const workflowTemplates: CanvasWorkflowTemplate[] = [
   {
     description: '从提示词到图片节点，适合快速探索视觉方向',
     id: 'blank',
@@ -240,8 +241,8 @@ const assetError = ref('');
 const batchSelectedIds = ref<string[]>([]);
 const batchRunning = ref(false);
 const batchCancelRequested = ref(false);
-const saveState = ref<'idle' | 'saved' | 'saving'>('saved');
-const lastSavedAt = ref('10:30');
+const saveState = ref<'error' | 'idle' | 'saved' | 'saving'>('idle');
+const lastSavedAt = ref('');
 const viewport = ref({
   scale: 0.9,
   x: 28,
@@ -280,6 +281,9 @@ let panState:
 let saveTimer: number | undefined;
 let noticeTimer: number | undefined;
 let hydrated = false;
+let canvasId = '';
+let cloudSavePromise: Promise<void> | null = null;
+let cloudSaveQueued = false;
 
 const generationModels = computed<GenerationModel[]>(() =>
   modelCatalog.modelsFor('image').map((model) => ({
@@ -511,67 +515,195 @@ function redo(): void {
   replaceSnapshot(snapshot);
 }
 
-function loadCanvas(): void {
-  const saved = readJson<{
-    edges?: CanvasEdge[];
-    groups?: CanvasGroup[];
-    nodes?: CanvasNode[];
-    title?: string;
-    viewport?: typeof viewport.value;
-  }>(CANVAS_STORAGE_KEY);
+function createCanvasDocument(): CanvasWorkflowDocument {
+  return {
+    edges: edges.value.map((edge) => ({ ...edge })),
+    groups: groups.value.map((group) => ({ ...group, nodeIds: [...group.nodeIds] })),
+    nodes: nodes.value.map((node) => ({
+      ...node,
+      previewUrl: undefined,
+    })),
+    title: canvasTitle.value,
+    version: 1,
+    viewport: { ...viewport.value },
+  };
+}
 
-  if (saved?.nodes?.length) {
-    nodes.value = saved.nodes;
-    edges.value = Array.isArray(saved.edges) ? saved.edges : [];
-    groups.value = Array.isArray(saved.groups)
-      ? saved.groups.map((group) => ({ ...group, nodeIds: [...group.nodeIds] }))
-      : [];
-    canvasTitle.value = saved.title || '新建画布';
-    viewport.value = saved.viewport || viewport.value;
-  } else {
-    const seed = createSeedCanvas();
-    nodes.value = seed.nodes;
-    edges.value = seed.edges;
-    groups.value = seed.groups;
+function applyCanvasDocument(document: CanvasWorkflowDocument): void {
+  nodes.value = document.nodes.map((node) => ({ ...node }));
+  edges.value = Array.isArray(document.edges) ? document.edges.map((edge) => ({ ...edge })) : [];
+  groups.value = Array.isArray(document.groups)
+    ? document.groups.map((group) => ({ ...group, nodeIds: [...group.nodeIds] }))
+    : [];
+  canvasTitle.value = document.title?.trim() || '新建画布';
+  viewport.value = document.viewport ?? { scale: 0.9, x: 28, y: 52 };
+}
+
+function normalizeCanvasDocument(value: unknown): CanvasWorkflowDocument | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
   }
 
-  assets.value =
-    readJson<CanvasAsset[]>(CANVAS_ASSET_STORAGE_KEY)?.filter((asset) => Boolean(asset.fileId)) ??
-    [];
-  hydrated = true;
+  const candidate = value as Partial<CanvasWorkflowDocument>;
+
+  if (!Array.isArray(candidate.nodes) || !Array.isArray(candidate.edges)) {
+    return null;
+  }
+
+  return {
+    edges: candidate.edges as CanvasEdge[],
+    groups: Array.isArray(candidate.groups) ? (candidate.groups as CanvasGroup[]) : [],
+    nodes: candidate.nodes as CanvasNode[],
+    title: typeof candidate.title === 'string' ? candidate.title : '新建画布',
+    version: 1,
+    viewport:
+      typeof candidate.viewport === 'object' && candidate.viewport !== null
+        ? candidate.viewport
+        : undefined,
+  };
+}
+
+function formatSavedAt(value: number): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(value);
+}
+
+function writeLocalCanvas(savedAt = Date.now()): void {
+  try {
+    window.localStorage.setItem(
+      CANVAS_STORAGE_KEY,
+      serializeLocalCanvasWorkflow({
+        document: createCanvasDocument(),
+        id: canvasId,
+        savedAt,
+      }),
+    );
+    window.localStorage.setItem(
+      CANVAS_ASSET_STORAGE_KEY,
+      JSON.stringify(assets.value.filter((asset) => Boolean(asset.fileId))),
+    );
+  } catch {
+    if (saveState.value !== 'error') {
+      saveState.value = 'idle';
+    }
+  }
+}
+
+async function persistCanvasNow(options: { notifyOnError?: boolean } = {}): Promise<void> {
+  writeLocalCanvas();
+
+  if (cloudSavePromise) {
+    cloudSaveQueued = true;
+    return cloudSavePromise;
+  }
+
+  cloudSavePromise = (async () => {
+    do {
+      cloudSaveQueued = false;
+      const document = createCanvasDocument();
+
+      try {
+        const saved = await saveCanvasWorkflow({
+          document: document as unknown as Record<string, unknown>,
+          id: canvasId || undefined,
+          title: canvasTitle.value.trim() || '新建画布',
+          version: 1,
+        });
+        const savedAt = Date.parse(saved.updatedAt) || Date.now();
+
+        canvasId = saved.id;
+        saveState.value = 'saved';
+        lastSavedAt.value = formatSavedAt(savedAt);
+        writeLocalCanvas(savedAt);
+      } catch (error) {
+        saveState.value = 'error';
+        cloudSaveQueued = false;
+
+        if (options.notifyOnError !== false) {
+          showCanvasNotice(
+            error instanceof Error
+              ? `云端保存失败，已保留本地副本：${error.message}`
+              : '云端保存失败，已保留本地副本',
+          );
+        }
+        break;
+      }
+    } while (cloudSaveQueued);
+  })().finally(() => {
+    cloudSavePromise = null;
+  });
+
+  return cloudSavePromise;
 }
 
 function persistCanvas(): void {
   saveState.value = 'saving';
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
-    try {
-      window.localStorage.setItem(
-        CANVAS_STORAGE_KEY,
-        JSON.stringify({
-          edges: edges.value,
-          groups: groups.value,
-          nodes: nodes.value.map((node) => ({
-            ...node,
-            previewUrl: undefined,
-          })),
-          title: canvasTitle.value,
-          viewport: viewport.value,
-        }),
-      );
-      window.localStorage.setItem(
-        CANVAS_ASSET_STORAGE_KEY,
-        JSON.stringify(assets.value.filter((asset) => Boolean(asset.fileId))),
-      );
-      saveState.value = 'saved';
-      lastSavedAt.value = new Intl.DateTimeFormat('zh-CN', {
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(Date.now());
-    } catch {
-      saveState.value = 'idle';
-    }
+    void persistCanvasNow();
   }, 420);
+}
+
+async function loadCanvas(): Promise<void> {
+  const local = parseLocalCanvasWorkflow<CanvasWorkflowDocument>(
+    window.localStorage.getItem(CANVAS_STORAGE_KEY),
+  );
+
+  if (local) {
+    applyCanvasDocument(local.document);
+    canvasId = local.id;
+    lastSavedAt.value = local.savedAt ? formatSavedAt(local.savedAt) : '';
+  } else {
+    const seed = createSeedCanvas();
+
+    nodes.value = seed.nodes;
+    edges.value = seed.edges;
+    groups.value = seed.groups;
+    canvasId = createId('canvas');
+  }
+
+  assets.value =
+    readJson<CanvasAsset[]>(CANVAS_ASSET_STORAGE_KEY)?.filter((asset) => Boolean(asset.fileId)) ??
+    [];
+
+  try {
+    const workflows = await fetchCanvasWorkflows();
+    const remote = workflows[0];
+    const remoteUpdatedAt = remote ? Date.parse(remote.updatedAt) : 0;
+
+    if (remote && (!local || remoteUpdatedAt >= local.savedAt)) {
+      const document = normalizeCanvasDocument(remote.document);
+
+      if (!document) {
+        throw new Error('云端画布数据格式无效');
+      }
+
+      applyCanvasDocument(document);
+      canvasId = remote.id;
+      saveState.value = 'saved';
+      lastSavedAt.value = formatSavedAt(remoteUpdatedAt || Date.now());
+      writeLocalCanvas(remoteUpdatedAt || Date.now());
+    } else {
+      if (remote && !canvasId) {
+        canvasId = remote.id;
+      }
+
+      await persistCanvasNow({ notifyOnError: false });
+    }
+  } catch (error) {
+    saveState.value = 'error';
+    writeLocalCanvas();
+    showCanvasNotice(
+      error instanceof Error
+        ? `云端加载失败，已使用本地画布：${error.message}`
+        : '云端加载失败，已使用本地画布',
+    );
+  } finally {
+    await nextTick();
+    hydrated = true;
+  }
 }
 
 function readJson<T>(key: string): T | null {
@@ -628,7 +760,7 @@ function createCanvas(): void {
   persistCanvas();
 }
 
-function loadWorkflow(workflow: CanvasWorkflow): void {
+function loadWorkflow(workflow: CanvasWorkflowTemplate): void {
   commitHistory();
   const seed = createSeedCanvas();
 
@@ -1514,7 +1646,7 @@ function sendInspiration(): void {
   inspirationMessage.value = '';
 }
 
-function workflowForAsset(): CanvasWorkflow[] {
+function workflowForAsset(): CanvasWorkflowTemplate[] {
   return workflowTemplates;
 }
 
@@ -2047,16 +2179,29 @@ watch(
   { immediate: true },
 );
 
+function handleBeforeUnload(): void {
+  if (hydrated) {
+    writeLocalCanvas();
+  }
+}
+
 onMounted(() => {
-  loadCanvas();
+  void loadCanvas();
   void modelCatalog.load();
   void workspace.initialize();
+  window.addEventListener('beforeunload', handleBeforeUnload);
   window.addEventListener('pointermove', handlePointerMove);
   window.addEventListener('pointerup', finishPointerAction);
   window.addEventListener('keydown', handleKeyboard);
 });
 
 onBeforeUnmount(() => {
+  if (hydrated) {
+    writeLocalCanvas();
+    void persistCanvasNow();
+  }
+
+  window.removeEventListener('beforeunload', handleBeforeUnload);
   window.removeEventListener('pointermove', handlePointerMove);
   window.removeEventListener('pointerup', finishPointerAction);
   window.removeEventListener('keydown', handleKeyboard);
@@ -2094,9 +2239,17 @@ onBeforeUnmount(() => {
 
         <div class="canvas-topbar__actions">
           <span class="canvas-save-state" :class="`canvas-save-state--${saveState}`">
-            <CloudSyncOutlined v-if="saveState === 'saving'" />
+            <CloudSyncOutlined v-if="saveState === 'saving' || saveState === 'error'" />
             <CheckOutlined v-else />
-            {{ saveState === 'saving' ? '保存中' : `已自动保存 ${lastSavedAt}` }}
+            {{
+              saveState === 'saving'
+                ? '保存中'
+                : saveState === 'error'
+                  ? '仅本地保存'
+                  : lastSavedAt
+                    ? `已自动保存 ${lastSavedAt}`
+                    : '等待保存'
+            }}
           </span>
           <button type="button" class="canvas-topbar__button" @click="persistCanvas">
             <SaveOutlined />
@@ -3251,6 +3404,10 @@ onBeforeUnmount(() => {
 
 .canvas-save-state--saving {
   color: #9d8cff;
+}
+
+.canvas-save-state--error {
+  color: #e29a92;
 }
 
 .canvas-topbar__button {

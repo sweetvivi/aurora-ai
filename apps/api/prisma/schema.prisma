@@ -164,6 +164,7 @@ model User {
   imageTasks      ImageTask[]
   videoTasks      VideoTask[]
   customAgents    CustomAgent[]
+  canvasWorkflows CanvasWorkflow[]
 
   @@index([createdAt])
   @@map("users")
@@ -241,17 +242,17 @@ model Conversation {
 }
 
 model Message {
-  id             String        @id @default(cuid())
+  id             String              @id @default(cuid())
   conversationId String
   userId         String
   role           MessageRole
-  content        String        @db.Text
-  status         MessageStatus @default(COMPLETED)
+  content        String              @db.Text
+  status         MessageStatus       @default(COMPLETED)
   requestId      String?
   metadata       Json?
-  createdAt      DateTime      @default(now())
-  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime            @default(now())
+  conversation   Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   attachments    MessageAttachment[]
 
   @@index([conversationId, createdAt])
@@ -260,12 +261,12 @@ model Message {
 }
 
 model MessageAttachment {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   messageId String
   fileId    String
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  message   Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
   file      FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, fileId])
@@ -297,23 +298,23 @@ model ChatRequest {
 }
 
 model FileAsset {
-  id               String          @id @default(cuid())
-  userId           String
-  storageKey       String          @unique
-  originalName     String
-  mimeType         String
-  size             Int
-  checksum         String
-  status           FileAssetStatus @default(READY)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sourceImageTasks ImageTask[]     @relation("ImageTaskSource")
-  resultImageTasks ImageTask[]     @relation("ImageTaskResult")
-  videoSourceTasks VideoTask[]     @relation("VideoTaskSourceFrame")
-  videoLastFrameTasks VideoTask[]  @relation("VideoTaskLastFrame")
-  videoResultTasks VideoTask[]     @relation("VideoTaskResult")
-  messageAttachments MessageAttachment[]
+  id                  String              @id @default(cuid())
+  userId              String
+  storageKey          String              @unique
+  originalName        String
+  mimeType            String
+  size                Int
+  checksum            String
+  status              FileAssetStatus     @default(READY)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceImageTasks    ImageTask[]         @relation("ImageTaskSource")
+  resultImageTasks    ImageTask[]         @relation("ImageTaskResult")
+  videoSourceTasks    VideoTask[]         @relation("VideoTaskSourceFrame")
+  videoLastFrameTasks VideoTask[]         @relation("VideoTaskLastFrame")
+  videoResultTasks    VideoTask[]         @relation("VideoTaskResult")
+  messageAttachments  MessageAttachment[]
 
   @@index([userId, createdAt])
   @@map("file_assets")
@@ -394,4 +395,18 @@ model CustomAgent {
 
   @@index([userId, status, updatedAt])
   @@map("custom_agents")
+}
+
+model CanvasWorkflow {
+  id        String   @id
+  userId    String
+  title     String   @default("新建画布")
+  document  Json
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@map("canvas_workflows")
 }

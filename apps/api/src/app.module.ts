@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AdminModule } from './admin/admin.module';
 import { AgentsModule } from './agents/agents.module';
 import { AuthModule } from './auth/auth.module';
+import { CanvasWorkflowsModule } from './canvas-workflows/canvas-workflows.module';
 import { ChatModule } from './chat/chat.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { RequestIdMiddleware } from './common/http/request-id.middleware';
@@ -37,6 +38,7 @@ import { VideoTasksModule } from './video-tasks/video-tasks.module';
     VideoTasksModule,
     ProvidersModule,
     AgentsModule,
+    CanvasWorkflowsModule,
     AdminModule,
     AuthModule,
     HealthModule,

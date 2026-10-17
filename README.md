@@ -32,7 +32,7 @@
 - 智能修图：画布式工作台、处理方式快捷切换、原图/结果对比、最多 30 步撤销/恢复、任务记录和真实图片任务链路
 - 图片生成：参考产品式作品历史、高级设置、存储天数、效果示例和底部固定创作栏
 - 视频生成：按参考产品行为从主平台独立打开 `/video`，使用自带深色工具栏和工作区；支持文生视频、单图参考、4000 字提示词、任务轮询、取消、重试、下载和播放；未接入的首尾帧、AI 音效和极速模式保持明确禁用或标记
-- AI 画布：节点增删、多选拖拽、连线校验、缩放平移、图片/输出/视频节点、从节点派生文本/图像/视频任务、3D 视角控制、素材库、组合分组、右键菜单、自动布局、工作流 JSON 导入导出、批量生成队列、历史、灵感面板和本地持久化
+- AI 画布：节点增删、多选拖拽、连线校验、缩放平移、图片/输出/视频节点、从节点派生文本/图像/视频任务、3D 视角控制、素材库、组合分组、右键菜单、自动布局、工作流 JSON 导入导出、批量生成队列、历史、灵感面板、本地备份和服务端持久化
 - 电商工具：四栏工作台、商品换背景、服饰图案替换、产品包装/部件/材质替换、商品抠图、放大、风格转换、虚拟模特试穿和手持模特替换
 - 运行时模型目录：绘画、画布、修图、图片生成、电商和视频工作台统一读取后台已启用模型；后台保存或导入后即时刷新，API 不可用时回退到内置兼容模型
 - M3 管理后台：管理员路由守卫、总览、用户管理、积分调整、厂商管理、模型管理，以及数据库优先的运行时模型注册表
@@ -44,12 +44,12 @@
 当前批次验证结果：
 
 - `pnpm format:check`、`pnpm lint`、`pnpm typecheck` 通过
-- `pnpm test`：API 19 个文件 76 项，Web 15 个文件 60 项
+- `pnpm test`：API 20 个文件 79 项，Web 16 个文件 63 项
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-canvas-studio.mjs`、`verify-video-tasks.mjs`、`verify-m2-interactions.mjs`、`verify-m2-routes.mjs` 和 `verify-admin-modules.mjs` 全部通过
 - `node outputs/ui-reference/verify-admin-modules.mjs` 通过，模块改名、角标、排序和显隐会同步刷新共享目录；桌面端和移动端无横向溢出、无页面脚本错误
 - `node outputs/ui-reference/verify-admin-provider-probe.mjs` 通过，桌面端和移动端无横向溢出，探测 Key 未出现在页面、响应或控制台
-- `node outputs/ui-reference/verify-canvas-studio.mjs` 通过，画布批量面板、右键菜单、组合分组和节点生成菜单在桌面端与移动端无脚本错误或横向溢出
+- `node outputs/ui-reference/verify-canvas-studio.mjs` 通过，画布批量面板、右键菜单、组合分组、节点生成菜单、云端恢复、自动保存和失败回退在桌面端与移动端无脚本错误或横向溢出
 - `node outputs/ui-reference/verify-chat-m1.mjs` 通过，对话空态、桌面成功流和移动端错误流保持正常
 - `node outputs/ui-reference/verify-chat-markdown.mjs` 通过，Markdown 标题、列表、表格、代码块复制、安全外链和脚本清理在桌面端与移动端均正常
 - `node outputs/ui-reference/verify-chat-attachments.mjs` 通过，图片上传、预览、发送、消息展示和历史恢复在桌面端与移动端均正常；验收使用 Mock，不调用真实 Provider
