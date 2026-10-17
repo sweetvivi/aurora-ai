@@ -231,4 +231,64 @@ describe('chat workspace store', () => {
       recoverable: true,
     });
   });
+
+  it('regenerates the latest reply without duplicating the user message', async () => {
+    apiMocks.streamChat.mockImplementation(
+      async (
+        _input: unknown,
+        handlers: {
+          onDone: (event: {
+            assistantMessageId: string;
+            balance: number;
+            requestId: string;
+            status: 'COMPLETED';
+          }) => void;
+          onMeta: (event: {
+            assistantMessageId: string;
+            balance: number;
+            conversationId: string;
+            modelAlias: string;
+            pointsCost: number;
+            requestId: string;
+          }) => void;
+        },
+      ) => {
+        const assistantMessageId = `assistant-${apiMocks.streamChat.mock.calls.length}`;
+
+        handlers.onMeta({
+          assistantMessageId,
+          balance: 99,
+          conversationId: 'conversation-regenerate',
+          modelAlias: 'openai-gpt-6-astra',
+          pointsCost: 1,
+          requestId: assistantMessageId,
+        });
+        handlers.onDone({
+          assistantMessageId,
+          balance: 99,
+          requestId: assistantMessageId,
+          status: 'COMPLETED',
+        });
+      },
+    );
+
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+    const chatStore = useChatWorkspaceStore();
+
+    await chatStore.initialize();
+    await chatStore.sendMessage('需要重试的问题');
+
+    expect(chatStore.messages).toHaveLength(2);
+
+    await chatStore.regenerateLastResponse();
+
+    expect(chatStore.messages).toHaveLength(2);
+    expect(chatStore.messages.map((message) => message.role)).toEqual(['user', 'assistant']);
+    expect(chatStore.messages.filter((message) => message.role === 'user')).toHaveLength(1);
+    expect(apiMocks.streamChat).toHaveBeenCalledTimes(2);
+  });
 });

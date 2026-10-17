@@ -4,10 +4,15 @@ import {
   ArrowUpOutlined,
   BulbOutlined,
   CodeOutlined,
+  CopyOutlined,
+  DislikeOutlined,
   DownOutlined,
+  EditOutlined,
   FileTextOutlined,
   HistoryOutlined,
+  LikeOutlined,
   LoadingOutlined,
+  MenuOutlined,
   MessageOutlined,
   PaperClipOutlined,
   PlusOutlined,
@@ -31,6 +36,10 @@ const { conversations, error, messages, models, selectedModelAlias, status, stre
 const prompt = ref('');
 const search = ref('');
 const conversationArea = ref<HTMLElement | null>(null);
+const composerInput = ref<HTMLTextAreaElement | null>(null);
+const historyOpen = ref(false);
+const copiedMessageId = ref('');
+const messageFeedback = ref<Record<string, '' | 'dislike' | 'like'>>({});
 
 const suggestions = [
   {
@@ -135,6 +144,7 @@ async function sendMessage(): Promise<void> {
 
 async function openConversation(conversationId: string): Promise<void> {
   await chatStore.openConversation(conversationId);
+  historyOpen.value = false;
   await scrollToBottom();
 }
 
@@ -142,7 +152,37 @@ function startNewConversation(): void {
   chatStore.newConversation();
   prompt.value = '';
   search.value = '';
+  historyOpen.value = false;
   void scrollToBottom(false);
+}
+
+async function copyMessage(messageId: string, content: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(content);
+    copiedMessageId.value = messageId;
+  } catch {
+    copiedMessageId.value = '';
+  }
+}
+
+function continueMessage(): void {
+  prompt.value = '请继续展开上一条回答，并给出更具体的步骤。';
+  composerInput.value?.focus();
+}
+
+function toggleFeedback(messageId: string, value: 'dislike' | 'like'): void {
+  messageFeedback.value[messageId] = messageFeedback.value[messageId] === value ? '' : value;
+}
+
+async function regenerateMessage(messageId: string): Promise<void> {
+  const assistantMessages = messages.value.filter((message) => message.role === 'assistant');
+
+  if (streaming.value || !assistantMessages.length || assistantMessages.at(-1)?.id !== messageId) {
+    return;
+  }
+
+  await chatStore.regenerateLastResponse();
+  await scrollToBottom();
 }
 
 async function retryLastPrompt(): Promise<void> {
@@ -190,7 +230,15 @@ function formatConversationTime(value: string | null): string {
 
 <template>
   <div class="chat-view">
-    <aside class="chat-history">
+    <button
+      v-if="historyOpen"
+      class="chat-history__backdrop"
+      type="button"
+      aria-label="关闭历史会话"
+      @click="historyOpen = false"
+    />
+
+    <aside class="chat-history" :class="{ open: historyOpen }">
       <header>
         <strong>所有会话</strong>
         <div>
@@ -237,6 +285,14 @@ function formatConversationTime(value: string | null): string {
     <main class="chat-main">
       <header class="chat-main__toolbar">
         <div>
+          <button
+            class="chat-main__history-toggle"
+            type="button"
+            aria-label="打开历史会话"
+            @click="historyOpen = true"
+          >
+            <MenuOutlined />
+          </button>
           <span class="chat-main__mark">极</span>
           <strong>模型对话</strong>
           <a-select
@@ -300,6 +356,49 @@ function formatConversationTime(value: string | null): string {
               <i v-if="message.status === 'STREAMING'" class="chat-message__cursor" />
               <em v-if="message.status === 'PENDING'">正在恢复生成状态...</em>
             </p>
+            <div
+              v-if="message.role === 'assistant' && message.status === 'COMPLETED'"
+              class="chat-message__actions"
+            >
+              <button
+                type="button"
+                :class="{ active: copiedMessageId === message.id }"
+                :title="copiedMessageId === message.id ? '已复制' : '复制回答'"
+                @click="copyMessage(message.id, message.content)"
+              >
+                <CopyOutlined />
+                <span>{{ copiedMessageId === message.id ? '已复制' : '复制' }}</span>
+              </button>
+              <button type="button" title="继续追问" @click="continueMessage">
+                <EditOutlined />
+                <span>继续追问</span>
+              </button>
+              <button
+                type="button"
+                title="重新生成"
+                :disabled="streaming"
+                @click="regenerateMessage(message.id)"
+              >
+                <ReloadOutlined />
+                <span>重新生成</span>
+              </button>
+              <button
+                type="button"
+                title="有帮助"
+                :class="{ active: messageFeedback[message.id] === 'like' }"
+                @click="toggleFeedback(message.id, 'like')"
+              >
+                <LikeOutlined />
+              </button>
+              <button
+                type="button"
+                title="需改进"
+                :class="{ active: messageFeedback[message.id] === 'dislike' }"
+                @click="toggleFeedback(message.id, 'dislike')"
+              >
+                <DislikeOutlined />
+              </button>
+            </div>
           </article>
         </div>
       </section>
@@ -318,6 +417,7 @@ function formatConversationTime(value: string | null): string {
 
         <div class="chat-composer__inner">
           <textarea
+            ref="composerInput"
             v-model="prompt"
             rows="3"
             :disabled="streaming"
@@ -377,6 +477,10 @@ function formatConversationTime(value: string | null): string {
   overflow: hidden;
   border-right: 1px solid #e8ebf0;
   background: #fff;
+}
+
+.chat-history__backdrop {
+  display: none;
 }
 
 .chat-history > header {
@@ -542,6 +646,19 @@ function formatConversationTime(value: string | null): string {
   min-width: 0;
   align-items: center;
   gap: 10px;
+}
+
+.chat-main__history-toggle {
+  display: none;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #e2e6ec;
+  border-radius: 8px;
+  background: #fff;
+  color: #596273;
+  cursor: pointer;
 }
 
 .chat-main__mark,
@@ -773,6 +890,45 @@ function formatConversationTime(value: string | null): string {
   font-style: normal;
 }
 
+.chat-message__actions {
+  display: flex;
+  grid-column: 2;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chat-message--user .chat-message__actions {
+  grid-column: 1;
+}
+
+.chat-message__actions button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #8a93a0;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.chat-message__actions button:hover,
+.chat-message__actions button.active {
+  border-color: #dbe5f8;
+  background: #f5f8ff;
+  color: #3979ed;
+}
+
+.chat-message__actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .chat-message__cursor {
   display: inline-block;
   width: 6px;
@@ -934,7 +1090,31 @@ function formatConversationTime(value: string | null): string {
   }
 
   .chat-history {
-    display: none;
+    position: fixed;
+    z-index: 45;
+    top: 56px;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    width: min(86vw, 320px);
+    border-right: 1px solid #e3e7ec;
+    box-shadow: 18px 0 44px rgb(31 43 65 / 14%);
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+  }
+
+  .chat-history.open {
+    transform: translateX(0);
+  }
+
+  .chat-history__backdrop {
+    position: fixed;
+    z-index: 40;
+    inset: 56px 0 0;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: rgb(28 36 50 / 24%);
   }
 
   .chat-main {
@@ -948,6 +1128,10 @@ function formatConversationTime(value: string | null): string {
 
   .chat-main__toolbar strong {
     display: none;
+  }
+
+  .chat-main__history-toggle {
+    display: grid;
   }
 
   .chat-main__model-select {
@@ -972,6 +1156,10 @@ function formatConversationTime(value: string | null): string {
 
   .chat-composer {
     padding: 10px 12px 16px;
+  }
+
+  .chat-message__actions {
+    flex-wrap: wrap;
   }
 
   .chat-error {

@@ -132,7 +132,7 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
         this.status = 'error';
       }
     },
-    async sendMessage(rawContent: string): Promise<void> {
+    async sendMessage(rawContent: string, options: { appendUser?: boolean } = {}): Promise<void> {
       const content = rawContent.trim();
 
       if (!content || this.streaming) {
@@ -159,14 +159,7 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
       const balanceBeforeRequest = sessionStore.points;
 
       this.error = null;
-      this.messages.push(
-        {
-          content,
-          createdAt,
-          id: createLocalId('user'),
-          role: 'user',
-          status: 'COMPLETED',
-        },
+      const nextMessages: ChatThreadMessage[] = [
         {
           content: '',
           createdAt,
@@ -174,7 +167,19 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
           role: 'assistant',
           status: 'STREAMING',
         },
-      );
+      ];
+
+      if (options.appendUser !== false) {
+        nextMessages.unshift({
+          content,
+          createdAt,
+          id: createLocalId('user'),
+          role: 'user',
+          status: 'COMPLETED',
+        });
+      }
+
+      this.messages.push(...nextMessages);
       this.status = 'streaming';
       activeStreamController = new AbortController();
 
@@ -257,6 +262,29 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
         activeStreamController = null;
         this.status = this.error ? 'error' : 'ready';
       }
+    },
+    async regenerateLastResponse(): Promise<void> {
+      if (this.streaming) {
+        return;
+      }
+
+      let lastUserIndex = -1;
+
+      for (let index = this.messages.length - 1; index >= 0; index -= 1) {
+        if (this.messages[index]?.role === 'user') {
+          lastUserIndex = index;
+          break;
+        }
+      }
+
+      const lastUserMessage = this.messages[lastUserIndex];
+
+      if (!lastUserMessage) {
+        return;
+      }
+
+      this.messages.splice(lastUserIndex + 1);
+      await this.sendMessage(lastUserMessage.content, { appendUser: false });
     },
     stopStreaming(): void {
       activeStreamController?.abort();
