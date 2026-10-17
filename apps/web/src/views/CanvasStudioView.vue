@@ -18,6 +18,7 @@ import {
   LoadingOutlined,
   MoreOutlined,
   NodeIndexOutlined,
+  PaperClipOutlined,
   PictureOutlined,
   PlusOutlined,
   QuestionCircleOutlined,
@@ -30,6 +31,7 @@ import {
   UploadOutlined,
   UserOutlined,
   VideoCameraOutlined,
+  GlobalOutlined,
   ZoomInOutlined,
   ZoomOutOutlined,
 } from '@ant-design/icons-vue';
@@ -206,7 +208,6 @@ const workflowTemplates: CanvasWorkflow[] = [
   },
 ];
 
-const routeName = 'ai-canvas';
 const workspace = useDrawWorkspaceStore();
 const modelCatalog = useModelCatalogStore();
 const nodes = ref<CanvasNode[]>([]);
@@ -225,7 +226,7 @@ const nodeMenuNodeId = ref('');
 const connectionFromId = ref('');
 const contextMenu = ref<CanvasContextMenu | null>(null);
 const canvasNotice = ref('');
-const inspirationOpen = ref(false);
+const inspirationOpen = ref(true);
 const inspirationMessage = ref('');
 const composerPrompt = ref('');
 const composerSourceNodeId = ref('');
@@ -242,9 +243,9 @@ const batchCancelRequested = ref(false);
 const saveState = ref<'idle' | 'saved' | 'saving'>('saved');
 const lastSavedAt = ref('10:30');
 const viewport = ref({
-  scale: 1,
+  scale: 0.9,
   x: 28,
-  y: 32,
+  y: 52,
 });
 const workspaceElement = ref<HTMLElement | null>(null);
 const nodeUploadInput = ref<HTMLInputElement | null>(null);
@@ -416,7 +417,7 @@ function createSeedCanvas(): CanvasSnapshot {
         status: 'done',
         title: '主视觉素材',
         width: 330,
-        x: 350,
+        x: 240,
         y: 145,
       },
       {
@@ -428,7 +429,7 @@ function createSeedCanvas(): CanvasSnapshot {
         status: 'done',
         title: '背景素材',
         width: 300,
-        x: 720,
+        x: 500,
         y: 420,
       },
       {
@@ -440,7 +441,7 @@ function createSeedCanvas(): CanvasSnapshot {
         status: 'idle',
         title: '融合指令',
         width: 310,
-        x: 270,
+        x: 230,
         y: 505,
       },
       {
@@ -452,7 +453,7 @@ function createSeedCanvas(): CanvasSnapshot {
         status: 'done',
         title: '输出结果',
         width: 330,
-        x: 820,
+        x: 590,
         y: 175,
       },
     ],
@@ -623,7 +624,7 @@ function createCanvas(): void {
   composerTargetNodeId.value = '';
   composerSourceNodeId.value = '';
   connectionFromId.value = '';
-  viewport.value = { scale: 1, x: 28, y: 32 };
+  viewport.value = { scale: 0.9, x: 28, y: 52 };
   persistCanvas();
 }
 
@@ -2088,7 +2089,6 @@ onBeforeUnmount(() => {
           </span>
           <div>
             <strong>{{ canvasTitle }}</strong>
-            <small>{{ routeName === 'ai-canvas' ? 'AI Canvas' : routeName }}</small>
           </div>
         </div>
 
@@ -2950,19 +2950,19 @@ onBeforeUnmount(() => {
 
       <section class="canvas-inspiration__intro">
         <h2>你好，Creator</h2>
-        <p>把图片或节点加入对话，提取风格、主体和提示词，继续扩展你的画布。</p>
+        <strong class="canvas-inspiration__eyebrow">在找灵感吗？</strong>
         <div>
           <span class="canvas-inspiration__preview">
-            <i />
-            <i />
-            <i />
+            <img src="/showcase/concept-v1.png" alt="灵感画板示例" />
           </span>
-          <p>将图片或视频节点拖入创作面板，可以生成更贴近素材的提示词和延展方向。</p>
+          <p>
+            将图片或视频节点拖入聊天框，可解锁高级功能：基于节点内容生成提示词，为你的创作提供更多灵感~
+          </p>
         </div>
-        <button type="button" @click="addPromptNode()">开始探索</button>
+        <button type="button" @click="addPromptNode()">我知道了</button>
       </section>
 
-      <section class="canvas-inspiration__history">
+      <section v-if="generatedWorks.length > 0" class="canvas-inspiration__history">
         <header>
           <strong>最近创作</strong>
           <button type="button" @click="activeRailMenu = 'history'">全部</button>
@@ -2989,7 +2989,10 @@ onBeforeUnmount(() => {
         />
         <footer>
           <button type="button" aria-label="添加素材" @click="activeRailMenu = 'assets'">
-            <PlusOutlined />
+            <PaperClipOutlined />
+          </button>
+          <button type="button" aria-label="浏览素材" @click="activeRailMenu = 'assets'">
+            <GlobalOutlined />
           </button>
           <button type="button" aria-label="画布设置" @click="resetViewport">
             <SettingOutlined />
@@ -3132,7 +3135,7 @@ onBeforeUnmount(() => {
   display: grid;
   height: calc(100vh - 56px);
   min-height: 680px;
-  grid-template-columns: minmax(0, 1fr) 304px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   overflow: hidden;
   background: #050506;
   color: #f4f5f8;
@@ -3218,11 +3221,6 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.canvas-topbar__title small {
-  color: #717783;
-  font-size: 7px;
-}
-
 .canvas-topbar__actions {
   display: flex;
   align-items: center;
@@ -3282,8 +3280,8 @@ onBeforeUnmount(() => {
 
 .canvas-rail {
   position: absolute;
-  top: 78px;
-  left: 16px;
+  top: 31%;
+  left: 18px;
   z-index: 31;
   display: grid;
   width: 40px;
@@ -3338,7 +3336,7 @@ onBeforeUnmount(() => {
 
 .canvas-rail-menu {
   position: absolute;
-  top: 136px;
+  top: calc(31% - 4px);
   left: 68px;
   z-index: 36;
   display: grid;
@@ -5018,78 +5016,53 @@ onBeforeUnmount(() => {
 
 .canvas-inspiration__intro {
   overflow-y: auto;
-  padding: 28px 17px 18px;
+  padding: 28px 20px 18px;
   scrollbar-width: thin;
 }
 
 .canvas-inspiration__intro h2 {
   margin: 0;
   color: #f1f2f5;
-  font-size: 21px;
+  font-size: 25px;
   line-height: 1.1;
 }
 
-.canvas-inspiration__intro > p {
-  margin: 9px 0 18px;
-  color: #737985;
-  font-size: 8px;
-  line-height: 1.6;
+.canvas-inspiration__eyebrow {
+  display: block;
+  margin-top: 8px;
+  color: #56c8ee;
+  font-size: 12px;
+  font-weight: 730;
 }
 
 .canvas-inspiration__intro > div {
+  margin-top: 25px;
   padding: 11px;
   border: 1px solid rgb(255 255 255 / 8%);
-  border-radius: 9px;
-  background: #17181d;
+  border-radius: 12px;
+  background: #f3f3f1;
+  box-shadow: 0 18px 42px rgb(0 0 0 / 18%);
 }
 
 .canvas-inspiration__preview {
   position: relative;
   display: block;
-  height: 120px;
+  height: 168px;
   overflow: hidden;
   border-radius: 7px;
-  background:
-    linear-gradient(135deg, rgb(103 73 228 / 26%), transparent 48%),
-    linear-gradient(30deg, #20222a, #121319);
+  background: #0e0f13;
 }
 
-.canvas-inspiration__preview i {
-  position: absolute;
-  display: block;
-  border: 1px solid rgb(255 255 255 / 14%);
-  border-radius: 5px;
-  background: linear-gradient(145deg, rgb(255 255 255 / 10%), rgb(255 255 255 / 3%));
-}
-
-.canvas-inspiration__preview i:nth-child(1) {
-  top: 21px;
-  left: 28px;
-  width: 116px;
-  height: 67px;
-  transform: rotate(-5deg);
-}
-
-.canvas-inspiration__preview i:nth-child(2) {
-  top: 33px;
-  left: 92px;
-  width: 112px;
-  height: 62px;
-  transform: rotate(4deg);
-}
-
-.canvas-inspiration__preview i:nth-child(3) {
-  top: 47px;
-  left: 160px;
-  width: 72px;
-  height: 57px;
-  transform: rotate(8deg);
+.canvas-inspiration__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .canvas-inspiration__intro > div > p {
   margin: 10px 1px 0;
-  color: #787e8a;
-  font-size: 7px;
+  color: #4e596a;
+  font-size: 9px;
   line-height: 1.6;
 }
 
@@ -5101,9 +5074,9 @@ onBeforeUnmount(() => {
   padding: 0 12px;
   border: 1px solid rgb(255 255 255 / 10%);
   border-radius: 7px;
-  background: #2b2c32;
-  color: #d8dae0;
-  font-size: 8px;
+  background: #3a3b40;
+  color: #f4f5f7;
+  font-size: 10px;
   cursor: pointer;
 }
 
@@ -5173,7 +5146,7 @@ onBeforeUnmount(() => {
 
 .canvas-inspiration__composer {
   display: grid;
-  min-height: 112px;
+  min-height: 108px;
   margin: 11px;
   padding: 12px;
   border: 1px solid rgb(255 255 255 / 9%);
@@ -5589,7 +5562,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1180px) {
   .canvas-studio {
-    grid-template-columns: minmax(0, 1fr) 270px;
+    grid-template-columns: minmax(0, 1fr) 330px;
   }
 
   .canvas-composer {
@@ -5631,7 +5604,6 @@ onBeforeUnmount(() => {
     padding-left: 10px;
   }
 
-  .canvas-topbar__title small,
   .canvas-save-state {
     display: none;
   }

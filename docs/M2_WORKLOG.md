@@ -8,7 +8,7 @@
 - 分支：`main`
 - 分支起始提交：`5ced005 docs: mark m1 synchronization complete`
 - 视频链路批次基线：`19af73a feat: connect media workflows and agent history`
-- 当前批次基线：`6c3b3c0 docs: sync project status and module coverage`
+- 当前批次基线：`cd4548c fix: align commerce initial catalog state`
 - 画布增强批次基线：`60f470d feat: complete commerce replacement tools`
 - 运行时模型目录批次基线：`136e1f5 feat: add configurable platform modules`
 - 超级对话批次基线：`d87fefd feat: expand newdraw template studio`
@@ -134,9 +134,11 @@
 - 批量生成：按未生成、失败和全部筛选图片、输出和视频节点，支持选择全部、预计积分、单线程顺序提交和停止后续任务；自动验收只检查面板，不点击开始生成
 - 连接约束：按节点类型限制输入输出，阻止自连和循环连接
 - 素材分类：全部、角色、场景、物品、风格、声音、其他
-- 默认界面：纯黑点阵无限画布、悬浮图片节点、左侧窄工具栏、顶部保存/新建操作、底部创作输入框和右下灵感入口
+- 默认界面：纯黑点阵无限画布、悬浮图片节点、左侧窄工具栏、顶部保存/新建操作、底部创作输入框和默认展开的“灵感画板”
 - 弹层结构：加号菜单、我的工作流/示例工作流、素材库、图片历史/视频历史均保持深色半透明悬浮面板
-- 交互边界：灵感画板默认关闭，可点击左侧灵感按钮或右下圆钮打开；继续保留节点、连线、历史、工作流和本地任务能力
+- 灵感画板：桌面端宽 360px、窄屏宽 330px；采用“你好，Creator / 在找灵感吗？”、真实示例图、说明文案和“我知道了”按钮，空历史不占用面板；底部保留素材、浏览、设置和发送入口
+- 画布布局：左侧工具栏按视口垂直居中，默认缩放为 90%，种子节点重新排布并避免被灵感画板遮挡
+- 交互边界：可点击左侧灵感按钮或右下圆钮关闭/重新打开；继续保留节点、连线、历史、工作流和本地任务能力
 
 ### 电商工具
 
@@ -595,6 +597,23 @@ node outputs/ui-reference/verify-commerce-studio.mjs
 - 点击工具后才渲染操作表单；点击“全部”恢复空状态，已保留素材上传、试穿、替换任务和移动端选择器行为
 - 桌面端 `1440x1000` 和移动端 `390x844` 均无横向溢出或页面脚本错误
 - 自动验收使用 Mock 路由，不调用真实 Provider，不读取或输出 Key
+
+AI 画布参考产品布局补充验证：
+
+```text
+pnpm format:check
+pnpm lint
+pnpm --filter @aurora/web typecheck
+pnpm --filter @aurora/web test
+pnpm test
+pnpm build
+node outputs/ui-reference/verify-canvas-studio.mjs
+```
+
+- 灵感画板默认展开，桌面端宽度 360px，窄屏 330px；空历史隐藏，真实示例图和“我知道了”入口正常展示
+- 左侧工具栏、默认缩放和种子节点位置完成对齐，节点不会被侧栏或右下灵感入口遮挡
+- 桌面端 `1440x1000`、移动端 `390x844` 均无横向溢出或页面脚本错误；验收使用本地状态，不调用真实 Provider、不读取或输出 Key
+- Web 测试为 13 个文件 53 项，API 测试为 18 个文件 74 项；格式检查、lint、类型检查和构建均通过
 
 ## 5. 密钥和外部调用边界
 
