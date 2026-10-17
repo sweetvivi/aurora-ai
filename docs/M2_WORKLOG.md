@@ -637,6 +637,29 @@ node outputs/ui-reference/verify-commerce-studio.mjs
 - 电商验收覆盖空状态、占位值、两列分类、字段顺序、示例图、必填参数、素材上传和任务请求；桌面端 `1440x1000`、移动端 `390x844` 均无横向溢出或页面脚本错误
 - Web 测试为 13 个文件 53 项，API 测试为 18 个文件 74 项；格式检查、lint、类型检查、测试和构建全部通过
 
+视频创作页参考产品布局补充验证：
+
+```text
+pnpm format:check
+pnpm lint
+pnpm --filter @aurora/web typecheck
+pnpm --filter @aurora/web test
+pnpm --filter @aurora/api test -- --runInBand
+pnpm build
+node outputs/ui-reference/verify-video-studio.mjs
+node outputs/ui-reference/verify-video-preview.mjs
+node outputs/ui-reference/verify-video-tasks.mjs
+```
+
+- `/image-generation`、`/retouch`、`/image-tools` 和 `/video` 在桌面端启用约 80px 的参考产品式紧凑主侧栏，图标与文字纵向排列，分组间距和激活态同步收紧
+- 视频工作台列宽调整为 `78px + 322px + 剩余宽度`，提示词上限从 800 字扩展到 4000 字，API DTO 同步校验
+- 新增 AI 音效、极速模式和自适应增强项；未接入能力标记“待接入”，自适应标记“本地生效”
+- 首尾帧当前未接入，改为禁用并显示提示；真实视频 Provider 继续只支持文生视频和单张参考图
+- 完成作品卡补齐复制提示词和收藏入口标题，移动端操作栏不截断
+- 桌面端 `1440x1000` 和移动端 `390x844` 均无横向溢出、无页面脚本错误；视频任务 Mock 轮询两次后成功
+- Web 测试为 13 个文件 53 项，API 测试为 18 个文件 74 项；格式检查、lint、类型检查、测试和构建全部通过
+- 自动验收全部使用 Mock 或 Playwright 路由拦截，不调用真实图片、视频或对话 Provider，不读取或输出 Key
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥

@@ -56,10 +56,22 @@ interface ShowcaseItem {
   variant: number;
 }
 
-const modes: { description: string; label: string; value: VideoMode }[] = [
+interface VideoModeOption {
+  available?: boolean;
+  description: string;
+  label: string;
+  value: VideoMode;
+}
+
+const modes: VideoModeOption[] = [
   { description: '用文字描述镜头', label: '文生视频', value: 'text-to-video' },
   { description: '上传图片生成视频', label: '图生视频', value: 'image-to-video' },
-  { description: '控制首尾画面', label: '首尾帧', value: 'first-last-frame' },
+  {
+    available: false,
+    description: '控制首尾画面',
+    label: '首尾帧',
+    value: 'first-last-frame',
+  },
 ];
 
 const modelAccents = ['#7c72ff', '#e5689a', '#21a77c', '#3979d5'];
@@ -337,6 +349,11 @@ async function consumeRouteContext(): Promise<void> {
 }
 
 function changeMode(nextMode: VideoMode): void {
+  if (modes.find((item) => item.value === nextMode)?.available === false) {
+    showNotice('首尾帧能力待接入，当前支持文生视频和单图参考');
+    return;
+  }
+
   mode.value = nextMode;
   formError.value = '';
 
@@ -644,12 +661,14 @@ onBeforeUnmount(() => {
               :key="item.value"
               type="button"
               :class="{ active: mode === item.value }"
+              :disabled="item.available === false"
+              :title="item.available === false ? '首尾帧能力待接入' : item.description"
               @click="changeMode(item.value)"
             >
               <PlayCircleOutlined />
               <span>
                 <strong>{{ item.label }}</strong>
-                <small>{{ item.description }}</small>
+                <small>{{ item.available === false ? '待接入' : item.description }}</small>
               </span>
               <CheckOutlined v-if="mode === item.value" />
             </button>
@@ -685,7 +704,7 @@ onBeforeUnmount(() => {
             >
               <UploadOutlined />
               <strong>{{ sourceFrames.length === 0 ? '上传参考画面' : '补充尾帧' }}</strong>
-              <small>JPG、PNG、WebP</small>
+              <small>当前支持图片，视频/音频待接入</small>
             </button>
           </div>
         </section>
@@ -695,10 +714,10 @@ onBeforeUnmount(() => {
           <span>
             <textarea
               v-model="prompt"
-              maxlength="800"
-              placeholder="描述主体、动作、镜头运动、光线和氛围"
+              maxlength="4000"
+              placeholder="一句话描述你的视频主题，场景、风格等（新手推荐点击下方使用AI智能创作提示词）"
             />
-            <small>{{ prompt.length }} / 800</small>
+            <small>{{ prompt.length }} / 4000</small>
           </span>
         </label>
 
@@ -712,6 +731,30 @@ onBeforeUnmount(() => {
             {{ preset }}
           </button>
         </div>
+
+        <section class="video-enhancements" aria-label="创作增强">
+          <div>
+            <span>
+              <strong>AI 音效</strong>
+              <small>根据画面自动匹配声音</small>
+            </span>
+            <em>待接入</em>
+          </div>
+          <div>
+            <span>
+              <strong>极速模式</strong>
+              <small>优先返回生成结果</small>
+            </span>
+            <em>待接入</em>
+          </div>
+          <div>
+            <span>
+              <strong>自适应</strong>
+              <small>按当前规格自动匹配</small>
+            </span>
+            <em>本地生效</em>
+          </div>
+        </section>
 
         <section class="video-section video-section--options">
           <header>
@@ -908,6 +951,7 @@ onBeforeUnmount(() => {
                   v-if="task.status === 'done'"
                   type="button"
                   :class="{ active: task.favorite }"
+                  title="收藏"
                   @click="toggleFavorite(task.id)"
                 >
                   <StarOutlined />
@@ -922,6 +966,14 @@ onBeforeUnmount(() => {
                 </button>
                 <button v-if="task.status === 'done'" type="button" @click="reuseTask(task)">
                   <ReloadOutlined />
+                </button>
+                <button
+                  v-if="task.status === 'done'"
+                  type="button"
+                  title="复制提示词"
+                  @click="copyPrompt(task.prompt)"
+                >
+                  <CopyOutlined />
                 </button>
                 <button
                   v-if="task.status === 'cancelled' || task.status === 'failed'"
@@ -1133,7 +1185,7 @@ onBeforeUnmount(() => {
 .video-workbench {
   display: grid;
   min-height: calc(100vh - 114px);
-  grid-template-columns: 78px 310px minmax(0, 1fr);
+  grid-template-columns: 78px 322px minmax(0, 1fr);
 }
 
 .video-model-rail {
@@ -1326,6 +1378,18 @@ onBeforeUnmount(() => {
   color: #bdaaff;
 }
 
+.video-mode-grid button:disabled {
+  border-color: #24242a;
+  background: #101014;
+  color: #5d5d66;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.video-mode-grid button:disabled small {
+  color: #a183e9;
+}
+
 .video-mode-grid button > :deep(svg:first-child) {
   font-size: 13px;
 }
@@ -1496,6 +1560,61 @@ onBeforeUnmount(() => {
 .video-presets button:hover {
   border-color: #6558cf;
   color: #c5b9ff;
+}
+
+.video-enhancements {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  margin: 2px 0 13px;
+  border: 1px solid #24242b;
+  border-radius: 8px;
+  background: #18181d;
+}
+
+.video-enhancements > div {
+  display: flex;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 9px;
+  background: #111115;
+}
+
+.video-enhancements > div > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.video-enhancements strong {
+  color: #d9d9df;
+  font-size: 8px;
+}
+
+.video-enhancements small {
+  overflow: hidden;
+  color: #666670;
+  font-size: 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-enhancements em {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border: 1px solid #383044;
+  border-radius: 999px;
+  color: #9c83e5;
+  font-size: 6px;
+  font-style: normal;
+}
+
+.video-enhancements > div:last-child em {
+  border-color: #28483c;
+  color: #70c9a0;
 }
 
 .video-section--options {
@@ -1687,7 +1806,7 @@ onBeforeUnmount(() => {
 .video-showcase-grid {
   display: grid;
   gap: 13px;
-  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(218px, 1fr));
 }
 
 .video-showcase-card {
@@ -2159,7 +2278,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1180px) {
   .video-workbench {
-    grid-template-columns: 72px 285px minmax(0, 1fr);
+    grid-template-columns: 72px 294px minmax(0, 1fr);
   }
 
   .video-showcase-grid {

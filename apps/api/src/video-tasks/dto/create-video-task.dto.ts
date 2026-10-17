@@ -3,7 +3,7 @@ import { IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-vali
 export class CreateVideoTaskDto {
   @IsString()
   @MinLength(1)
-  @MaxLength(2_000)
+  @MaxLength(4_000)
   prompt!: string;
 
   @IsOptional()
