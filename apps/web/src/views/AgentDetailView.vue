@@ -3,9 +3,14 @@ import {
   ArrowLeftOutlined,
   ClockCircleOutlined,
   CloseOutlined,
+  CopyOutlined,
+  DislikeOutlined,
+  EditOutlined,
   HistoryOutlined,
+  LikeOutlined,
   MessageOutlined,
   PlusOutlined,
+  ReloadOutlined,
   SearchOutlined,
   SendOutlined,
   StopOutlined,
@@ -26,7 +31,10 @@ const activeSessionId = ref<string | null>(null);
 const conversationArea = ref<HTMLElement | null>(null);
 const consumedRoutePrompt = ref('');
 const sessionSearchInput = ref<HTMLInputElement | null>(null);
+const composerInput = ref<HTMLTextAreaElement | null>(null);
 const historyOpen = ref(false);
+const copiedMessageId = ref('');
+const messageFeedback = ref<Record<string, '' | 'dislike' | 'like'>>({});
 const streaming = computed(() => workspace.streamingSessionId !== null);
 
 const agent = computed(
@@ -140,6 +148,42 @@ function selectHistorySession(sessionId: string): void {
 
 function useStarter(starter: string): void {
   prompt.value = starter;
+  composerInput.value?.focus();
+}
+
+async function copyMessage(messageId: string, content: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(content);
+    copiedMessageId.value = messageId;
+  } catch {
+    copiedMessageId.value = '';
+  }
+}
+
+function continueMessage(): void {
+  prompt.value = '请继续展开上一条回答，并给出更具体的步骤。';
+  composerInput.value?.focus();
+}
+
+function toggleFeedback(messageId: string, value: 'dislike' | 'like'): void {
+  messageFeedback.value[messageId] = messageFeedback.value[messageId] === value ? '' : value;
+}
+
+async function regenerateMessage(messageId: string): Promise<void> {
+  if (!agent.value || !activeSessionId.value || streaming.value) {
+    return;
+  }
+
+  const lastAssistantMessage = [...messages.value]
+    .reverse()
+    .find((message) => message.role === 'assistant');
+
+  if (lastAssistantMessage?.id !== messageId) {
+    return;
+  }
+
+  await workspace.regenerateLastResponse(agent.value, activeSessionId.value);
+  await scrollToLatest();
 }
 
 async function sendMessage(): Promise<void> {
@@ -334,6 +378,49 @@ watch(
               <p v-else>
                 {{ message.content }}
               </p>
+              <div
+                v-if="message.role === 'assistant' && message.status === 'COMPLETED'"
+                class="agent-detail__message-actions"
+              >
+                <button
+                  type="button"
+                  :class="{ active: copiedMessageId === message.id }"
+                  :title="copiedMessageId === message.id ? '已复制' : '复制回答'"
+                  @click="copyMessage(message.id, message.content)"
+                >
+                  <CopyOutlined />
+                  <span>{{ copiedMessageId === message.id ? '已复制' : '复制' }}</span>
+                </button>
+                <button type="button" title="继续追问" @click="continueMessage">
+                  <EditOutlined />
+                  <span>继续追问</span>
+                </button>
+                <button
+                  type="button"
+                  title="重新生成"
+                  :disabled="streaming"
+                  @click="regenerateMessage(message.id)"
+                >
+                  <ReloadOutlined />
+                  <span>重新生成</span>
+                </button>
+                <button
+                  type="button"
+                  title="有帮助"
+                  :class="{ active: messageFeedback[message.id] === 'like' }"
+                  @click="toggleFeedback(message.id, 'like')"
+                >
+                  <LikeOutlined />
+                </button>
+                <button
+                  type="button"
+                  title="需改进"
+                  :class="{ active: messageFeedback[message.id] === 'dislike' }"
+                  @click="toggleFeedback(message.id, 'dislike')"
+                >
+                  <DislikeOutlined />
+                </button>
+              </div>
             </div>
           </article>
         </div>
@@ -355,6 +442,7 @@ watch(
         </div>
         <div class="agent-detail__input">
           <textarea
+            ref="composerInput"
             v-model="prompt"
             rows="2"
             :disabled="streaming"
@@ -832,6 +920,46 @@ watch(
   font-size: 12px;
   line-height: 1.75;
   text-align: left;
+}
+
+.agent-detail__message-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.agent-detail__message-actions button {
+  display: inline-flex;
+  height: 27px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #89919e;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.agent-detail__message-actions button:hover,
+.agent-detail__message-actions button.active {
+  border-color: #dce6f8;
+  background: #f5f8fe;
+  color: #3979ed;
+}
+
+.agent-detail__message-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.agent-detail__message-actions button:disabled:hover {
+  border-color: transparent;
+  background: transparent;
+  color: #89919e;
 }
 
 .agent-detail__message--user p {

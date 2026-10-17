@@ -372,4 +372,76 @@ describe('agent workspace store', () => {
     finishStream?.();
     await sendPromise;
   });
+
+  it('regenerates the final response without appending a duplicate user message', async () => {
+    const agent = getAgentById('code-mentor')!;
+    let requestCount = 0;
+
+    apiMocks.streamChat.mockImplementation(
+      async (
+        input: { content: string },
+        handlers: {
+          onDelta: (event: { content: string }) => void;
+          onDone: (event: {
+            assistantMessageId: string;
+            balance: number;
+            requestId: string;
+            status: 'COMPLETED';
+          }) => void;
+          onMeta: (event: {
+            assistantMessageId: string;
+            balance: number;
+            conversationId: string;
+            modelAlias: string;
+            pointsCost: number;
+            requestId: string;
+          }) => void;
+        },
+      ) => {
+        requestCount += 1;
+        const suffix = requestCount === 1 ? '第一次回答' : '重新生成的回答';
+
+        expect(input.content).toBe('解释这段代码');
+        handlers.onMeta({
+          assistantMessageId: `assistant-regenerate-${requestCount}`,
+          balance: 100 - requestCount,
+          conversationId: 'conversation-regenerate',
+          modelAlias: 'openai-gpt-6-astra',
+          pointsCost: 1,
+          requestId: `request-regenerate-${requestCount}`,
+        });
+        handlers.onDelta({ content: suffix });
+        handlers.onDone({
+          assistantMessageId: `assistant-regenerate-${requestCount}`,
+          balance: 100 - requestCount,
+          requestId: `request-regenerate-${requestCount}`,
+          status: 'COMPLETED',
+        });
+      },
+    );
+
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+    const store = useAgentWorkspaceStore();
+
+    await store.initialize();
+    const session = await store.sendMessage(agent, '解释这段代码');
+    const regenerated = await store.regenerateLastResponse(agent, session.id);
+
+    expect(regenerated?.messages).toEqual([
+      expect.objectContaining({
+        content: '解释这段代码',
+        role: 'user',
+      }),
+      expect.objectContaining({
+        content: '重新生成的回答',
+        role: 'assistant',
+        status: 'COMPLETED',
+      }),
+    ]);
+    expect(apiMocks.streamChat).toHaveBeenCalledTimes(2);
+  });
 });

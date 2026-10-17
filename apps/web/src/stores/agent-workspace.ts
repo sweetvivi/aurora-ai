@@ -28,6 +28,10 @@ export interface AgentSession {
   updatedAt: number;
 }
 
+export interface AgentSendOptions {
+  appendUser?: boolean;
+}
+
 export interface AgentDraft {
   capabilities: AgentCapabilityId[];
   description: string;
@@ -270,6 +274,7 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
       agent: AgentCatalogItem,
       content: string,
       sessionId?: string,
+      options: AgentSendOptions = {},
     ): Promise<AgentSession> {
       const normalized = content.trim();
       let session = sessionId ? this.sessions.find((item) => item.id === sessionId) : undefined;
@@ -295,13 +300,15 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
       const now = Date.now();
       const assistantMessageId = makeId('message');
 
-      session.messages.push({
-        content: normalized,
-        createdAt: now,
-        id: makeId('message'),
-        role: 'user',
-        status: 'COMPLETED',
-      });
+      if (options.appendUser !== false) {
+        session.messages.push({
+          content: normalized,
+          createdAt: now,
+          id: makeId('message'),
+          role: 'user',
+          status: 'COMPLETED',
+        });
+      }
       session.messages.push({
         content: '',
         createdAt: now + 1,
@@ -405,6 +412,30 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
       }
 
       return session;
+    },
+    async regenerateLastResponse(
+      agent: AgentCatalogItem,
+      sessionId: string,
+    ): Promise<AgentSession | undefined> {
+      const session = this.sessions.find((item) => item.id === sessionId);
+
+      if (!session || session.agentId !== agent.id || this.streamingSessionId) {
+        return session;
+      }
+
+      const lastUserMessage = [...session.messages]
+        .reverse()
+        .find((message) => message.role === 'user');
+
+      if (!lastUserMessage) {
+        return session;
+      }
+
+      const lastUserIndex = session.messages.findIndex(
+        (message) => message.id === lastUserMessage.id,
+      );
+      session.messages.splice(lastUserIndex + 1);
+      return this.sendMessage(agent, lastUserMessage.content, session.id, { appendUser: false });
     },
     stopStreaming(): void {
       activeAgentStreamController?.abort();

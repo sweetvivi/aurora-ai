@@ -193,6 +193,15 @@ AI 画布和电商工具复用同一异步图片任务 Store，并分别使用 `
 - 真实联调：通过本地 API 和 `http://127.0.0.1:5173/chat` 选择 `Qwen 3.8 Max` 完成一次真实 SSE 对话，浏览器收到 `OK`，无页面错误或横向溢出
 - 可用性：GPT 和 DeepSeek 组当前受上游服务影响分别返回不可用或限流并自动退款；千问组已验证 4 个模型均可返回 `OK`
 
+### 智能体助手消息操作
+
+- 页面：`apps/web/src/views/AgentDetailView.vue`
+- Store：`apps/web/src/stores/agent-workspace.ts`
+- 能力：助手完成态消息支持复制、继续追问、重新生成、有帮助和需改进反馈
+- 重新生成：复用当前会话最后一条用户消息，先移除旧的后续消息，再通过原有 SSE 链路生成；不会重复追加用户消息或新建会话
+- 状态边界：流式生成期间禁用重新生成；没有用户消息或会话不属于当前智能体时保持原状态
+- 验收：`verify-agent-detail-actions.mjs` 覆盖 `1440x1000` 桌面端和 `390x844` 移动端，确认操作按钮、重新生成内容、请求次数、消息数量和横向溢出；整个验收使用 Playwright 路由拦截，不调用真实 Provider
+
 ### 对话页视觉对齐
 
 - 页面：`apps/web/src/views/ChatView.vue`
