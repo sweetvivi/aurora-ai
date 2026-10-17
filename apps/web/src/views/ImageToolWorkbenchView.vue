@@ -28,7 +28,7 @@ import {
 import type { Component } from 'vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import type { FileAsset } from '@/app/api';
+import { fetchFileBlob, type FileAsset } from '@/app/api';
 import {
   IMAGE_TASK_POINTS_COST,
   useDrawWorkspaceStore,
@@ -161,6 +161,7 @@ const sourceError = ref('');
 const sourceImage = ref<SourceImage | null>(null);
 const sourceInput = ref<HTMLInputElement | null>(null);
 const uploading = ref(false);
+const consumedRouteContext = ref('');
 
 const isGeneration = computed(() => route.name === 'image-generation');
 const toolKey = computed(() => (isGeneration.value ? 'image-generation' : 'smart-retouch'));
@@ -239,6 +240,73 @@ function resetLocalForm(): void {
   if (sourceImage.value) {
     URL.revokeObjectURL(sourceImage.value.url);
     sourceImage.value = null;
+  }
+}
+
+async function consumeRouteContext(): Promise<void> {
+  const queryOperation =
+    typeof route.query.operation === 'string' ? route.query.operation.trim() : '';
+  const queryPrompt = typeof route.query.prompt === 'string' ? route.query.prompt.trim() : '';
+  const sourceWorkId =
+    typeof route.query.sourceWork === 'string' ? route.query.sourceWork.trim() : '';
+  const routeKey = `${String(route.name)}:${queryOperation}:${sourceWorkId}:${queryPrompt}`;
+
+  if (consumedRouteContext.value === routeKey) {
+    return;
+  }
+
+  consumedRouteContext.value = routeKey;
+
+  if (
+    !isGeneration.value &&
+    queryOperation &&
+    retouchOperations.some((operation) => operation.value === queryOperation)
+  ) {
+    selectedOperation.value = queryOperation;
+  }
+
+  if (queryPrompt) {
+    if (isGeneration.value) {
+      prompt.value = queryPrompt;
+    } else {
+      instruction.value = queryPrompt;
+    }
+  }
+
+  if (!sourceWorkId || isGeneration.value) {
+    return;
+  }
+
+  uploading.value = true;
+  sourceError.value = '';
+
+  try {
+    await workspace.initialize();
+
+    const work = workspace.works.find(
+      (item) => item.id === sourceWorkId && item.status === 'done' && item.resultFileId,
+    );
+
+    if (!work?.resultFileId) {
+      throw new Error('原作品文件暂不可用，请重新上传图片');
+    }
+
+    const blob = await fetchFileBlob(work.resultFileId);
+
+    if (sourceImage.value) {
+      URL.revokeObjectURL(sourceImage.value.url);
+    }
+
+    sourceImage.value = {
+      assetId: work.resultFileId,
+      id: work.resultFileId,
+      name: work.resultFileName || `draw-${work.id}.png`,
+      url: URL.createObjectURL(blob),
+    };
+  } catch (error) {
+    sourceError.value = error instanceof Error ? error.message : '原作品载入失败，请重新上传图片';
+  } finally {
+    uploading.value = false;
   }
 }
 
@@ -370,11 +438,21 @@ watch(
   () => route.name,
   () => {
     resetLocalForm();
+    consumedRouteContext.value = '';
+    void consumeRouteContext();
+  },
+);
+
+watch(
+  () => [route.query.operation, route.query.prompt, route.query.sourceWork],
+  () => {
+    void consumeRouteContext();
   },
 );
 
 onMounted(() => {
   void workspace.initialize();
+  void consumeRouteContext();
 });
 
 onBeforeUnmount(() => {

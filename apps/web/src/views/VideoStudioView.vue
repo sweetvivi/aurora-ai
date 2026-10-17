@@ -16,9 +16,11 @@ import {
   UploadOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons-vue';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { RouterLink } from 'vue-router';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { RouterLink, useRoute } from 'vue-router';
+import { fetchFileBlob } from '@/app/api';
 import GalleryArtwork from '@/components/GalleryArtwork.vue';
+import { useDrawWorkspaceStore } from '@/stores/draw-workspace';
 
 type VideoMode = 'first-last-frame' | 'image-to-video' | 'text-to-video';
 type VideoTaskStatus = 'cancelled' | 'done' | 'failed' | 'generating' | 'queued';
@@ -175,6 +177,8 @@ const promptPresets = [
 ];
 
 const activeGalleryTab = ref<GalleryTab>('discover');
+const route = useRoute();
+const drawWorkspace = useDrawWorkspaceStore();
 const mode = ref<VideoMode>('text-to-video');
 const selectedModel = ref(models[0]?.value ?? 'aurora-video-3');
 const selectedRatio = ref('16:9');
@@ -185,6 +189,7 @@ const sourceFrames = ref<SourceFrame[]>([]);
 const sourceInput = ref<HTMLInputElement | null>(null);
 const tasks = ref<VideoTask[]>([]);
 const formError = ref('');
+const consumedRouteContext = ref('');
 let progressTimer: number | undefined;
 
 const activeModel = computed(
@@ -316,6 +321,63 @@ function removeAllSourceFrames(): void {
   }
 
   sourceFrames.value = [];
+}
+
+function isVideoMode(value: string): value is VideoMode {
+  return modes.some((item) => item.value === value);
+}
+
+async function consumeRouteContext(): Promise<void> {
+  const queryMode = typeof route.query.mode === 'string' ? route.query.mode.trim() : '';
+  const queryPrompt = typeof route.query.prompt === 'string' ? route.query.prompt.trim() : '';
+  const sourceWorkId =
+    typeof route.query.sourceWork === 'string' ? route.query.sourceWork.trim() : '';
+  const routeKey = `${queryMode}:${queryPrompt}:${sourceWorkId}`;
+
+  if (consumedRouteContext.value === routeKey) {
+    return;
+  }
+
+  consumedRouteContext.value = routeKey;
+
+  if (queryMode && isVideoMode(queryMode)) {
+    changeMode(queryMode);
+  }
+
+  if (queryPrompt) {
+    prompt.value = queryPrompt;
+  }
+
+  if (!sourceWorkId) {
+    return;
+  }
+
+  formError.value = '';
+
+  try {
+    await drawWorkspace.initialize();
+
+    const work = drawWorkspace.works.find(
+      (item) => item.id === sourceWorkId && item.status === 'done' && item.resultFileId,
+    );
+
+    if (!work?.resultFileId) {
+      throw new Error('原作品文件暂不可用，请重新上传参考图');
+    }
+
+    const blob = await fetchFileBlob(work.resultFileId);
+
+    removeAllSourceFrames();
+    changeMode('image-to-video');
+    sourceFrames.value = [
+      {
+        name: work.resultFileName || `draw-${work.id}.png`,
+        url: URL.createObjectURL(blob),
+      },
+    ];
+  } catch (error) {
+    formError.value = error instanceof Error ? error.message : '原作品载入失败，请重新上传参考图';
+  }
 }
 
 function changeMode(nextMode: VideoMode): void {
@@ -487,11 +549,19 @@ function variantFromId(value: string): number {
 
 onMounted(() => {
   loadStoredTasks();
+  void consumeRouteContext();
 
   if (activeTasks.value.length > 0) {
     progressTimer = window.setInterval(advanceTasks, 650);
   }
 });
+
+watch(
+  () => [route.query.mode, route.query.prompt, route.query.sourceWork],
+  () => {
+    void consumeRouteContext();
+  },
+);
 
 onBeforeUnmount(() => {
   clearProgressTimer();

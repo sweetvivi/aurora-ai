@@ -2,6 +2,7 @@
 import {
   ArrowLeftOutlined,
   ClockCircleOutlined,
+  CloseOutlined,
   HistoryOutlined,
   MessageOutlined,
   PlusOutlined,
@@ -12,7 +13,7 @@ import {
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getAgentById } from '@/data/agents';
-import { useAgentWorkspaceStore } from '@/stores/agent-workspace';
+import { useAgentWorkspaceStore, type AgentSession } from '@/stores/agent-workspace';
 
 const route = useRoute();
 const router = useRouter();
@@ -23,6 +24,7 @@ const activeSessionId = ref<string | null>(null);
 const conversationArea = ref<HTMLElement | null>(null);
 const consumedRoutePrompt = ref('');
 const sessionSearchInput = ref<HTMLInputElement | null>(null);
+const historyOpen = ref(false);
 const streaming = computed(() => workspace.streamingSessionId !== null);
 
 const agent = computed(
@@ -54,8 +56,50 @@ const activeSession = computed(
 );
 
 const messages = computed(() => activeSession.value?.messages ?? []);
+const historyGroups = computed(() => {
+  const groups = new Map<string, AgentSession[]>();
+
+  for (const session of sessions.value) {
+    const label = formatHistoryDate(session.updatedAt);
+    const items = groups.get(label) ?? [];
+
+    items.push(session);
+    groups.set(label, items);
+  }
+
+  return [...groups.entries()].map(([label, items]) => ({ items, label }));
+});
 
 function formatTime(timestamp: number): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(timestamp);
+}
+
+function formatHistoryDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const dayDifference = Math.round((startOfToday - startOfDate) / 86_400_000);
+
+  if (dayDifference === 0) {
+    return '今天';
+  }
+
+  if (dayDifference === 1) {
+    return '昨天';
+  }
+
+  if (dayDifference < 7) {
+    return '最近 7 天';
+  }
+
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+function formatHistoryTimestamp(timestamp: number): string {
   return new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
@@ -79,11 +123,17 @@ function selectSession(sessionId: string): void {
 function startNewSession(): void {
   activeSessionId.value = null;
   prompt.value = '';
+  historyOpen.value = false;
   void scrollToLatest();
 }
 
-function focusSessionSearch(): void {
-  sessionSearchInput.value?.focus();
+function openHistory(): void {
+  historyOpen.value = true;
+}
+
+function selectHistorySession(sessionId: string): void {
+  selectSession(sessionId);
+  historyOpen.value = false;
 }
 
 function useStarter(starter: string): void {
@@ -171,7 +221,7 @@ watch(
             <PlusOutlined />
             新对话
           </button>
-          <button type="button" aria-label="会话记录">
+          <button type="button" aria-label="会话记录" @click="openHistory">
             <HistoryOutlined />
           </button>
         </div>
@@ -273,7 +323,7 @@ watch(
             <MessageOutlined />
             新建对话
           </button>
-          <button type="button" @click="focusSessionSearch">
+          <button type="button" @click="openHistory">
             <HistoryOutlined />
             历史记录
           </button>
@@ -310,6 +360,61 @@ watch(
         </div>
       </footer>
     </main>
+
+    <Teleport to="body">
+      <div
+        v-if="historyOpen"
+        class="agent-history-layer"
+        role="presentation"
+        @click.self="historyOpen = false"
+      >
+        <aside class="agent-history-panel" aria-label="历史记录">
+          <header>
+            <div>
+              <span><HistoryOutlined /></span>
+              <strong>历史记录</strong>
+              <small>{{ sessions.length }} 个对话</small>
+            </div>
+            <button type="button" aria-label="关闭历史记录" @click="historyOpen = false">
+              <CloseOutlined />
+            </button>
+          </header>
+
+          <div v-if="historyGroups.length > 0" class="agent-history-panel__groups">
+            <section v-for="group in historyGroups" :key="group.label">
+              <h3>{{ group.label }}</h3>
+              <button
+                v-for="session in group.items"
+                :key="session.id"
+                type="button"
+                :class="{ active: activeSessionId === session.id }"
+                @click="selectHistorySession(session.id)"
+              >
+                <span class="agent-history-panel__avatar">
+                  {{ session.title.slice(0, 1) }}
+                </span>
+                <span>
+                  <strong>{{ session.title }}</strong>
+                  <small>
+                    {{ session.messages.length }} 条消息 ·
+                    {{ formatHistoryTimestamp(session.updatedAt) }}
+                  </small>
+                </span>
+              </button>
+            </section>
+          </div>
+
+          <div v-else class="agent-history-panel__empty">
+            <MessageOutlined />
+            <strong>{{ search ? '没有匹配的会话' : '暂无历史记录' }}</strong>
+            <p>
+              {{ search ? '换一个关键词继续搜索。' : '发送第一条消息后，会话会保存在这里。' }}
+            </p>
+            <button type="button" @click="startNewSession">新建对话</button>
+          </div>
+        </aside>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -756,6 +861,203 @@ watch(
   cursor: not-allowed;
 }
 
+.agent-history-layer {
+  position: fixed;
+  z-index: 1700;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(22 30 43 / 24%);
+  backdrop-filter: blur(2px);
+}
+
+.agent-history-panel {
+  display: flex;
+  width: min(380px, 100%);
+  height: 100%;
+  flex-direction: column;
+  border-left: 1px solid #e9edf2;
+  background: #fff;
+  box-shadow: -20px 0 54px rgb(21 31 48 / 14%);
+  animation: agent-history-slide-in 180ms ease-out both;
+}
+
+.agent-history-panel > header {
+  display: flex;
+  min-height: 74px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 20px;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.agent-history-panel > header > div {
+  display: grid;
+  align-items: center;
+  gap: 1px 10px;
+  grid-template-columns: 36px auto;
+}
+
+.agent-history-panel > header > div > span {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  grid-row: 1 / span 2;
+  place-items: center;
+  border-radius: 10px;
+  background: #eef4ff;
+  color: #4c84ff;
+}
+
+.agent-history-panel > header strong {
+  color: #343c48;
+  font-size: 14px;
+}
+
+.agent-history-panel > header small {
+  color: #969eaa;
+  font-size: 9px;
+}
+
+.agent-history-panel > header > button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #e3e7ed;
+  border-radius: 8px;
+  background: #fff;
+  color: #6d7583;
+  cursor: pointer;
+}
+
+.agent-history-panel > header > button:hover {
+  border-color: #bdcff4;
+  color: #3979ed;
+}
+
+.agent-history-panel__groups {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 17px 14px 28px;
+}
+
+.agent-history-panel__groups section + section {
+  margin-top: 22px;
+}
+
+.agent-history-panel__groups h3 {
+  margin: 0 0 8px;
+  padding: 0 7px;
+  color: #8c94a1;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.agent-history-panel__groups section > button {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  padding: 10px 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #556071;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-history-panel__groups section > button:hover,
+.agent-history-panel__groups section > button.active {
+  border-color: #d8e4ff;
+  background: #f4f8ff;
+}
+
+.agent-history-panel__avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  background: #edf3ff;
+  color: #3979ed;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.agent-history-panel__groups section > button > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.agent-history-panel__groups strong {
+  overflow: hidden;
+  color: #424a57;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-history-panel__groups small {
+  color: #969eaa;
+  font-size: 9px;
+}
+
+.agent-history-panel__empty {
+  display: grid;
+  margin: auto 30px;
+  justify-items: center;
+  text-align: center;
+}
+
+.agent-history-panel__empty > svg {
+  width: 42px;
+  height: 42px;
+  color: #d3d9e2;
+}
+
+.agent-history-panel__empty strong {
+  margin-top: 15px;
+  color: #596273;
+  font-size: 13px;
+}
+
+.agent-history-panel__empty p {
+  margin: 7px 0 18px;
+  color: #939ba7;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.agent-history-panel__empty button {
+  min-width: 126px;
+  height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: #4c84ff;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+@keyframes agent-history-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 @media (max-width: 720px) {
   .agent-detail {
     display: block;
@@ -792,6 +1094,11 @@ watch(
 
   .agent-detail__composer {
     width: calc(100% - 24px);
+  }
+
+  .agent-history-panel {
+    width: 100%;
+    border-left: 0;
   }
 }
 </style>

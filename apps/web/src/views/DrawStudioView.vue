@@ -9,7 +9,9 @@ import {
   DeleteOutlined,
   DownOutlined,
   DownloadOutlined,
+  EditOutlined,
   ExperimentOutlined,
+  ExpandOutlined,
   HighlightOutlined,
   HomeOutlined,
   LoadingOutlined,
@@ -17,6 +19,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  ScissorOutlined,
   StarOutlined,
   ThunderboltFilled,
   VideoCameraOutlined,
@@ -360,6 +363,7 @@ const activeResultTab = ref<'gallery' | 'mine'>('gallery');
 const activeEffectCategory = ref('全部');
 const activeGalleryFilter = ref('全部');
 const selectedEffectId = ref('');
+const selectedWorkDetailId = ref('');
 const referenceImages = ref<ReferenceImage[]>([]);
 const referenceError = ref('');
 const referenceInput = ref<HTMLInputElement | null>(null);
@@ -409,6 +413,12 @@ const visibleWorks = computed(() => {
     (work) => inferGalleryCategory(work.prompt, work.modelLabel) === activeGalleryFilter.value,
   );
 });
+const activeWorkDetail = computed(
+  () =>
+    workspace.works.find(
+      (work) => work.id === selectedWorkDetailId.value && work.status === 'done',
+    ) ?? null,
+);
 
 function inferGalleryCategory(prompt: string, modelLabel: string): string {
   const content = `${prompt} ${modelLabel}`.toLowerCase();
@@ -517,6 +527,28 @@ function openTemplatePicker(): void {
   });
 }
 
+function openVideoStudio(promptValue = prompt.value, sourceWorkId?: string): void {
+  void router.push({
+    name: 'video',
+    query: {
+      mode: sourceWorkId ? 'image-to-video' : 'text-to-video',
+      prompt: promptValue.trim() || undefined,
+      sourceWork: sourceWorkId,
+    },
+  });
+}
+
+function openRetouch(operation: string, work?: { id: string; prompt: string }): void {
+  void router.push({
+    name: 'smart-retouch',
+    query: {
+      operation,
+      prompt: work?.prompt,
+      sourceWork: work?.id,
+    },
+  });
+}
+
 function applyEffectTemplate(template: EffectTemplate): void {
   selectedEffectId.value = template.id;
   selectedMode.value = template.mode;
@@ -562,25 +594,73 @@ function leaveGenerator(): void {
 }
 
 function handleTopNavigation(item: string): void {
-  if (item === '做视频') {
-    selectedMode.value = '视频特效';
-    void router.push('/video');
-    return;
-  }
+  const destinations: Record<string, () => void> = {
+    做视频: () => openVideoStudio(),
+    做电商: () => void router.push('/commerce'),
+    拍写真: () => openRetouch('restyle'),
+    搞设计: () => void router.push('/canvas'),
+  };
+  const destination = destinations[item];
 
-  openGenerator();
+  if (destination) {
+    destination();
+  } else {
+    openGenerator();
+  }
 }
 
 function handleCreativeType(item: ToolItem): void {
   if (item.label === 'AI 视频') {
-    selectedMode.value = '视频特效';
-    void router.push('/video');
+    openVideoStudio();
+    return;
+  }
+
+  if (item.label === '图片编辑') {
+    openRetouch('enhance');
     return;
   }
 
   openGenerator({
     mode: item.label === 'AI 绘画' ? '文生图' : '参考图重绘',
   });
+}
+
+function handleImageTool(item: ToolItem): void {
+  const operations: Record<string, string> = {
+    人物处理: 'restyle',
+    图片修复: 'enhance',
+    图片处理: 'enhance',
+    图片融合: 'canvas',
+    场景优化: 'background',
+    尺寸调整: 'upscale',
+    批量处理: 'commerce',
+    智能抠图: 'cutout',
+    智能识别: 'erase',
+    更多工具: 'map',
+    色彩调整: 'restyle',
+    特效处理: 'restyle',
+    细节优化: 'enhance',
+    创意设计: 'restyle',
+    风格转换: 'restyle',
+  };
+  const destination = operations[item.label];
+
+  if (destination === 'canvas') {
+    void router.push('/canvas');
+    return;
+  }
+
+  if (destination === 'commerce') {
+    void router.push('/commerce');
+    return;
+  }
+
+  if (destination === 'map') {
+    void router.push('/map');
+    return;
+  }
+
+  openRetouch(destination ?? 'enhance');
 }
 
 function selectCreationMode(mode: string): void {
@@ -648,6 +728,60 @@ function downloadWork(workId: string): void {
 
 function retryWork(workId: string): void {
   void workspace.retryWork(workId);
+}
+
+function openWorkDetail(workId: string): void {
+  const work = workspace.works.find((item) => item.id === workId);
+
+  if (work?.status === 'done') {
+    selectedWorkDetailId.value = workId;
+  }
+}
+
+function closeWorkDetail(): void {
+  selectedWorkDetailId.value = '';
+}
+
+function reuseWorkPrompt(workId: string): void {
+  const work = workspace.works.find((item) => item.id === workId);
+
+  if (!work) {
+    return;
+  }
+
+  usePromptInComposer(work.prompt);
+  closeWorkDetail();
+  document.querySelector('.draw-composer')?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  });
+}
+
+function regenerateWork(workId: string): void {
+  void workspace.retryWork(workId);
+  closeWorkDetail();
+}
+
+function editWork(operation: string, workId: string): void {
+  const work = workspace.works.find((item) => item.id === workId);
+
+  if (!work) {
+    return;
+  }
+
+  closeWorkDetail();
+  openRetouch(operation, work);
+}
+
+function animateWork(workId: string): void {
+  const work = workspace.works.find((item) => item.id === workId);
+
+  if (!work) {
+    return;
+  }
+
+  closeWorkDetail();
+  openVideoStudio(work.prompt, work.id);
 }
 
 function workStatusLabel(status: DrawWorkStatus): string {
@@ -1111,7 +1245,14 @@ onBeforeUnmount(() => {
                   </em>
                 </header>
 
-                <div class="draw-work-card__visual">
+                <div
+                  class="draw-work-card__visual"
+                  :class="{ 'draw-work-card__visual--interactive': work.status === 'done' }"
+                  :role="work.status === 'done' ? 'button' : undefined"
+                  :tabindex="work.status === 'done' ? 0 : undefined"
+                  @click="work.status === 'done' && openWorkDetail(work.id)"
+                  @keyup.enter="work.status === 'done' && openWorkDetail(work.id)"
+                >
                   <img
                     v-if="work.status === 'done' && work.artworkUrl"
                     :src="work.artworkUrl"
@@ -1403,7 +1544,7 @@ onBeforeUnmount(() => {
               <h2>图片创作</h2>
               <p>全部图片处理工具，按任务分类快速进入对应能力。</p>
             </div>
-            <button type="button">查看全部工具</button>
+            <button type="button" @click="router.push('/map')">查看全部工具</button>
           </header>
 
           <div v-for="group in imageToolGroups" :key="group.label" class="draw-tool-group">
@@ -1417,6 +1558,7 @@ onBeforeUnmount(() => {
                 :key="item.label"
                 type="button"
                 class="draw-tool-card"
+                @click="handleImageTool(item)"
               >
                 <span class="draw-tool-glyph" :style="{ '--tool-accent': item.accent }">
                   {{ item.glyph }}
@@ -1429,6 +1571,103 @@ onBeforeUnmount(() => {
         </section>
       </div>
     </main>
+
+    <Teleport to="body">
+      <div
+        v-if="activeWorkDetail"
+        class="draw-work-detail"
+        role="presentation"
+        @click.self="closeWorkDetail"
+      >
+        <section
+          class="draw-work-detail__dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="作品详情"
+        >
+          <header>
+            <div>
+              <span>{{ activeWorkDetail.modelLabel }}</span>
+              <strong>作品详情</strong>
+            </div>
+            <button type="button" aria-label="关闭作品详情" @click="closeWorkDetail">
+              <CloseOutlined />
+            </button>
+          </header>
+
+          <div class="draw-work-detail__content">
+            <div class="draw-work-detail__preview">
+              <img :src="activeWorkDetail.artworkUrl" :alt="activeWorkDetail.prompt" />
+            </div>
+
+            <div class="draw-work-detail__info">
+              <div class="draw-work-detail__meta">
+                <span>{{ activeWorkDetail.size }}</span>
+                <span>{{ activeWorkDetail.ratio }}</span>
+                <span>{{ formatWorkTime(activeWorkDetail.createdAt) }}</span>
+              </div>
+              <p>{{ activeWorkDetail.prompt }}</p>
+
+              <div class="draw-work-detail__primary">
+                <button type="button" @click="downloadWork(activeWorkDetail.id)">
+                  <DownloadOutlined />
+                  下载原图
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: activeWorkDetail.favorite }"
+                  @click="workspace.toggleFavorite(activeWorkDetail.id)"
+                >
+                  <StarOutlined />
+                  {{ activeWorkDetail.favorite ? '已收藏' : '收藏' }}
+                </button>
+                <button type="button" @click="reuseWorkPrompt(activeWorkDetail.id)">
+                  <ThunderboltFilled />
+                  使用提示词
+                </button>
+                <button type="button" @click="regenerateWork(activeWorkDetail.id)">
+                  <ReloadOutlined />
+                  重新生成
+                </button>
+              </div>
+
+              <section class="draw-work-detail__edits">
+                <header>
+                  <strong>继续编辑</strong>
+                  <span>选择操作后会带着当前作品进入对应工作台</span>
+                </header>
+                <div>
+                  <button type="button" @click="editWork('restyle', activeWorkDetail.id)">
+                    <EditOutlined />
+                    编辑
+                  </button>
+                  <button type="button" @click="animateWork(activeWorkDetail.id)">
+                    <VideoCameraOutlined />
+                    视频
+                  </button>
+                  <button type="button" @click="editWork('cutout', activeWorkDetail.id)">
+                    <ScissorOutlined />
+                    抠图
+                  </button>
+                  <button type="button" @click="editWork('upscale', activeWorkDetail.id)">
+                    <ExpandOutlined />
+                    裁剪扩图
+                  </button>
+                  <button type="button" @click="editWork('erase', activeWorkDetail.id)">
+                    <CloseOutlined />
+                    擦除
+                  </button>
+                  <button type="button" @click="editWork('enhance', activeWorkDetail.id)">
+                    <HighlightOutlined />
+                    重绘
+                  </button>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -2781,6 +3020,25 @@ onBeforeUnmount(() => {
   object-fit: cover;
 }
 
+.draw-work-card__visual--interactive {
+  cursor: zoom-in;
+}
+
+.draw-work-card__visual--interactive::after {
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  background: linear-gradient(180deg, transparent 66%, rgb(20 30 46 / 22%));
+  content: '';
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.draw-work-card__visual--interactive:hover::after,
+.draw-work-card__visual--interactive:focus-visible::after {
+  opacity: 1;
+}
+
 .draw-work-card__loading {
   display: grid;
   width: 100%;
@@ -2923,6 +3181,199 @@ onBeforeUnmount(() => {
 
 .draw-work-card > footer button.draw-work-card__delete {
   color: #9a6260;
+}
+
+.draw-work-detail {
+  position: fixed;
+  z-index: 1600;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgb(18 24 34 / 62%);
+  backdrop-filter: blur(8px);
+}
+
+.draw-work-detail__dialog {
+  display: grid;
+  width: min(1020px, 100%);
+  max-height: min(780px, calc(100vh - 56px));
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgb(8 15 28 / 32%);
+}
+
+.draw-work-detail__dialog > header {
+  display: flex;
+  min-height: 60px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 20px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.draw-work-detail__dialog > header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.draw-work-detail__dialog > header span {
+  color: #8b94a1;
+  font-size: 8px;
+}
+
+.draw-work-detail__dialog > header strong {
+  color: #29313c;
+  font-size: 15px;
+}
+
+.draw-work-detail__dialog > header button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #e0e5eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #6e7785;
+  cursor: pointer;
+}
+
+.draw-work-detail__content {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1.55fr) minmax(310px, 0.85fr);
+}
+
+.draw-work-detail__preview {
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
+  background:
+    linear-gradient(45deg, #e9edf2 25%, transparent 25%),
+    linear-gradient(-45deg, #e9edf2 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e9edf2 75%),
+    linear-gradient(-45deg, transparent 75%, #e9edf2 75%), #f5f7f9;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+}
+
+.draw-work-detail__preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 620px;
+  border-radius: 6px;
+  box-shadow: 0 16px 42px rgb(24 36 54 / 18%);
+  object-fit: contain;
+}
+
+.draw-work-detail__info {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 22px;
+  border-left: 1px solid #edf0f4;
+}
+
+.draw-work-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.draw-work-detail__meta span {
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: #f1f4f7;
+  color: #7a8491;
+  font-size: 8px;
+}
+
+.draw-work-detail__info > p {
+  margin: 16px 0 20px;
+  color: #3f4854;
+  font-size: 10px;
+  line-height: 1.75;
+}
+
+.draw-work-detail__primary {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.draw-work-detail__primary button,
+.draw-work-detail__edits button {
+  display: inline-flex;
+  min-width: 0;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid #dfe4ea;
+  border-radius: 7px;
+  background: #fff;
+  color: #5f6977;
+  font-size: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.draw-work-detail__primary button:first-child {
+  border-color: #5f5ad8;
+  background: #5f5ad8;
+  color: #fff;
+}
+
+.draw-work-detail__primary button.active {
+  border-color: #e8ce87;
+  background: #fffaf0;
+  color: #b67a13;
+}
+
+.draw-work-detail__edits {
+  margin-top: 23px;
+  padding-top: 19px;
+  border-top: 1px solid #edf0f4;
+}
+
+.draw-work-detail__edits > header {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.draw-work-detail__edits > header strong {
+  color: #303844;
+  font-size: 11px;
+}
+
+.draw-work-detail__edits > header span {
+  color: #929aa6;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.draw-work-detail__edits > div {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.draw-work-detail__primary button:hover,
+.draw-work-detail__edits button:hover {
+  border-color: #bdc9dc;
+  color: #3e63b8;
 }
 
 .draw-generator__empty {
