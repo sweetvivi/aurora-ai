@@ -28,6 +28,11 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import type { FileAsset } from '@/app/api';
 import {
+  DRAW_EFFECT_CATEGORIES,
+  DRAW_EFFECT_TEMPLATES,
+  type DrawEffectTemplate,
+} from '@/data/draw-templates';
+import {
   IMAGE_TASK_POINTS_COST,
   useDrawWorkspaceStore,
   type DrawWorkStatus,
@@ -63,19 +68,6 @@ interface ReferenceImage {
   url: string;
 }
 
-interface EffectTemplate {
-  category: string;
-  description: string;
-  id: string;
-  image: string;
-  label: string;
-  mode: string;
-  prompt: string;
-  steps: string[];
-  tags: string[];
-  visualClass: string;
-}
-
 const navigation: NavigationItem[] = [
   { icon: HomeOutlined, label: '首页', to: '/' },
   { icon: PictureOutlined, label: '作品广场', to: '/draw' },
@@ -102,90 +94,10 @@ const galleryFilters = [
   '建筑',
   '其他',
 ];
-const effectCategories = [
-  '全部',
-  '人像美化',
-  '场景优化',
-  '创意设计',
-  '风格迁移',
-  '图片修复',
-  'AI 绘画',
-];
-
-const effectTemplates: EffectTemplate[] = [
-  {
-    category: '人像美化',
-    description: '保留人物脸型与原始光线，自然替换发型、发色和发量。',
-    id: 'hair-style',
-    image: '/showcase/portrait-v1.png',
-    label: '发型变换',
-    mode: '参考图重绘',
-    prompt: '保留照片中的人物脸型、姿势和背景，将发型自然替换为柔和的大波浪卷发，发丝细节清晰。',
-    steps: ['上传一张清晰的人像照片', '描述想要替换的发型和发色'],
-    tags: ['发型', '换发'],
-    visualClass: 'portrait',
-  },
-  {
-    category: '人像美化',
-    description: '快速更换服装款式与颜色，并保持人物姿态和身体比例自然。',
-    id: 'outfit-change',
-    image: '/showcase/fashion-v1.png',
-    label: '服装换装',
-    mode: '参考图重绘',
-    prompt: '保持照片中的人物姿态、面部和背景不变，将服装替换为轻盈的碎花连衣裙，布料细节真实。',
-    steps: ['上传人物全身或半身照', '描述目标服装的款式与颜色'],
-    tags: ['换装', '服饰'],
-    visualClass: 'outfit',
-  },
-  {
-    category: '场景优化',
-    description: '识别天空区域并替换为蓝天白云、晚霞或电影感天空。',
-    id: 'sky-replace',
-    image: '/showcase/landscape-v1.png',
-    label: '天空替换',
-    mode: '参考图重绘',
-    prompt: '识别照片中的天空区域，替换为明亮的蓝天白云，保留山体、建筑和前景细节，光线自然统一。',
-    steps: ['上传包含天空的风景照片', '描述想要的天气和光线氛围'],
-    tags: ['天空', '替换'],
-    visualClass: 'sky',
-  },
-  {
-    category: '创意设计',
-    description: '为商品补充适配的广告场景，统一光影、材质与品牌氛围。',
-    id: 'product-scene',
-    image: '/showcase/product-v1.png',
-    label: '商品场景',
-    mode: '商品图处理',
-    prompt: '保留商品主体、包装文字和外观细节，放置到简洁明亮的现代商业摄影场景中，柔和棚拍光。',
-    steps: ['上传商品主体图片', '选择场景氛围并描述画面用途'],
-    tags: ['商品', '商拍'],
-    visualClass: 'product',
-  },
-  {
-    category: '风格迁移',
-    description: '把照片转换为动漫、水彩、插画或电影概念风格。',
-    id: 'anime-style',
-    image: '/showcase/concept-v1.png',
-    label: '动漫风格',
-    mode: '参考图重绘',
-    prompt: '将上传照片转换为精致的日系动漫插画，保留人物特征和构图，线条干净、色彩通透。',
-    steps: ['上传需要转换的照片', '描述目标画风和色彩倾向'],
-    tags: ['动漫', '插画'],
-    visualClass: 'anime',
-  },
-  {
-    category: '图片修复',
-    description: '修复旧照片划痕、噪点和模糊，同时恢复自然的面部细节。',
-    id: 'old-photo',
-    image: '/showcase/restore-v1.png',
-    label: '老照片修复',
-    mode: '参考图重绘',
-    prompt: '修复照片中的划痕、噪点和褪色，提升清晰度并恢复自然面部与衣物细节，不改变人物身份。',
-    steps: ['上传需要修复的旧照片', '选择修复强度与输出清晰度'],
-    tags: ['修复', '增强'],
-    visualClass: 'restore',
-  },
-];
+const effectCategories = DRAW_EFFECT_CATEGORIES;
+const effectTemplates = DRAW_EFFECT_TEMPLATES;
+const storageOptions = ['1天', '3天', '7天'];
+const MAX_REFERENCE_IMAGES = 10;
 
 const creativeTypes: ToolItem[] = [
   {
@@ -363,6 +275,9 @@ const activeResultTab = ref<'gallery' | 'mine'>('gallery');
 const activeEffectCategory = ref('全部');
 const activeGalleryFilter = ref('全部');
 const selectedEffectId = ref('');
+const selectedStorage = ref('1天');
+const templateAdvancedOpen = ref(false);
+const templateExampleId = ref('');
 const selectedWorkDetailId = ref('');
 const detailPrompt = ref('');
 const detailSubmitting = ref(false);
@@ -370,6 +285,7 @@ const workEditDrafts = ref<Record<string, string>>({});
 const referenceImages = ref<ReferenceImage[]>([]);
 const referenceError = ref('');
 const referenceInput = ref<HTMLInputElement | null>(null);
+const templateReferenceInput = ref<HTMLInputElement | null>(null);
 const consumedGenerationToken = ref('');
 const uploadingReference = ref(false);
 const route = useRoute();
@@ -401,7 +317,7 @@ const selectedModelLabel = computed(
 );
 
 const isGeneratingView = computed(() => route.query.view === 'generate');
-const isTemplateView = computed(() => route.query.view === 'templates');
+const isTemplateView = computed(() => route.name === 'newdraw' || route.query.view === 'templates');
 const generationCost = computed(() => selectedAmount.value * IMAGE_TASK_POINTS_COST);
 const generating = computed(() => workspace.generating || uploadingReference.value);
 const filteredEffectTemplates = computed(() => {
@@ -411,6 +327,13 @@ const filteredEffectTemplates = computed(() => {
 
   return effectTemplates.filter((item) => item.category === activeEffectCategory.value);
 });
+const selectedExampleTemplate = computed(
+  () =>
+    effectTemplates.find((template) => template.id === templateExampleId.value) ??
+    effectTemplates.find((template) => template.id === selectedEffectId.value) ??
+    filteredEffectTemplates.value[0] ??
+    null,
+);
 const visibleWorks = computed(() => {
   const works =
     activeResultTab.value === 'gallery'
@@ -485,6 +408,7 @@ function syncGeneratorFromRoute(): void {
   const routeAmount = Number(route.query.amount);
   const routeSize = route.query.size;
   const routeMode = route.query.mode;
+  const routeStorage = route.query.storage;
 
   if (typeof routePrompt === 'string') {
     prompt.value = routePrompt;
@@ -509,6 +433,10 @@ function syncGeneratorFromRoute(): void {
   if (typeof routeMode === 'string' && creationModes.includes(routeMode)) {
     selectedMode.value = routeMode;
   }
+
+  if (typeof routeStorage === 'string' && storageOptions.includes(routeStorage)) {
+    selectedStorage.value = routeStorage;
+  }
 }
 
 function openGenerator(options: { auto?: boolean; mode?: string } = {}): void {
@@ -527,9 +455,14 @@ function openGenerator(options: { auto?: boolean; mode?: string } = {}): void {
       ratio: selectedRatio.value,
       size: selectedSize.value,
       start: options.auto ? Date.now().toString() : undefined,
+      storage: selectedStorage.value,
       view: 'generate',
     },
   });
+}
+
+function openTemplateRetouch(): void {
+  void router.push({ name: 'smart-retouch' });
 }
 
 function openTemplatePicker(): void {
@@ -542,6 +475,7 @@ function openTemplatePicker(): void {
       prompt: prompt.value.trim() || undefined,
       ratio: selectedRatio.value,
       size: selectedSize.value,
+      storage: selectedStorage.value,
       view: 'templates',
     },
   });
@@ -558,7 +492,7 @@ function openRetouch(operation: string, work?: { id: string; prompt: string }): 
   });
 }
 
-function applyEffectTemplate(template: EffectTemplate): void {
+function applyEffectTemplate(template: DrawEffectTemplate): void {
   selectedEffectId.value = template.id;
   selectedMode.value = template.mode;
   prompt.value = template.prompt;
@@ -569,6 +503,26 @@ function applyEffectTemplate(template: EffectTemplate): void {
       block: 'center',
     });
   });
+}
+
+function openTemplateExample(template?: DrawEffectTemplate): void {
+  templateExampleId.value =
+    (template?.id ?? selectedEffectId.value) || filteredEffectTemplates.value[0]?.id || '';
+}
+
+function closeTemplateExample(): void {
+  templateExampleId.value = '';
+}
+
+function applyTemplateExample(template: DrawEffectTemplate): void {
+  applyEffectTemplate(template);
+  closeTemplateExample();
+}
+
+function handleTemplateExampleKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    closeTemplateExample();
+  }
 }
 
 function usePromptInComposer(value: string): void {
@@ -590,8 +544,12 @@ async function startGeneration(): Promise<void> {
     modelLabel: selectedModelLabel.value,
     prompt: prompt.value.trim(),
     ratio: selectedRatio.value,
+    referenceFileIds: referenceImages.value.slice(1).map((image) => image.assetId),
     size: selectedSize.value,
     sourceFileId: referenceImages.value[0]?.assetId,
+    extraParameters: {
+      storage: selectedStorage.value,
+    },
   });
 
   if (createdWorks.length > 0) {
@@ -674,31 +632,45 @@ function selectCreationMode(mode: string): void {
 
 async function handleReferenceUpload(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
+  const files = Array.from(input.files ?? []);
 
-  if (!file) {
+  if (files.length === 0) {
     return;
   }
 
+  const remaining = MAX_REFERENCE_IMAGES - referenceImages.value.length;
+
+  if (remaining <= 0) {
+    referenceError.value = `最多上传 ${MAX_REFERENCE_IMAGES} 张参考图`;
+    input.value = '';
+    return;
+  }
+
+  const acceptedFiles = files.slice(0, remaining);
   uploadingReference.value = true;
   referenceError.value = '';
 
   try {
-    const asset: FileAsset = await workspace.uploadReference(file);
-    const previous = referenceImages.value[0];
-
-    if (previous) {
-      URL.revokeObjectURL(previous.url);
-    }
+    const uploaded = await Promise.all(
+      acceptedFiles.map(async (file) => ({
+        asset: (await workspace.uploadReference(file)) as FileAsset,
+        file,
+      })),
+    );
 
     referenceImages.value = [
-      {
+      ...referenceImages.value,
+      ...uploaded.map(({ asset, file }) => ({
         assetId: asset.id,
         id: asset.id,
         name: asset.originalName,
         url: URL.createObjectURL(file),
-      },
+      })),
     ];
+
+    if (files.length > acceptedFiles.length) {
+      referenceError.value = `最多上传 ${MAX_REFERENCE_IMAGES} 张参考图，超出的图片未上传`;
+    }
   } catch (error) {
     referenceError.value = error instanceof Error ? error.message : '参考图上传失败，请重试';
   } finally {
@@ -887,6 +859,7 @@ watch(
 onMounted(() => {
   void modelCatalog.load();
   void workspace.initialize();
+  window.addEventListener('keydown', handleTemplateExampleKeydown);
 });
 
 watch(
@@ -898,6 +871,8 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleTemplateExampleKeydown);
+
   for (const image of referenceImages.value) {
     URL.revokeObjectURL(image.url);
   }
@@ -975,8 +950,8 @@ onBeforeUnmount(() => {
           </button>
           <strong>极光 AI 智能生图</strong>
           <div>
-            <button type="button" @click="openGenerator({ mode: '参考图重绘' })">旧版绘图</button>
-            <button type="button" class="active">新版智能生图</button>
+            <button type="button" @click="openGenerator({ mode: '文生图' })">旧文生图</button>
+            <button type="button" @click="openTemplateRetouch">新版修图</button>
           </div>
         </header>
 
@@ -1056,15 +1031,33 @@ onBeforeUnmount(() => {
         </div>
 
         <form class="draw-template-composer" @submit.prevent="generate">
+          <input
+            ref="templateReferenceInput"
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            :disabled="uploadingReference || referenceImages.length >= MAX_REFERENCE_IMAGES"
+            @change="handleReferenceUpload"
+          />
           <button
             type="button"
             class="draw-template-composer__upload"
             aria-label="上传参考图"
-            @click="openGenerator({ mode: '参考图重绘' })"
+            :disabled="uploadingReference || referenceImages.length >= MAX_REFERENCE_IMAGES"
+            @click="templateReferenceInput?.click()"
           >
-            <PlusOutlined />
-            <span>上传图片</span>
-            <small>支持 10 张以内</small>
+            <img v-if="referenceImages[0]" :src="referenceImages[0].url" alt="" />
+            <LoadingOutlined v-else-if="uploadingReference" />
+            <PlusOutlined v-else />
+            <span>
+              {{
+                referenceImages.length
+                  ? `${referenceImages.length} / ${MAX_REFERENCE_IMAGES}`
+                  : '上传图片'
+              }}
+            </span>
+            <small>{{ referenceImages.length ? '继续添加' : '最多 10 张' }}</small>
           </button>
           <label class="draw-template-composer__prompt">
             <textarea
@@ -1074,6 +1067,23 @@ onBeforeUnmount(() => {
             />
             <small>{{ prompt.length }}/500</small>
           </label>
+          <p v-if="referenceError" class="draw-template-composer__error">{{ referenceError }}</p>
+          <div v-if="templateAdvancedOpen" class="draw-template-composer__advanced">
+            <label>
+              <span>画面比例</span>
+              <select v-model="selectedRatio">
+                <option v-for="ratio in ratios" :key="ratio" :value="ratio">{{ ratio }}</option>
+              </select>
+            </label>
+            <label>
+              <span>输出清晰度</span>
+              <select v-model="selectedSize">
+                <option v-for="size in ['1K', '2K', '4K']" :key="size" :value="size">
+                  {{ size }}
+                </option>
+              </select>
+            </label>
+          </div>
           <footer>
             <label>
               <select v-model="currentModel" aria-label="选择绘画模型">
@@ -1091,12 +1101,27 @@ onBeforeUnmount(() => {
               </select>
               <DownOutlined />
             </label>
-            <button type="button" @click="openGenerator({ mode: selectedMode })">高级设置</button>
+            <button
+              type="button"
+              :class="{ active: templateAdvancedOpen }"
+              @click="templateAdvancedOpen = !templateAdvancedOpen"
+            >
+              高级设置
+              <DownOutlined />
+            </button>
+            <label>
+              <select v-model="selectedStorage" aria-label="选择图片存储时长">
+                <option v-for="storage in storageOptions" :key="storage" :value="storage">
+                  存储 {{ storage }}
+                </option>
+              </select>
+              <DownOutlined />
+            </label>
             <span>
               <ThunderboltFilled />
               {{ generationCost }} 积分
             </span>
-            <button type="button">查看示例</button>
+            <button type="button" @click="openTemplateExample()">查看示例</button>
             <button
               class="draw-template-composer__submit"
               type="submit"
@@ -1178,14 +1203,21 @@ onBeforeUnmount(() => {
             <section class="draw-param-section draw-generator__references">
               <header>
                 <strong>参考图</strong>
-                <span>{{ uploadingReference ? '上传中...' : '当前支持 1 张' }}</span>
+                <span>
+                  {{
+                    uploadingReference
+                      ? '上传中...'
+                      : `已上传 ${referenceImages.length} / ${MAX_REFERENCE_IMAGES} 张`
+                  }}
+                </span>
               </header>
               <input
                 ref="referenceInput"
                 type="file"
                 accept="image/*"
+                multiple
                 hidden
-                :disabled="uploadingReference"
+                :disabled="uploadingReference || referenceImages.length >= MAX_REFERENCE_IMAGES"
                 @change="handleReferenceUpload"
               />
               <div>
@@ -1200,10 +1232,10 @@ onBeforeUnmount(() => {
                   </button>
                 </span>
                 <button
-                  v-if="referenceImages.length < 1"
+                  v-if="referenceImages.length < MAX_REFERENCE_IMAGES"
                   type="button"
                   class="draw-generator__upload"
-                  :disabled="uploadingReference"
+                  :disabled="uploadingReference || referenceImages.length >= MAX_REFERENCE_IMAGES"
                   @click="referenceInput?.click()"
                 >
                   <LoadingOutlined v-if="uploadingReference" />
@@ -1832,6 +1864,65 @@ onBeforeUnmount(() => {
         </section>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="templateExampleId && selectedExampleTemplate"
+        class="draw-template-example"
+        role="presentation"
+        @click.self="closeTemplateExample"
+      >
+        <section
+          class="draw-template-example__dialog"
+          role="dialog"
+          aria-labelledby="draw-template-example-title"
+          aria-modal="true"
+        >
+          <header>
+            <div>
+              <span>{{ selectedExampleTemplate.category }}</span>
+              <strong id="draw-template-example-title">
+                {{ selectedExampleTemplate.label }}效果示例
+              </strong>
+            </div>
+            <button type="button" aria-label="关闭效果示例" @click="closeTemplateExample">
+              <CloseOutlined />
+            </button>
+          </header>
+
+          <div class="draw-template-example__preview">
+            <figure>
+              <span>原图</span>
+              <img
+                :src="selectedExampleTemplate.image"
+                :alt="`${selectedExampleTemplate.label}原图`"
+              />
+            </figure>
+            <figure>
+              <span>效果图</span>
+              <img
+                :src="selectedExampleTemplate.image"
+                :alt="`${selectedExampleTemplate.label}效果图`"
+              />
+            </figure>
+          </div>
+
+          <div class="draw-template-example__content">
+            <p>{{ selectedExampleTemplate.description }}</p>
+            <ol>
+              <li v-for="step in selectedExampleTemplate.steps" :key="step">{{ step }}</li>
+            </ol>
+          </div>
+
+          <footer>
+            <button type="button" @click="closeTemplateExample">取消</button>
+            <button type="button" @click="applyTemplateExample(selectedExampleTemplate)">
+              使用该效果
+            </button>
+          </footer>
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -2127,20 +2218,14 @@ onBeforeUnmount(() => {
 
 .draw-template-studio__header > div button {
   height: 32px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid #dfe4ea;
   border-radius: 7px;
   background: #fff;
   color: #606a78;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 720;
   cursor: pointer;
-}
-
-.draw-template-studio__header > div button.active {
-  border-color: #a9ddcb;
-  background: #ebf9f4;
-  color: #25886a;
 }
 
 .draw-template-studio__content {
@@ -2456,9 +2541,11 @@ onBeforeUnmount(() => {
 }
 
 .draw-template-composer__upload {
+  position: relative;
   display: grid;
   width: 82px;
   height: 72px;
+  overflow: hidden;
   place-items: center;
   align-content: center;
   gap: 4px;
@@ -2469,7 +2556,31 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+.draw-template-composer__upload img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.draw-template-composer__upload span,
+.draw-template-composer__upload small {
+  position: relative;
+  z-index: 1;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 82%);
+}
+
+.draw-template-composer__upload:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .draw-template-composer__upload :deep(svg) {
+  position: relative;
+  z-index: 1;
   font-size: 17px;
 }
 
@@ -2515,6 +2626,47 @@ onBeforeUnmount(() => {
   font-size: 8px;
 }
 
+.draw-template-composer__error {
+  align-self: end;
+  margin: 2px 0 0;
+  color: #d14b55;
+  font-size: 8px;
+  grid-column: 2;
+}
+
+.draw-template-composer__advanced {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 9px 10px;
+  border: 1px solid #e4e8ed;
+  border-radius: 8px;
+  background: #f8fafb;
+}
+
+.draw-template-composer__advanced label {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: 74px minmax(0, 1fr);
+  color: #65707d;
+  font-size: 8px;
+}
+
+.draw-template-composer__advanced select {
+  width: 100%;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid #dfe4e9;
+  border-radius: 6px;
+  outline: 0;
+  background: #fff;
+  color: #4e5865;
+  font-size: 8px;
+}
+
 .draw-template-composer > footer {
   display: flex;
   min-width: 0;
@@ -2538,6 +2690,10 @@ onBeforeUnmount(() => {
   width: 78px;
 }
 
+.draw-template-composer > footer label:nth-of-type(3) {
+  width: 110px;
+}
+
 .draw-template-composer > footer select {
   width: 100%;
   height: 100%;
@@ -2559,7 +2715,11 @@ onBeforeUnmount(() => {
 }
 
 .draw-template-composer > footer > button {
+  display: inline-flex;
   height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   padding: 0 11px;
   border: 1px solid #e0e4e9;
   border-radius: 7px;
@@ -2567,6 +2727,12 @@ onBeforeUnmount(() => {
   color: #65707e;
   font-size: 8px;
   cursor: pointer;
+}
+
+.draw-template-composer > footer > button.active {
+  border-color: #9bd7c5;
+  background: #eef9f5;
+  color: #287f65;
 }
 
 .draw-template-composer > footer > span {
@@ -2596,6 +2762,186 @@ onBeforeUnmount(() => {
   border-color: #d7dbe1;
   background: #d7dbe1;
   cursor: not-allowed;
+}
+
+.draw-template-example {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(18 24 32 / 52%);
+  backdrop-filter: blur(4px);
+}
+
+.draw-template-example__dialog {
+  width: min(100%, 860px);
+  max-height: min(760px, calc(100vh - 48px));
+  overflow-y: auto;
+  border: 1px solid #e2e6eb;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 26px 80px rgb(17 25 35 / 28%);
+}
+
+.draw-template-example__dialog > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 20px;
+  border-bottom: 1px solid #e9edf1;
+  background: rgb(255 255 255 / 96%);
+  backdrop-filter: blur(10px);
+}
+
+.draw-template-example__dialog > header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.draw-template-example__dialog > header span {
+  color: #8d55bf;
+  font-size: 8px;
+  font-weight: 760;
+}
+
+.draw-template-example__dialog > header strong {
+  color: #222a34;
+  font-size: 16px;
+}
+
+.draw-template-example__dialog > header button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #e1e5ea;
+  border-radius: 7px;
+  background: #fff;
+  color: #697381;
+  cursor: pointer;
+}
+
+.draw-template-example__preview {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 20px 20px 0;
+}
+
+.draw-template-example__preview figure {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #e4e8ed;
+  border-radius: 9px;
+  background: #f4f6f8;
+}
+
+.draw-template-example__preview figure:last-child {
+  box-shadow: 0 0 0 2px rgb(165 84 226 / 10%);
+}
+
+.draw-template-example__preview span {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: rgb(30 36 45 / 78%);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 760;
+}
+
+.draw-template-example__preview figure:last-child span {
+  background: #aa50dc;
+}
+
+.draw-template-example__preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.55 / 1;
+  object-fit: cover;
+}
+
+.draw-template-example__preview figure:first-child img {
+  filter: saturate(0.72) brightness(0.94);
+}
+
+.draw-template-example__content {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px;
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+
+.draw-template-example__content p {
+  margin: 0;
+  color: #697381;
+  font-size: 10px;
+  line-height: 1.75;
+}
+
+.draw-template-example__content ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  color: #747e8b;
+  font-size: 9px;
+  list-style: none;
+}
+
+.draw-template-example__content li {
+  display: grid;
+  align-items: start;
+  gap: 7px;
+  grid-template-columns: 18px minmax(0, 1fr);
+}
+
+.draw-template-example__content li::before {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 999px;
+  background: #eef1f4;
+  color: #707986;
+  content: counter(list-item);
+  font-size: 8px;
+}
+
+.draw-template-example__dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding: 0 20px 20px;
+}
+
+.draw-template-example__dialog > footer button {
+  height: 36px;
+  padding: 0 18px;
+  border: 1px solid #dfe4e9;
+  border-radius: 7px;
+  background: #fff;
+  color: #626c79;
+  font-size: 9px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.draw-template-example__dialog > footer button:last-child {
+  border-color: #2b9877;
+  background: #2b9877;
+  color: #fff;
 }
 
 .draw-generator {

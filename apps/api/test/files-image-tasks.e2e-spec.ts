@@ -229,6 +229,49 @@ describe('file uploads and image tasks', () => {
     ).toBe(1);
   });
 
+  it('accepts ten total images and rejects an eleventh input', async () => {
+    imageMode = 'success';
+    lastImageInput = undefined;
+    const { accessToken } = await registerUser();
+    const sourceFileId = await uploadImage(accessToken, 'source.png');
+    const referenceFileIds = await Promise.all(
+      Array.from({ length: 10 }, (_, index) =>
+        uploadImage(accessToken, `reference-${index + 1}.png`),
+      ),
+    );
+
+    const createResponse = await request(app.getHttpServer())
+      .post('/api/v1/image-tasks')
+      .set('authorization', `Bearer ${accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        prompt: '组合十张输入图片',
+        referenceFileIds: referenceFileIds.slice(0, 9),
+        sourceFileId,
+      })
+      .expect(202);
+
+    const task = await waitForTerminalTask(accessToken, createResponse.body.data.id as string);
+
+    expect(task.status).toBe('SUCCEEDED');
+    const observedInput = lastImageInput as GenerateImageInput | undefined;
+
+    expect(observedInput?.sourceImages).toHaveLength(10);
+
+    const rejectedResponse = await request(app.getHttpServer())
+      .post('/api/v1/image-tasks')
+      .set('authorization', `Bearer ${accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        prompt: '超过输入图片上限',
+        referenceFileIds,
+        sourceFileId,
+      })
+      .expect(400);
+
+    expect(rejectedResponse.body.error.code).toBe('BAD_REQUEST');
+  });
+
   it('marks provider failures and refunds the image task points', async () => {
     imageMode = 'failure';
     const { accessToken, email } = await registerUser();

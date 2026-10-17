@@ -55,6 +55,14 @@ export const appRoutes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'newdraw',
+        name: 'newdraw',
+        component: () => import('@/views/DrawStudioView.vue'),
+        meta: {
+          title: '极光 AI 智能生图',
+        },
+      },
+      {
         path: 'retouch',
         alias: ['image-tools'],
         name: 'smart-retouch',
