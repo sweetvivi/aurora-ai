@@ -221,6 +221,67 @@ describe('draw workspace store', () => {
     });
   });
 
+  it('restores the source, reference files and tool parameters when retrying a failed work', async () => {
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+    apiMocks.createImageTask.mockResolvedValue(
+      makeTask({
+        id: 'task-retry',
+        status: 'QUEUED',
+      }),
+    );
+    const store = useDrawWorkspaceStore();
+
+    store.mergeTask(
+      makeTask({
+        id: 'task-failed',
+        parameters: {
+          mode: 'image-to-image',
+          operation: 'pattern-replace',
+          ratio: '保持原图',
+          referenceFileIds: ['file-reference-1', 'file-reference-2', 'file-reference-1'],
+          size: '2K',
+          strength: 72,
+          tool: 'commerce',
+          uiModel: 'commerce-image-2',
+          uiModelLabel: '服饰图案替换设计师',
+        },
+        sourceFile: {
+          ...resultFile,
+          id: 'file-source',
+          originalName: 'source.png',
+        },
+        status: 'FAILED',
+      }),
+    );
+
+    const works = await store.retryWork('task-failed');
+
+    expect(works).toHaveLength(1);
+    expect(apiMocks.createImageTask).toHaveBeenCalledWith(
+      {
+        modelAlias: IMAGE_MODEL_ALIAS,
+        parameters: {
+          mode: 'image-to-image',
+          operation: 'pattern-replace',
+          ratio: '保持原图',
+          size: '2K',
+          strength: 72,
+          tool: 'commerce',
+          uiModel: 'commerce-image-2',
+          uiModelLabel: '服饰图案替换设计师',
+        },
+        prompt: '测试图片',
+        referenceFileIds: ['file-reference-1', 'file-reference-2'],
+        sourceFileId: 'file-source',
+      },
+      expect.stringMatching(/^generation-.+:1$/),
+    );
+  });
+
   it('loads a successful result and refreshes the settled balance', async () => {
     const sessionStore = useSessionStore();
     sessionStore.$patch({
@@ -338,6 +399,28 @@ describe('draw workspace store', () => {
       code: 'AUTH_REQUIRED',
       recoverable: true,
     });
+  });
+
+  it('rejects unsupported or oversized reference files before uploading', async () => {
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+    const store = useDrawWorkspaceStore();
+    const unsupportedFile = new File(['document'], 'notes.txt', { type: 'text/plain' });
+    const oversizedFile = new File(['image'], 'large.png', { type: 'image/png' });
+
+    Object.defineProperty(oversizedFile, 'size', {
+      configurable: true,
+      value: 10 * 1024 * 1024 + 1,
+    });
+
+    await expect(store.uploadReference(unsupportedFile)).rejects.toThrow(
+      '仅支持 JPG、PNG、WebP 或 GIF 图片',
+    );
+    await expect(store.uploadReference(oversizedFile)).rejects.toThrow('单张图片不能超过 10 MB');
+    expect(apiMocks.uploadImageFile).not.toHaveBeenCalled();
   });
 });
 

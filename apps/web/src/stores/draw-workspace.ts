@@ -15,6 +15,15 @@ import { useSessionStore } from './session';
 export const IMAGE_MODEL_ALIAS = 'jiguang-gpt-image-2.5';
 export const IMAGE_TASK_POINTS_COST = 5;
 
+const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+const SUPPORTED_IMAGE_MIME_TYPES = new Set([
+  'image/gif',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+]);
+
 export type DrawWorkStatus = 'done' | 'failed' | 'generating' | 'queued';
 export type DrawWorkspaceStatus = 'error' | 'idle' | 'loading' | 'ready';
 
@@ -161,6 +170,8 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
         throw new Error(this.error?.message ?? '请先登录后再上传参考图');
       }
 
+      validateImageUpload(file);
+
       return uploadImageFile(file);
     },
     async createGenerationWorks(input: CreateGenerationInput): Promise<DrawWork[]> {
@@ -241,14 +252,20 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
         return [];
       }
 
+      const extraParameters = { ...work.parameters };
+      const referenceFileIds = normalizeReferenceFileIds(extraParameters.referenceFileIds);
+
+      delete extraParameters.referenceFileIds;
+
       return this.createGenerationWorks({
         amount: 1,
         model: work.model,
         modelAlias: work.modelAlias,
         modelLabel: work.modelLabel,
-        extraParameters: work.parameters,
+        extraParameters,
         prompt: work.prompt,
         ratio: work.ratio,
+        referenceFileIds: referenceFileIds.length > 0 ? referenceFileIds : undefined,
         size: work.size,
         sourceFileId: work.sourceFileId ?? undefined,
         toolKey: work.tool,
@@ -602,6 +619,32 @@ function toTimestamp(value: string | null): number | null {
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function validateImageUpload(file: File): void {
+  if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
+    throw new Error('单张图片不能超过 10 MB');
+  }
+
+  const mimeType = file.type.trim().toLowerCase();
+
+  if (mimeType && !SUPPORTED_IMAGE_MIME_TYPES.has(mimeType)) {
+    throw new Error('仅支持 JPG、PNG、WebP 或 GIF 图片');
+  }
+}
+
+function normalizeReferenceFileIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      value
+        .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        .map((item) => item.trim()),
+    ),
+  ].slice(0, 9);
 }
 
 function extractExtraParameters(
