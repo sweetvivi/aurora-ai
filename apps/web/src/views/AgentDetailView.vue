@@ -21,6 +21,7 @@ const search = ref('');
 const activeSessionId = ref<string | null>(null);
 const conversationArea = ref<HTMLElement | null>(null);
 const consumedRoutePrompt = ref('');
+const sessionSearchInput = ref<HTMLInputElement | null>(null);
 
 const agent = computed(
   () =>
@@ -77,6 +78,10 @@ function startNewSession(): void {
   activeSessionId.value = null;
   prompt.value = '';
   void scrollToLatest();
+}
+
+function focusSessionSearch(): void {
+  sessionSearchInput.value?.focus();
 }
 
 function useStarter(starter: string): void {
@@ -160,7 +165,7 @@ watch(
 
       <label>
         <SearchOutlined />
-        <input v-model="search" placeholder="搜索会话" />
+        <input ref="sessionSearchInput" v-model="search" placeholder="搜索会话" />
       </label>
 
       <div v-if="sessions.length > 0" class="agent-detail__session-list">
@@ -204,9 +209,6 @@ watch(
 
       <section ref="conversationArea" class="agent-detail__conversation">
         <div v-if="messages.length === 0" class="agent-detail__welcome">
-          <span class="agent-detail__welcome-mark" :style="{ background: agent.color }">
-            {{ agent.glyph }}
-          </span>
           <h1>你好，我是{{ agent.name }}</h1>
           <p>{{ agent.opening }}</p>
           <div class="agent-detail__welcome-prompts">
@@ -243,6 +245,16 @@ watch(
       </section>
 
       <footer class="agent-detail__composer">
+        <div class="agent-detail__composer-actions">
+          <button type="button" class="active" @click="startNewSession">
+            <MessageOutlined />
+            新建对话
+          </button>
+          <button type="button" @click="focusSessionSearch">
+            <HistoryOutlined />
+            历史记录
+          </button>
+        </div>
         <div class="agent-detail__input">
           <textarea
             v-model="prompt"
@@ -501,33 +513,21 @@ watch(
   display: grid;
   max-width: 920px;
   width: 100%;
-  justify-items: center;
-  margin: 7vh auto 0;
-  text-align: center;
-}
-
-.agent-detail__welcome-mark {
-  display: grid;
-  width: 50px;
-  height: 50px;
-  place-items: center;
-  border-radius: 14px;
-  color: #fff;
-  font-size: 18px;
-  font-weight: 850;
-  box-shadow: 0 12px 26px rgb(42 76 140 / 16%);
+  margin: 6vh auto 0;
+  padding-bottom: 27px;
+  border-bottom: 1px solid #edf0f4;
 }
 
 .agent-detail__welcome h1 {
-  margin: 18px 0 0;
-  font-size: 22px;
+  margin: 0;
+  font-size: 20px;
 }
 
 .agent-detail__welcome p {
-  max-width: 650px;
-  margin: 10px 0 0;
+  max-width: 720px;
+  margin: 9px 0 0;
   color: #747d8b;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.75;
 }
 
@@ -632,6 +632,40 @@ watch(
   width: min(820px, calc(100% - 48px));
   justify-self: center;
   padding-bottom: 24px;
+}
+
+.agent-detail__composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-left: 1px;
+}
+
+.agent-detail__composer-actions button {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid #dfe5ed;
+  border-radius: 999px;
+  background: #fff;
+  color: #5e6877;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.agent-detail__composer-actions button.active {
+  border-color: #cfe0ff;
+  background: #f6f9ff;
+  color: #3979ed;
+}
+
+.agent-detail__composer-actions button:hover {
+  border-color: #b9cef7;
+  color: #3979ed;
 }
 
 .agent-detail__input {

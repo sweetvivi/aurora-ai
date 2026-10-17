@@ -31,10 +31,48 @@ export interface AgentDraft {
 interface AgentWorkspaceState {
   customAgents: AgentCatalogItem[];
   drafts: AgentDraft[];
+  favoriteAgentIds: string[];
   sessions: AgentSession[];
 }
 
+const AGENT_WORKSPACE_STORAGE_KEY = 'aurora:agent-workspace:v1';
 const customAgentColors = ['#3979ed', '#198e68', '#c36d2d', '#7c5bd9', '#c54871'];
+
+function emptyWorkspaceState(): AgentWorkspaceState {
+  return {
+    customAgents: [],
+    drafts: [],
+    favoriteAgentIds: [],
+    sessions: [],
+  };
+}
+
+function loadWorkspaceState(): AgentWorkspaceState {
+  if (typeof window === 'undefined') {
+    return emptyWorkspaceState();
+  }
+
+  try {
+    const rawState = window.localStorage.getItem(AGENT_WORKSPACE_STORAGE_KEY);
+
+    if (!rawState) {
+      return emptyWorkspaceState();
+    }
+
+    const parsedState = JSON.parse(rawState) as Partial<AgentWorkspaceState>;
+
+    return {
+      customAgents: Array.isArray(parsedState.customAgents) ? parsedState.customAgents : [],
+      drafts: Array.isArray(parsedState.drafts) ? parsedState.drafts : [],
+      favoriteAgentIds: Array.isArray(parsedState.favoriteAgentIds)
+        ? parsedState.favoriteAgentIds.filter((id): id is string => typeof id === 'string')
+        : [],
+      sessions: Array.isArray(parsedState.sessions) ? parsedState.sessions : [],
+    };
+  } catch {
+    return emptyWorkspaceState();
+  }
+}
 
 function makeId(prefix: string): string {
   const randomPart =
@@ -140,12 +178,23 @@ function createAssistantReply(agent: AgentCatalogItem, prompt: string): string {
 }
 
 export const useAgentWorkspaceStore = defineStore('agent-workspace', {
-  state: (): AgentWorkspaceState => ({
-    customAgents: [],
-    drafts: [],
-    sessions: [],
-  }),
+  state: (): AgentWorkspaceState => loadWorkspaceState(),
   actions: {
+    persist(): void {
+      if (typeof window === 'undefined') {
+        return;
+      }
+
+      window.localStorage.setItem(
+        AGENT_WORKSPACE_STORAGE_KEY,
+        JSON.stringify({
+          customAgents: this.customAgents,
+          drafts: this.drafts,
+          favoriteAgentIds: this.favoriteAgentIds,
+          sessions: this.sessions,
+        }),
+      );
+    },
     createSession(agentId: string): AgentSession {
       const now = Date.now();
       const session: AgentSession = {
@@ -158,6 +207,7 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
       };
 
       this.sessions.unshift(session);
+      this.persist();
       return session;
     },
     sendMessage(agent: AgentCatalogItem, content: string, sessionId?: string): AgentSession {
@@ -187,6 +237,7 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
       session.updatedAt = now + 1;
 
       this.sessions = [session, ...this.sessions.filter((item) => item.id !== session.id)];
+      this.persist();
 
       return session;
     },
@@ -198,6 +249,15 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
     latestSessionForAgent(agentId: string): AgentSession | undefined {
       return this.sessionsForAgent(agentId)[0];
     },
+    toggleFavorite(agentId: string): void {
+      if (this.favoriteAgentIds.includes(agentId)) {
+        this.favoriteAgentIds = this.favoriteAgentIds.filter((id) => id !== agentId);
+      } else {
+        this.favoriteAgentIds.push(agentId);
+      }
+
+      this.persist();
+    },
     saveDraft(draft: AgentDraft): AgentDraft {
       const index = this.drafts.findIndex((item) => item.id === draft.id);
 
@@ -207,6 +267,7 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
         this.drafts.unshift(draft);
       }
 
+      this.persist();
       return draft;
     },
     publishDraft(draft: AgentDraft): AgentCatalogItem {
@@ -240,6 +301,7 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
         this.customAgents.unshift(customAgent);
       }
 
+      this.persist();
       return customAgent;
     },
   },

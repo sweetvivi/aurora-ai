@@ -1,1025 +1,1328 @@
 <script setup lang="ts">
 import {
-  ArrowUpOutlined,
+  AppstoreOutlined,
+  ArrowRightOutlined,
   BarChartOutlined,
+  BulbOutlined,
+  CodeOutlined,
+  CoffeeOutlined,
   FileTextOutlined,
-  FormOutlined,
-  HistoryOutlined,
+  HighlightOutlined,
   LayoutOutlined,
-  LinkOutlined,
+  MessageOutlined,
+  PictureOutlined,
   PlusOutlined,
   ReadOutlined,
+  RobotOutlined,
   SearchOutlined,
-  TableOutlined,
+  ShoppingCartOutlined,
+  SoundOutlined,
+  StarFilled,
+  StarOutlined,
+  TeamOutlined,
+  ThunderboltFilled,
+  TranslationOutlined,
+  UserOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import GalleryArtwork from '@/components/GalleryArtwork.vue';
+import { agentCatalog, type AgentCatalogItem } from '@/data/agents';
 import { useAgentWorkspaceStore } from '@/stores/agent-workspace';
 
-interface QuickMode {
-  agentId: string;
+type CatalogTab = 'created' | 'favorites' | 'official';
+
+interface CategoryItem {
+  count: number;
   icon: Component;
   label: string;
-  prompt: string;
-}
-
-interface ScenarioTab {
-  agentId: string;
-  label: string;
-  value: string;
-}
-
-interface AgentCase {
-  agentId: string;
-  category: string;
-  description: string;
-  tags: string[];
-  title: string;
-  variants: number[];
 }
 
 const router = useRouter();
 const workspace = useAgentWorkspaceStore();
-const prompt = ref('');
-const activeTab = ref('explore');
-const selectedAgentId = ref('document-editor');
+const activeTab = ref<CatalogTab>('official');
+const selectedCategory = ref('全部');
+const search = ref('');
 
-const quickModes: QuickMode[] = [
-  {
-    agentId: 'growth-copywriter',
-    icon: FormOutlined,
-    label: '写作',
-    prompt: '帮我策划一篇结构清晰、适合目标读者的文章。',
-  },
-  {
-    agentId: 'document-editor',
-    icon: FileTextOutlined,
-    label: '报告',
-    prompt: '根据主题整理研究框架，并生成一份专业报告。',
-  },
-  {
-    agentId: 'brand-designer',
-    icon: LayoutOutlined,
-    label: '设计',
-    prompt: '为品牌活动设计一套视觉方向，并说明设计依据。',
-  },
-  {
-    agentId: 'data-analyst',
-    icon: TableOutlined,
-    label: '表格',
-    prompt: '分析这份业务数据，输出关键结论和图表建议。',
-  },
-  {
-    agentId: 'visual-prompt',
-    icon: LinkOutlined,
-    label: '网页',
-    prompt: '把一个产品想法整理成可演示的网页方案。',
-  },
+const hotSearches = ['AI写作助手', '代码生成器', '数据分析', '图像处理', '翻译助手'];
+
+const categoryDefinitions: { icon: Component; label: string }[] = [
+  { icon: ReadOutlined, label: '教育与培训' },
+  { icon: PictureOutlined, label: 'AI 视觉创作' },
+  { icon: HighlightOutlined, label: '图形与图像处理' },
+  { icon: FileTextOutlined, label: '办公文档生成' },
+  { icon: BarChartOutlined, label: '数据计算与分析' },
+  { icon: SearchOutlined, label: '知识检索与信息获取' },
+  { icon: CodeOutlined, label: '编程与软件开发' },
+  { icon: BulbOutlined, label: '创意营销与内容策划' },
+  { icon: ReadOutlined, label: '学术与研究辅助' },
+  { icon: TranslationOutlined, label: '语言与文字处理' },
+  { icon: TeamOutlined, label: '商务与运营支持' },
+  { icon: CoffeeOutlined, label: '生活与娱乐' },
+  { icon: LayoutOutlined, label: '产品与 UI 设计' },
+  { icon: SoundOutlined, label: '媒体与传播' },
+  { icon: AppstoreOutlined, label: '综合工具（多模态）' },
+  { icon: ShoppingCartOutlined, label: 'AI 电商' },
+  { icon: PictureOutlined, label: 'AI 图片' },
+  { icon: UserOutlined, label: '我的智能体' },
 ];
 
-const scenarioTabs: ScenarioTab[] = [
-  { agentId: 'document-editor', label: '探索', value: 'explore' },
-  { agentId: 'document-editor', label: '做报告', value: 'report' },
-  { agentId: 'document-editor', label: '写文档', value: 'document' },
-  { agentId: 'research-mentor', label: '简历制作', value: 'resume' },
-  { agentId: 'growth-copywriter', label: '自媒体创作', value: 'media' },
-  { agentId: 'research-mentor', label: '市场调研', value: 'research' },
-  { agentId: 'study-planner', label: '教学设计', value: 'teaching' },
-  { agentId: 'study-planner', label: '学习研究', value: 'study' },
-  { agentId: 'growth-copywriter', label: '营销策划', value: 'marketing' },
-  { agentId: 'document-editor', label: '做播客', value: 'podcast' },
+const tabs: { icon: Component; label: string; value: CatalogTab }[] = [
+  { icon: StarFilled, label: '官方智能体', value: 'official' },
+  { icon: UserOutlined, label: '我创建的', value: 'created' },
+  { icon: StarOutlined, label: '我收藏的', value: 'favorites' },
 ];
 
-const agentCases: AgentCase[] = [
-  {
-    agentId: 'growth-copywriter',
-    category: '内容策划',
-    description: '从受众痛点和平台语境出发，生成完整图文指南。',
-    tags: ['旅行', '图文', '选题'],
-    title: '城市周末漫游图文指南',
-    variants: [0, 4],
-  },
-  {
-    agentId: 'document-editor',
-    category: '商业写作',
-    description: '搭建世界观与人物线，输出可继续扩写的章节结构。',
-    tags: ['小说', '人物', '世界观'],
-    title: '未来科技题材融合爽文情节',
-    variants: [6, 1],
-  },
-  {
-    agentId: 'meeting-notes',
-    category: '运营增长',
-    description: '把产品卖点、受众和渠道整理成多版本内容脚本。',
-    tags: ['饮食', '文案', '带货'],
-    title: '轻食品牌内容带货方案',
-    variants: [3, 5],
-  },
-  {
-    agentId: 'brand-designer',
-    category: '市场策略',
-    description: '拆解用户决策路径，形成渠道投放与转化建议。',
-    tags: ['家电', '洞察', '转化'],
-    title: '智能家电达人营销设计',
-    variants: [7, 2],
-  },
-  {
-    agentId: 'study-planner',
-    category: '学习成长',
-    description: '将知识主题拆成阶段练习和可复盘的学习路线。',
-    tags: ['学习方法', '笔记', '复盘'],
-    title: '创作学习方法对比与练习',
-    variants: [1, 4],
-  },
-  {
-    agentId: 'data-analyst',
-    category: '效率生活',
-    description: '结合预算、时间和营养目标规划一周日常菜单。',
-    tags: ['早餐', '预算', '清单'],
-    title: '一周低成本早餐计划',
-    variants: [5, 3],
-  },
-  {
-    agentId: 'research-mentor',
-    category: '职场研究',
-    description: '围绕岗位场景设计需求清单、功能优先级和验收标准。',
-    tags: ['职场', '产品', '调研'],
-    title: '新人办公软件需求调研',
-    variants: [2, 0],
-  },
-  {
-    agentId: 'professional-translator',
-    category: '行业报告',
-    description: '聚合技术、用户和竞争信息，形成结构化市场判断。',
-    tags: ['机器人', '市场', '趋势'],
-    title: '家用智能机器人市场研究',
-    variants: [4, 7],
-  },
-];
-
-const visibleCases = computed(() => {
-  if (activeTab.value === 'explore') {
-    return agentCases;
+const activeCollection = computed<AgentCatalogItem[]>(() => {
+  if (activeTab.value === 'created') {
+    return workspace.customAgents;
   }
 
-  const index = Math.max(
-    0,
-    scenarioTabs.findIndex((tab) => tab.value === activeTab.value),
-  );
+  if (activeTab.value === 'favorites') {
+    return [...agentCatalog, ...workspace.customAgents].filter((agent) =>
+      workspace.favoriteAgentIds.includes(agent.id),
+    );
+  }
 
-  return [...agentCases.slice(index), ...agentCases.slice(0, index)].slice(0, 4);
+  return agentCatalog;
 });
 
-function useMode(mode: QuickMode): void {
-  prompt.value = mode.prompt;
-  selectedAgentId.value = mode.agentId;
-}
+const categories = computed<CategoryItem[]>(() => {
+  const countByCategory = new Map<string, number>();
 
-function selectScenario(tab: ScenarioTab): void {
-  activeTab.value = tab.value;
-  selectedAgentId.value = tab.agentId;
-}
-
-function startTask(): void {
-  if (!prompt.value.trim()) {
-    return;
+  for (const agent of activeCollection.value) {
+    countByCategory.set(agent.category, (countByCategory.get(agent.category) ?? 0) + 1);
   }
 
-  void router.push({
-    name: 'agent-detail',
-    params: {
-      id: selectedAgentId.value,
-    },
-    query: {
-      prompt: prompt.value.trim(),
-      start: Date.now().toString(),
-    },
+  return categoryDefinitions
+    .filter((category) => (countByCategory.get(category.label) ?? 0) > 0)
+    .map((category) => ({
+      ...category,
+      count: countByCategory.get(category.label) ?? 0,
+    }));
+});
+
+const visibleAgents = computed(() => {
+  const keyword = search.value.trim().toLowerCase();
+
+  return activeCollection.value.filter((agent) => {
+    const matchesCategory =
+      selectedCategory.value === '全部' || agent.category === selectedCategory.value;
+
+    if (!matchesCategory) {
+      return false;
+    }
+
+    if (!keyword) {
+      return true;
+    }
+
+    return [agent.name, agent.description, agent.tags.join(' ')]
+      .join(' ')
+      .toLowerCase()
+      .includes(keyword);
   });
-}
+});
 
-function openLatestSession(): void {
-  const latest = workspace.sessions[0];
-
-  if (!latest) {
-    return;
+const collectionLabel = computed(() => {
+  if (activeTab.value === 'created') {
+    return '我创建的智能体';
   }
 
-  void router.push({
-    name: 'agent-detail',
-    params: {
-      id: latest.agentId,
-    },
-    query: {
-      session: latest.id,
-    },
-  });
+  if (activeTab.value === 'favorites') {
+    return '我收藏的智能体';
+  }
+
+  return '全部智能体';
+});
+
+const emptyTitle = computed(() => {
+  if (search.value.trim()) {
+    return '没有找到匹配的智能体';
+  }
+
+  if (activeTab.value === 'created') {
+    return '还没有创建智能体';
+  }
+
+  if (activeTab.value === 'favorites') {
+    return '还没有收藏智能体';
+  }
+
+  return '当前分类暂无智能体';
+});
+
+watch(activeTab, () => {
+  selectedCategory.value = '全部';
+});
+
+function openAgent(agentId: string): void {
+  void router.push(`/agents/${agentId}`);
+}
+
+function toggleFavorite(agentId: string): void {
+  workspace.toggleFavorite(agentId);
+}
+
+function applyHotSearch(keyword: string): void {
+  search.value = keyword;
+  activeTab.value = 'official';
+  selectedCategory.value = '全部';
 }
 </script>
 
 <template>
-  <div class="agents-hub">
-    <header class="agents-hub__utility">
-      <div>
-        <span>Agent 工作台</span>
-        <small>从一句目标开始，自动拆解任务与产出</small>
-      </div>
-      <button type="button" @click="openLatestSession">
-        <HistoryOutlined />
-        历史记录
-      </button>
-    </header>
-
+  <div class="agents-catalog-page">
     <section class="agents-hero">
-      <div class="agents-hero__heading">
-        <h1>你好，我是 <em>Agent 助手</em></h1>
-        <p>描述一个目标，我会自动选择合适的智能体，完成调研、写作、设计与演示。</p>
-      </div>
-
-      <div class="agents-quick-modes">
-        <button v-for="mode in quickModes" :key="mode.label" type="button" @click="useMode(mode)">
-          <component :is="mode.icon" />
-          {{ mode.label }}
-        </button>
-      </div>
-
-      <form class="agents-prompt" @submit.prevent="startTask">
-        <label class="agents-prompt__field">
-          <SearchOutlined />
-          <textarea
-            v-model="prompt"
-            rows="3"
-            placeholder="输入你的需求，例如：整理一份新手旅行计划，并生成可分享的网页。"
-          />
-        </label>
-
-        <div class="agents-prompt__footer">
-          <div class="agents-prompt__tools">
-            <button type="button" aria-label="添加文件">
-              <FileTextOutlined />
-            </button>
-            <button type="button" aria-label="添加链接">
-              <LinkOutlined />
-            </button>
-          </div>
-          <button
-            class="agents-prompt__submit"
-            type="submit"
-            :disabled="!prompt.trim()"
-            aria-label="开始任务"
-          >
-            <ArrowUpOutlined />
-          </button>
-        </div>
-      </form>
-    </section>
-
-    <nav class="agents-scenarios" aria-label="智能体场景">
-      <button
-        v-for="tab in scenarioTabs"
-        :key="tab.value"
-        type="button"
-        :class="{ active: activeTab === tab.value }"
-        @click="selectScenario(tab)"
-      >
-        {{ tab.label }}
-      </button>
-    </nav>
-
-    <section v-if="workspace.customAgents.length > 0" class="agents-custom-section">
-      <header class="agents-case-section__heading">
-        <div>
-          <h2>我的智能体</h2>
-          <p>已发布的本地草稿会出现在这里，可以继续对话和调试。</p>
-        </div>
-        <button type="button" @click="router.push('/agents/create')">
-          <PlusOutlined />
-          再创建一个
-        </button>
-      </header>
-      <div class="agents-custom-grid">
-        <button
-          v-for="item in workspace.customAgents"
-          :key="item.id"
-          type="button"
-          class="agents-custom-card"
-          @click="router.push(`/agents/${item.id}`)"
-        >
-          <span :style="{ background: item.color }">{{ item.glyph }}</span>
-          <span>
-            <strong>{{ item.name }}</strong>
-            <small>{{ item.description }}</small>
-          </span>
-          <em>{{ item.tags.slice(0, 2).join(' · ') }}</em>
-        </button>
-      </div>
-    </section>
-
-    <section class="agents-case-section">
-      <header class="agents-case-section__heading">
-        <div>
-          <h2>
-            {{
-              activeTab === 'explore'
-                ? '精选智能体场景'
-                : `${scenarioTabs.find((tab) => tab.value === activeTab)?.label}案例`
-            }}
-          </h2>
-          <p>选择一个场景直接开始，也可以进入智能体查看完整能力。</p>
-        </div>
-        <button type="button" @click="router.push('/agents/create')">
-          <PlusOutlined />
-          创建智能体
-        </button>
+      <header class="agents-hero__heading">
+        <span>
+          <RobotOutlined />
+          SUPER AGENTS
+        </span>
+        <h1>超级智能体，创建你的 APP 或助手</h1>
+        <p>释放 AI 的潜能，通过自定义模型、提示词和界面，打造属于你的智能应用。</p>
       </header>
 
-      <div class="agents-case-grid">
-        <article
-          v-for="item in visibleCases"
-          :key="item.title"
-          class="agents-case-card"
-          @click="router.push(`/agents/${item.agentId}`)"
-        >
-          <div class="agents-case-card__visual">
-            <GalleryArtwork :variant="item.variants[0] ?? 0" :title="item.title" />
-            <span class="agents-case-card__sheet agents-case-card__sheet--back">
-              <i v-for="line in 5" :key="line" />
-            </span>
-            <span class="agents-case-card__sheet agents-case-card__sheet--front">
-              <b />
-              <i v-for="line in 6" :key="line" />
-              <em />
-            </span>
+      <div class="agents-hero__cards">
+        <article class="agents-builder-card agents-builder-card--active">
+          <div class="agents-builder-card__visual agents-builder-card__visual--chat">
+            <div class="agent-window">
+              <header>
+                <i />
+                <span>智能体创建助手 (Prompt)</span>
+              </header>
+              <p />
+              <p />
+              <p />
+              <p />
+              <button type="button">AI 帮我完善</button>
+            </div>
           </div>
+          <div class="agents-builder-card__content">
+            <span class="agents-builder-card__tag">单智能体</span>
+            <h2>创建智能体</h2>
+            <p>适用于轻量灵活、自然语言驱动的场景。</p>
+            <ul>
+              <li>支持自定义界面</li>
+              <li>多模型选择</li>
+            </ul>
+            <button type="button" @click="router.push('/agents/create')">
+              <PlusOutlined />
+              立即创建
+            </button>
+          </div>
+        </article>
 
-          <div class="agents-case-card__body">
-            <span class="agents-case-card__category">
-              <ReadOutlined />
-              {{ item.category }}
+        <article class="agents-builder-card agents-builder-card--disabled">
+          <div class="agents-builder-card__visual agents-builder-card__visual--flow">
+            <span class="flow-node flow-node--one">开始</span>
+            <span class="flow-node flow-node--two">信息检索</span>
+            <span class="flow-node flow-node--three">内容生成</span>
+            <span class="flow-node flow-node--four">结果复核</span>
+            <i class="flow-line flow-line--one" />
+            <i class="flow-line flow-line--two" />
+            <i class="flow-line flow-line--three" />
+          </div>
+          <div class="agents-builder-card__content">
+            <span class="agents-builder-card__tag">多智能体</span>
+            <h2>创建多智能体蜂群</h2>
+            <p>适用于真实业务链路和多个专业角色协作的场景。</p>
+            <span class="agents-builder-card__soon">
+              <i />
+              即将上线
             </span>
-            <h3>{{ item.title }}</h3>
-            <p>{{ item.description }}</p>
-            <footer>
-              <span v-for="tag in item.tags" :key="tag">{{ tag }}</span>
-            </footer>
           </div>
         </article>
       </div>
     </section>
 
-    <section class="agents-builder-banner">
-      <div class="agents-builder-banner__mark">
-        <BarChartOutlined />
+    <section class="agents-catalog">
+      <header class="agents-catalog__toolbar">
+        <nav class="agents-tabs" aria-label="智能体资源库">
+          <button
+            v-for="tab in tabs"
+            :key="tab.value"
+            type="button"
+            :class="{ active: activeTab === tab.value }"
+            @click="activeTab = tab.value"
+          >
+            <component :is="tab.icon" />
+            {{ tab.label }}
+            <span v-if="tab.value === 'created' && workspace.customAgents.length">
+              {{ workspace.customAgents.length }}
+            </span>
+            <span v-if="tab.value === 'favorites' && workspace.favoriteAgentIds.length">
+              {{ workspace.favoriteAgentIds.length }}
+            </span>
+          </button>
+        </nav>
+
+        <label class="agents-search">
+          <SearchOutlined />
+          <input v-model="search" placeholder="搜索智能体..." />
+          <kbd>Ctrl K</kbd>
+        </label>
+
+        <div class="agents-hot-search">
+          <span>热门搜索：</span>
+          <button
+            v-for="keyword in hotSearches"
+            :key="keyword"
+            type="button"
+            @click="applyHotSearch(keyword)"
+          >
+            {{ keyword }}
+          </button>
+        </div>
+      </header>
+
+      <div class="agents-catalog__body">
+        <aside class="agents-categories">
+          <header>
+            <strong>分类</strong>
+            <span>{{ activeCollection.length }}</span>
+          </header>
+          <nav aria-label="智能体分类">
+            <button
+              type="button"
+              :class="{ active: selectedCategory === '全部' }"
+              @click="selectedCategory = '全部'"
+            >
+              <span>
+                <AppstoreOutlined />
+                全部
+              </span>
+              <em>{{ activeCollection.length }}</em>
+            </button>
+            <button
+              v-for="category in categories"
+              :key="category.label"
+              type="button"
+              :class="{ active: selectedCategory === category.label }"
+              @click="selectedCategory = category.label"
+            >
+              <span>
+                <component :is="category.icon" />
+                {{ category.label }}
+              </span>
+              <em>{{ category.count }}</em>
+            </button>
+          </nav>
+        </aside>
+
+        <main class="agents-results">
+          <header class="agents-results__heading">
+            <div>
+              <h2>{{ collectionLabel }}</h2>
+              <p>选择智能体即可进入对话，也可以先收藏常用能力。</p>
+            </div>
+            <span>{{ visibleAgents.length }} 个结果</span>
+          </header>
+
+          <div v-if="visibleAgents.length > 0" class="agents-grid">
+            <article
+              v-for="agent in visibleAgents"
+              :key="agent.id"
+              class="agent-card"
+              tabindex="0"
+              @click="openAgent(agent.id)"
+              @keydown.enter="openAgent(agent.id)"
+            >
+              <header class="agent-card__header">
+                <span class="agent-card__avatar" :style="{ background: agent.color }">
+                  {{ agent.glyph }}
+                </span>
+                <div>
+                  <strong>{{ agent.name }}</strong>
+                  <span v-if="activeTab === 'created'">我创建的</span>
+                  <span v-else>AI 助手</span>
+                </div>
+                <button
+                  type="button"
+                  class="agent-card__favorite"
+                  :class="{ active: workspace.favoriteAgentIds.includes(agent.id) }"
+                  :aria-label="
+                    workspace.favoriteAgentIds.includes(agent.id) ? '取消收藏' : '收藏智能体'
+                  "
+                  @click.stop="toggleFavorite(agent.id)"
+                >
+                  <StarFilled v-if="workspace.favoriteAgentIds.includes(agent.id)" />
+                  <StarOutlined v-else />
+                </button>
+              </header>
+
+              <div class="agent-card__metrics">
+                <span>
+                  <StarFilled />
+                  {{ agent.rating.toFixed(1) }}
+                </span>
+                <span>
+                  <MessageOutlined />
+                  {{ agent.usage }}
+                </span>
+              </div>
+
+              <p>{{ agent.description }}</p>
+
+              <footer>
+                <span v-for="tag in agent.tags.slice(0, 3)" :key="tag">{{ tag }}</span>
+              </footer>
+            </article>
+          </div>
+
+          <div v-else class="agents-empty">
+            <span>
+              <RobotOutlined />
+            </span>
+            <strong>{{ emptyTitle }}</strong>
+            <p>
+              {{
+                activeTab === 'created'
+                  ? '创建后可以继续添加提示词、知识库和工具能力。'
+                  : '调整关键词或切换分类后再试。'
+              }}
+            </p>
+            <button
+              v-if="activeTab === 'created'"
+              type="button"
+              @click="router.push('/agents/create')"
+            >
+              <PlusOutlined />
+              创建智能体
+            </button>
+          </div>
+        </main>
       </div>
+    </section>
+
+    <section v-if="activeTab === 'official'" class="agents-callout">
+      <span>
+        <ThunderboltFilled />
+      </span>
       <div>
-        <span>搭建自己的智能工作流</span>
-        <h2>把重复任务交给专属 Agent</h2>
-        <p>组合提示词、知识库和工具能力，创建适合团队或个人使用的智能体。</p>
+        <strong>没有找到合适的智能体？</strong>
+        <p>把提示词、知识边界和输出格式组合起来，创建一个真正符合你工作习惯的助手。</p>
       </div>
       <button type="button" @click="router.push('/agents/create')">
         开始创建
-        <ArrowUpOutlined />
+        <ArrowRightOutlined />
       </button>
     </section>
   </div>
 </template>
 
 <style scoped>
-.agents-hub {
-  width: min(100%, 1220px);
+.agents-catalog-page {
+  min-height: calc(100vh - 56px);
+  padding: 30px 28px 58px;
+  background:
+    radial-gradient(circle at 50% 0, rgb(61 202 136 / 8%), transparent 440px),
+    linear-gradient(180deg, #f7fcf9 0, #fff 430px);
+}
+
+.agents-hero,
+.agents-catalog,
+.agents-callout {
+  width: min(100%, 1380px);
   margin: 0 auto;
-  padding: 10px 28px 42px;
-  background: #fff;
-}
-
-.agents-hub__utility {
-  display: flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.agents-hub__utility > div {
-  display: grid;
-  gap: 3px;
-}
-
-.agents-hub__utility span {
-  color: #252c37;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.agents-hub__utility small {
-  color: #9aa2af;
-  font-size: 10px;
-}
-
-.agents-hub__utility button,
-.agents-case-section__heading > button,
-.agents-builder-banner > button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 8px;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-.agents-hub__utility button {
-  height: 34px;
-  padding: 0 12px;
-  border: 1px solid #dfe4ec;
-  background: #fff;
-  color: #586273;
-  font-size: 11px;
-}
-
-.agents-hero {
-  position: relative;
-  overflow: hidden;
-  padding: 34px 12px 18px;
-  border: 0;
-  border-radius: 0;
-  background: #fff;
-}
-
-.agents-hero::after {
-  position: absolute;
-  top: -150px;
-  right: -96px;
-  width: 330px;
-  height: 330px;
-  border: 46px solid rgb(94 142 255 / 5%);
-  border-radius: 50%;
-  content: '';
-}
-
-.agents-hero__heading,
-.agents-prompt,
-.agents-quick-modes {
-  position: relative;
-  z-index: 1;
 }
 
 .agents-hero__heading {
+  display: grid;
+  justify-items: center;
   text-align: center;
 }
 
-.agents-hero__heading h1 {
-  margin: 0;
-  color: #202632;
-  font-size: 38px;
-  font-weight: 880;
-  letter-spacing: -0.035em;
+.agents-hero__heading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #1ca96d;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
 }
 
-.agents-hero__heading h1 em {
-  color: #3f78ed;
-  font-style: normal;
+.agents-hero__heading h1 {
+  margin: 9px 0 0;
+  color: #169f67;
+  font-size: clamp(25px, 2.2vw, 34px);
+  font-weight: 900;
+  letter-spacing: -0.025em;
 }
 
 .agents-hero__heading p {
-  margin: 10px 0 0;
-  color: #7d8797;
-  font-size: 12px;
-}
-
-.agents-prompt {
-  max-width: 900px;
-  margin: 18px auto 0;
-  padding: 14px 15px 12px;
-  border: 1px solid #d9e2f0;
-  border-radius: 13px;
-  background: #fff;
-  box-shadow: 0 14px 38px rgb(54 81 124 / 9%);
-}
-
-.agents-prompt__field {
-  display: grid;
-  align-items: start;
-  gap: 10px;
-  grid-template-columns: auto minmax(0, 1fr);
-  color: #a1a9b6;
-}
-
-.agents-prompt__field :deep(svg) {
-  margin-top: 4px;
-  font-size: 14px;
-}
-
-.agents-prompt__field textarea {
-  width: 100%;
-  min-height: 74px;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: #343b48;
-  font-size: 12px;
-  line-height: 1.75;
-  resize: none;
-}
-
-.agents-prompt__field textarea::placeholder {
-  color: #a4abb7;
-}
-
-.agents-prompt__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 7px;
-}
-
-.agents-prompt__tools {
-  display: flex;
-  gap: 7px;
-}
-
-.agents-prompt__tools button,
-.agents-prompt__submit {
-  display: grid;
-  place-items: center;
-  border: 0;
-  cursor: pointer;
-}
-
-.agents-prompt__tools button {
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
-  background: #f5f7fa;
-  color: #737d8d;
-}
-
-.agents-prompt__submit {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #3979ed;
-  color: #fff;
-  font-size: 14px;
-}
-
-.agents-prompt__submit:disabled {
-  background: #d8dde5;
-  cursor: not-allowed;
-}
-
-.agents-quick-modes {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 9px;
-  margin-top: 10px;
-}
-
-.agents-quick-modes button {
-  display: inline-flex;
-  height: 36px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 17px;
-  border: 1px solid #dce3ec;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 90%);
-  color: #616b7b;
+  margin: 9px 0 0;
+  color: #6d7882;
   font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
+  line-height: 1.7;
 }
 
-.agents-quick-modes button:hover {
-  border-color: #b8cdf8;
-  color: #3e72d8;
-}
-
-.agents-quick-modes :deep(svg) {
-  color: #4f7de0;
-}
-
-.agents-scenarios {
-  display: flex;
-  overflow-x: auto;
-  gap: 6px;
-  margin: 12px 0 16px;
-  padding: 6px;
-  border: 1px solid #e5e9f0;
-  border-radius: 11px;
-  background: #fff;
-  scrollbar-width: none;
-}
-
-.agents-scenarios::-webkit-scrollbar {
-  display: none;
-}
-
-.agents-scenarios button {
-  min-width: max-content;
-  height: 34px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: #677181;
-  font-size: 11px;
-  font-weight: 720;
-  cursor: pointer;
-}
-
-.agents-scenarios button.active {
-  background: #edf4ff;
-  color: #3973df;
-}
-
-.agents-case-section {
-  padding: 6px 0 18px;
-  border: 0;
-  border-radius: 0;
-  background: #fff;
-}
-
-.agents-case-section__heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 15px;
-}
-
-.agents-case-section__heading h2 {
-  margin: 0;
-  color: #252b35;
-  font-size: 18px;
-}
-
-.agents-case-section__heading p {
-  margin: 5px 0 0;
-  color: #8e97a4;
-  font-size: 10px;
-}
-
-.agents-case-section__heading > button {
-  height: 34px;
-  padding: 0 13px;
-  border: 0;
-  background: #3979ed;
-  color: #fff;
-  font-size: 11px;
-}
-
-.agents-case-grid {
+.agents-hero__cards {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 25px;
 }
 
-.agents-case-card {
-  min-width: 0;
+.agents-builder-card {
+  display: grid;
+  min-height: 184px;
   overflow: hidden;
-  border: 1px solid #e7eaf0;
+  grid-template-columns: minmax(240px, 0.92fr) minmax(260px, 1fr);
+  border: 1px solid #e4ebe7;
   border-radius: 10px;
   background: #fff;
-  cursor: pointer;
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+  box-shadow: 0 12px 38px rgb(33 78 59 / 6%);
 }
 
-.agents-case-card:hover {
-  border-color: #bfd0ee;
-  box-shadow: 0 12px 26px rgb(43 73 123 / 9%);
-  transform: translateY(-2px);
+.agents-builder-card--disabled {
+  opacity: 0.72;
 }
 
-.agents-case-card__visual {
+.agents-builder-card__visual {
   position: relative;
-  height: 118px;
+  min-width: 0;
   overflow: hidden;
-  background: #eef3f9;
+  background:
+    linear-gradient(90deg, rgb(63 172 126 / 6%) 1px, transparent 1px),
+    linear-gradient(rgb(63 172 126 / 6%) 1px, transparent 1px), #edf8f3;
+  background-size: 28px 28px;
 }
 
-.agents-case-card__visual > :deep(.gallery-artwork) {
+.agents-builder-card__visual--chat::before {
   position: absolute;
   inset: 0;
-  opacity: 0.34;
+  background: linear-gradient(135deg, rgb(255 255 255 / 72%), transparent 65%);
+  content: '';
 }
 
-.agents-case-card__sheet {
+.agent-window {
   position: absolute;
+  top: 25px;
+  right: 26px;
+  bottom: 24px;
+  left: 26px;
   display: grid;
   align-content: start;
-  gap: 5px;
-  padding: 10px;
-  border: 1px solid #e2e6ec;
-  border-radius: 5px;
-  background: rgb(255 255 255 / 95%);
-  box-shadow: 0 8px 20px rgb(43 57 80 / 10%);
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid #cfe1d9;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 14px 30px rgb(41 96 74 / 10%);
 }
 
-.agents-case-card__sheet--back {
-  top: 16px;
-  right: 20px;
-  width: 42%;
-  height: 86px;
-  opacity: 0.7;
-  transform: rotate(4deg);
-}
-
-.agents-case-card__sheet--front {
-  top: 20px;
-  right: 35px;
-  width: 48%;
-  height: 92px;
-}
-
-.agents-case-card__sheet i {
-  display: block;
-  height: 4px;
-  border-radius: 999px;
-  background: #dce2e9;
-}
-
-.agents-case-card__sheet i:nth-child(2n) {
-  width: 72%;
-}
-
-.agents-case-card__sheet b {
-  display: block;
-  width: 58%;
-  height: 7px;
-  border-radius: 999px;
-  background: #9cb8e5;
-}
-
-.agents-case-card__sheet em {
-  display: block;
-  height: 20px;
-  border-radius: 4px;
-  background: #eaf1fb;
-}
-
-.agents-case-card__body {
-  padding: 13px;
-}
-
-.agents-case-card__category {
-  display: inline-flex;
+.agent-window header {
+  display: flex;
   align-items: center;
-  gap: 5px;
-  color: #4e79ce;
-  font-size: 9px;
-  font-weight: 780;
+  gap: 7px;
+  margin-bottom: 2px;
+  color: #5e6d67;
+  font-size: 8px;
+  font-weight: 750;
 }
 
-.agents-case-card__category :deep(svg) {
-  font-size: 10px;
+.agent-window header i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: #69c9a3;
 }
 
-.agents-case-card h3 {
-  min-height: 36px;
+.agent-window p {
+  height: 7px;
+  margin: 0;
+  border-radius: 999px;
+  background: #e3e9e6;
+}
+
+.agent-window p:nth-of-type(2) {
+  width: 82%;
+}
+
+.agent-window p:nth-of-type(3) {
+  width: 92%;
+}
+
+.agent-window p:nth-of-type(4) {
+  width: 68%;
+}
+
+.agent-window button {
+  justify-self: end;
+  height: 23px;
+  margin-top: 2px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 5px;
+  background: #55b98f;
+  color: #fff;
+  font-size: 7px;
+}
+
+.agents-builder-card__content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 28px;
+}
+
+.agents-builder-card__tag {
+  color: #1ca96d;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+
+.agents-builder-card__content h2 {
+  margin: 7px 0 0;
+  color: #26302c;
+  font-size: 19px;
+  font-weight: 850;
+}
+
+.agents-builder-card__content > p {
   margin: 8px 0 0;
-  color: #2b313b;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.agents-case-card p {
-  min-height: 34px;
-  margin: 6px 0 0;
-  color: #858e9b;
-  font-size: 9px;
+  color: #7c8882;
+  font-size: 10px;
   line-height: 1.65;
 }
 
-.agents-case-card footer {
-  display: flex;
-  flex-wrap: wrap;
+.agents-builder-card__content ul {
+  display: grid;
   gap: 4px;
-  margin-top: 10px;
+  margin: 10px 0 0;
+  padding: 0;
+  color: #69756f;
+  font-size: 9px;
+  list-style: none;
 }
 
-.agents-case-card footer span {
-  padding: 3px 6px;
+.agents-builder-card__content li::before {
+  margin-right: 6px;
+  color: #1ca96d;
+  content: '✓';
+  font-weight: 900;
+}
+
+.agents-builder-card__content > button {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: #159c66;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.agents-builder-card__soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 17px;
+  color: #8d9691;
+  font-size: 9px;
+}
+
+.agents-builder-card__soon i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef9141;
+}
+
+.agents-builder-card__visual--flow {
+  background:
+    linear-gradient(90deg, rgb(68 130 226 / 6%) 1px, transparent 1px),
+    linear-gradient(rgb(68 130 226 / 6%) 1px, transparent 1px), #eff5fc;
+  background-size: 28px 28px;
+}
+
+.flow-node {
+  position: absolute;
+  z-index: 2;
+  padding: 7px 9px;
+  border: 1px solid #d5e3f5;
   border-radius: 5px;
-  background: #f2f4f7;
-  color: #727c8a;
+  background: #fff;
+  color: #5e7087;
+  font-size: 7px;
+  box-shadow: 0 7px 16px rgb(54 86 128 / 8%);
+}
+
+.flow-node--one {
+  top: 41px;
+  left: 32px;
+}
+
+.flow-node--two {
+  top: 94px;
+  left: 66px;
+}
+
+.flow-node--three {
+  top: 50px;
+  right: 48px;
+}
+
+.flow-node--four {
+  right: 31px;
+  bottom: 32px;
+}
+
+.flow-line {
+  position: absolute;
+  z-index: 1;
+  width: 62px;
+  height: 1px;
+  background: #9ebce5;
+  transform-origin: left center;
+}
+
+.flow-line--one {
+  top: 69px;
+  left: 77px;
+  transform: rotate(28deg);
+}
+
+.flow-line--two {
+  top: 79px;
+  left: 130px;
+  transform: rotate(-15deg);
+}
+
+.flow-line--three {
+  top: 95px;
+  right: 78px;
+  transform: rotate(34deg);
+}
+
+.agents-catalog {
+  margin-top: 24px;
+  overflow: hidden;
+  border: 1px solid #e4ebe7;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 14px 40px rgb(33 78 59 / 5%);
+}
+
+.agents-catalog__toolbar {
+  display: grid;
+  min-height: 64px;
+  align-items: center;
+  gap: 12px;
+  grid-template-columns: auto minmax(280px, 540px) minmax(0, 1fr);
+  padding: 12px 16px;
+  border-bottom: 1px solid #edf1ef;
+}
+
+.agents-tabs {
+  display: flex;
+  min-width: 0;
+  padding: 3px;
+  border-radius: 8px;
+  background: #f3f5f4;
+}
+
+.agents-tabs button {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #68726d;
+  font-size: 9px;
+  font-weight: 760;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.agents-tabs button.active {
+  background: #fff;
+  color: #169c66;
+  box-shadow: 0 3px 12px rgb(35 67 53 / 8%);
+}
+
+.agents-tabs button span {
+  min-width: 15px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: #e5f5ee;
+  color: #169c66;
+  font-size: 7px;
+}
+
+.agents-search {
+  display: flex;
+  height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid #dde4e0;
+  border-radius: 8px;
+  color: #98a19c;
+}
+
+.agents-search:focus-within {
+  border-color: #85c9ad;
+  box-shadow: 0 0 0 3px rgb(28 169 109 / 8%);
+}
+
+.agents-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #39423e;
+  font-size: 10px;
+}
+
+.agents-search input::placeholder {
+  color: #a4aca8;
+}
+
+.agents-search kbd {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border: 1px solid #e2e7e4;
+  border-radius: 4px;
+  background: #f7f9f8;
+  color: #9aa29e;
+  font-size: 7px;
+}
+
+.agents-hot-search {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.agents-hot-search span {
+  flex: 0 0 auto;
+  color: #929b96;
   font-size: 8px;
 }
 
-.agents-custom-section {
-  margin: 8px 0 18px;
-  padding: 17px;
-  border: 1px solid #dce7fa;
-  border-radius: 12px;
-  background: #f8fbff;
+.agents-hot-search button {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #3267d8;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.agents-custom-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.agents-hot-search button:hover {
+  text-decoration: underline;
 }
 
-.agents-custom-card {
+.agents-catalog__body {
   display: grid;
-  min-width: 0;
-  align-items: center;
-  gap: 4px 10px;
-  grid-template-columns: 38px minmax(0, 1fr);
-  padding: 12px;
-  border: 1px solid #e1e8f3;
+  align-items: start;
+  gap: 18px;
+  grid-template-columns: 250px minmax(0, 1fr);
+  padding: 18px;
+}
+
+.agents-categories {
+  position: sticky;
+  top: 74px;
+  overflow: hidden;
+  border: 1px solid #edf1ef;
   border-radius: 9px;
-  background: #fff;
-  color: #303844;
+  background: #fbfcfc;
+}
+
+.agents-categories > header {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border-bottom: 1px solid #edf1ef;
+}
+
+.agents-categories > header strong {
+  color: #46504b;
+  font-size: 11px;
+}
+
+.agents-categories > header span {
+  color: #9ca49f;
+  font-size: 8px;
+}
+
+.agents-categories nav {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+}
+
+.agents-categories nav button {
+  display: flex;
+  min-width: 0;
+  min-height: 37px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #68726d;
+  font-size: 9px;
   text-align: left;
   cursor: pointer;
 }
 
-.agents-custom-card:hover {
-  border-color: #b9cfef;
-  box-shadow: 0 9px 22px rgb(43 73 123 / 8%);
+.agents-categories nav button:hover {
+  background: #f0f6f3;
 }
 
-.agents-custom-card > span:first-child {
+.agents-categories nav button.active {
+  background: linear-gradient(90deg, #18ad72, #28bd80);
+  color: #fff;
+  box-shadow: 0 8px 18px rgb(24 173 114 / 18%);
+}
+
+.agents-categories nav button > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agents-categories nav button :deep(svg) {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
+.agents-categories nav button em {
+  flex: 0 0 auto;
+  color: #9ba39f;
+  font-size: 8px;
+  font-style: normal;
+}
+
+.agents-categories nav button.active em {
+  color: rgb(255 255 255 / 82%);
+}
+
+.agents-results {
+  min-width: 0;
+}
+
+.agents-results__heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+
+.agents-results__heading h2 {
+  margin: 0;
+  color: #29332e;
+  font-size: 15px;
+}
+
+.agents-results__heading p {
+  margin: 5px 0 0;
+  color: #8d9691;
+  font-size: 8px;
+}
+
+.agents-results__heading > span {
+  flex: 0 0 auto;
+  color: #8e9792;
+  font-size: 8px;
+}
+
+.agents-grid {
+  display: grid;
+  gap: 11px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.agent-card {
+  display: grid;
+  min-width: 0;
+  min-height: 174px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid #e3e9e6;
+  border-radius: 9px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.agent-card:hover,
+.agent-card:focus-visible {
+  border-color: #a9d8c3;
+  outline: 0;
+  box-shadow: 0 13px 28px rgb(37 91 67 / 9%);
+  transform: translateY(-2px);
+}
+
+.agent-card__header {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+}
+
+.agent-card__avatar {
   display: grid;
   width: 38px;
   height: 38px;
-  grid-row: span 2;
   place-items: center;
   border-radius: 10px;
   color: #fff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 850;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
 }
 
-.agents-custom-card > span:nth-child(2) {
+.agent-card__header > div {
   display: grid;
   min-width: 0;
   gap: 4px;
 }
 
-.agents-custom-card strong {
+.agent-card__header strong {
   overflow: hidden;
-  font-size: 12px;
+  color: #2e3732;
+  font-size: 11px;
+  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.agents-custom-card small {
-  overflow: hidden;
-  color: #818b99;
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agents-custom-card em {
-  overflow: hidden;
-  grid-column: 2;
-  color: #5580cf;
-  font-size: 8px;
-  font-style: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agents-builder-banner {
-  display: grid;
-  align-items: center;
-  gap: 16px;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  margin-top: 8px;
-  padding: 20px 22px;
-  border: 1px solid #dce7fa;
-  border-radius: 13px;
-  background: #f6f9ff;
-}
-
-.agents-builder-banner__mark {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  place-items: center;
-  border-radius: 12px;
-  background: #3979ed;
-  color: #fff;
-  font-size: 19px;
-}
-
-.agents-builder-banner span {
-  color: #4a78d5;
-  font-size: 9px;
+.agent-card__header span {
+  width: max-content;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #e8f7f0;
+  color: #1ca96d;
+  font-size: 6px;
   font-weight: 800;
 }
 
-.agents-builder-banner h2 {
-  margin: 4px 0 0;
-  color: #27303c;
-  font-size: 17px;
-}
-
-.agents-builder-banner p {
-  margin: 5px 0 0;
-  color: #858f9d;
-  font-size: 10px;
-}
-
-.agents-builder-banner > button {
-  height: 36px;
-  padding: 0 15px;
+.agent-card__favorite {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
   border: 0;
-  background: #3979ed;
-  color: #fff;
+  border-radius: 7px;
+  background: #f5f7f6;
+  color: #a3aaa6;
   font-size: 11px;
+  cursor: pointer;
 }
 
-.agents-builder-banner > button :deep(svg) {
-  transform: rotate(45deg);
+.agent-card__favorite.active {
+  background: #fff7e6;
+  color: #e9a226;
 }
 
-@media (max-width: 1100px) {
-  .agents-case-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+.agent-card__metrics {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 10px;
+  color: #8b9490;
+  font-size: 8px;
+}
+
+.agent-card__metrics span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agent-card__metrics :deep(svg:first-child) {
+  color: #f1a02b;
+}
+
+.agent-card > p {
+  display: -webkit-box;
+  min-height: 35px;
+  overflow: hidden;
+  margin: 10px 0 0;
+  color: #77817c;
+  font-size: 9px;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.agent-card > footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 11px;
+}
+
+.agent-card > footer span {
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #f3f5f4;
+  color: #848d88;
+  font-size: 7px;
+}
+
+.agents-empty {
+  display: grid;
+  min-height: 370px;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  border: 1px dashed #dce5e0;
+  border-radius: 9px;
+  background:
+    linear-gradient(90deg, rgb(28 169 109 / 3%) 1px, transparent 1px),
+    linear-gradient(rgb(28 169 109 / 3%) 1px, transparent 1px), #fbfdfc;
+  background-size: 32px 32px;
+  text-align: center;
+}
+
+.agents-empty > span {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 14px;
+  background: #eaf8f2;
+  color: #1ca96d;
+  font-size: 20px;
+}
+
+.agents-empty strong {
+  color: #46504b;
+  font-size: 12px;
+}
+
+.agents-empty p {
+  max-width: 320px;
+  margin: 0;
+  color: #929b96;
+  font-size: 8px;
+  line-height: 1.65;
+}
+
+.agents-empty button {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  background: #159c66;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.agents-callout {
+  display: grid;
+  align-items: center;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-top: 16px;
+  padding: 17px 20px;
+  border: 1px solid #dcebe4;
+  border-radius: 10px;
+  background: #f5fbf8;
+}
+
+.agents-callout > span {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 11px;
+  background: #159c66;
+  color: #fff;
+  font-size: 16px;
+}
+
+.agents-callout strong {
+  color: #35413b;
+  font-size: 12px;
+}
+
+.agents-callout p {
+  margin: 5px 0 0;
+  color: #7f8a84;
+  font-size: 8px;
+}
+
+.agents-callout button {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 13px;
+  border: 1px solid #9fd3bc;
+  border-radius: 7px;
+  background: #fff;
+  color: #168d5f;
+  font-size: 9px;
+  font-weight: 780;
+  cursor: pointer;
+}
+
+@media (max-width: 1240px) {
+  .agents-catalog__toolbar {
+    grid-template-columns: auto minmax(260px, 1fr);
   }
 
-  .agents-custom-grid {
+  .agents-hot-search {
+    display: none;
+  }
+
+  .agents-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .agents-catalog-page {
+    padding: 24px 18px 48px;
+  }
+
+  .agents-hero__cards {
+    grid-template-columns: 1fr;
+  }
+
+  .agents-catalog__body {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+
+  .agents-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 760px) {
-  .agents-hub {
-    padding: 10px 12px 30px;
+  .agents-catalog-page {
+    padding: 20px 12px 40px;
   }
 
-  .agents-hub__utility {
-    min-height: 42px;
+  .agents-hero__cards {
+    margin-top: 19px;
   }
 
-  .agents-hero {
-    padding: 24px 4px 14px;
+  .agents-builder-card {
+    grid-template-columns: 1fr;
   }
 
-  .agents-hero__heading h1 {
-    font-size: 28px;
+  .agents-builder-card__visual {
+    min-height: 155px;
   }
 
-  .agents-hero__heading p {
-    line-height: 1.65;
+  .agents-builder-card__content {
+    padding: 18px;
   }
 
-  .agents-prompt {
-    margin-top: 18px;
+  .agents-catalog__toolbar {
+    grid-template-columns: 1fr;
+    padding: 11px;
   }
 
-  .agents-quick-modes {
-    justify-content: flex-start;
-    flex-wrap: nowrap;
+  .agents-tabs {
     overflow-x: auto;
-    padding-bottom: 2px;
     scrollbar-width: none;
   }
 
-  .agents-quick-modes::-webkit-scrollbar {
+  .agents-tabs::-webkit-scrollbar {
     display: none;
   }
 
-  .agents-quick-modes button {
+  .agents-tabs button {
+    flex: 1 0 auto;
+  }
+
+  .agents-catalog__body {
+    display: block;
+    padding: 12px;
+  }
+
+  .agents-categories {
+    position: static;
+    margin-bottom: 14px;
+  }
+
+  .agents-categories nav {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .agents-categories nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .agents-categories nav button {
     min-width: max-content;
+    gap: 12px;
   }
 
-  .agents-case-section {
-    padding: 14px;
-  }
-
-  .agents-case-section__heading {
+  .agents-results__heading {
     align-items: flex-start;
-    flex-direction: column;
   }
 
-  .agents-case-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .agents-custom-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .agents-builder-banner {
+  .agents-callout {
     align-items: start;
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .agents-builder-banner > button {
+  .agents-callout button {
     grid-column: 2;
     justify-self: start;
+  }
+}
+
+@media (max-width: 520px) {
+  .agents-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-card {
+    min-height: 158px;
   }
 }
 </style>
