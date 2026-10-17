@@ -2630,10 +2630,10 @@ onBeforeUnmount(() => {
 }
 
 .draw-generator__model-grid button.active {
-  border-color: #9fc3ee;
-  background: #f2f7ff;
-  color: #2d6fd0;
-  box-shadow: 0 0 0 1px rgb(47 114 223 / 8%);
+  border-color: #a991f6;
+  background: #f6f3ff;
+  color: #6440df;
+  box-shadow: 0 0 0 1px rgb(100 64 223 / 8%);
 }
 
 .draw-generator__model-grid button i {
@@ -2662,7 +2662,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 5px;
   right: 5px;
-  color: #2f72df;
+  color: #6b49e7;
   font-size: 8px;
 }
 
@@ -2814,13 +2814,16 @@ onBeforeUnmount(() => {
 }
 
 .draw-generator__options button.active {
-  border-color: #2f72df;
-  background: #eef5ff;
-  color: #2467ca;
-  box-shadow: 0 0 0 1px rgb(47 114 223 / 8%);
+  border-color: #7550e8;
+  background: #f3efff;
+  color: #6540db;
+  box-shadow: 0 0 0 1px rgb(101 64 219 / 8%);
 }
 
 .draw-generator__submit {
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
   display: inline-flex;
   width: 100%;
   height: 42px;
@@ -2830,15 +2833,16 @@ onBeforeUnmount(() => {
   margin-top: 19px;
   border: 0;
   border-radius: 8px;
-  background: #222830;
+  background: #6d49e8;
   color: #fff;
   font-size: 10px;
   font-weight: 800;
   cursor: pointer;
+  box-shadow: 0 10px 24px rgb(74 49 167 / 20%);
 }
 
 .draw-generator__submit:hover:not(:disabled) {
-  background: #12171e;
+  background: #5d3bd7;
 }
 
 .draw-generator__submit:disabled {
@@ -2851,7 +2855,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-y: auto;
   padding: 18px 20px 30px;
-  background: #f5f7fa;
+  background: #fff;
   scrollbar-width: thin;
 }
 
@@ -2865,7 +2869,7 @@ onBeforeUnmount(() => {
   gap: 16px;
   margin: -18px -20px 15px;
   padding: 18px 20px 13px;
-  background: rgb(245 247 250 / 96%);
+  background: rgb(255 255 255 / 96%);
   backdrop-filter: blur(8px);
 }
 
@@ -2947,7 +2951,7 @@ onBeforeUnmount(() => {
   display: grid;
   align-items: start;
   gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
 }
 
 .draw-work-card {

@@ -9,6 +9,7 @@ import {
   SearchOutlined,
   SendOutlined,
   StopOutlined,
+  ThunderboltFilled,
 } from '@ant-design/icons-vue';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -240,12 +241,19 @@ watch(
           :class="{ active: activeSessionId === session.id }"
           @click="selectSession(session.id)"
         >
-          <MessageOutlined />
+          <span class="agent-detail__session-avatar" :style="{ background: agent.color }">
+            {{ agent.glyph }}
+          </span>
           <span>
-            <strong>{{ session.title }}</strong>
+            <span class="agent-detail__session-title">
+              <strong>{{ session.title }}</strong>
+              <small>
+                <ClockCircleOutlined />
+                {{ formatTime(session.updatedAt) }}
+              </small>
+            </span>
             <small>
-              <ClockCircleOutlined />
-              {{ formatTime(session.updatedAt) }}
+              {{ session.messages.at(-1)?.content || '等待第一条消息' }}
             </small>
           </span>
         </button>
@@ -269,6 +277,10 @@ watch(
         </span>
         <strong>{{ agent.name }}</strong>
         <em>{{ agent.tags[0] }}</em>
+        <span class="agent-detail__cost">
+          <ThunderboltFilled />
+          1 积分/次
+        </span>
         <span class="agent-detail__status" :class="{ active: streaming }">
           {{ streaming ? '正在生成' : '服务就绪' }}
         </span>
@@ -371,8 +383,10 @@ watch(
         <aside class="agent-history-panel" aria-label="历史记录">
           <header>
             <div>
-              <span><HistoryOutlined /></span>
-              <strong>历史记录</strong>
+              <span class="agent-history-panel__agent" :style="{ background: agent.color }">
+                {{ agent.glyph }}
+              </span>
+              <strong>{{ agent.name }}</strong>
               <small>{{ sessions.length }} 个对话</small>
             </div>
             <button type="button" aria-label="关闭历史记录" @click="historyOpen = false">
@@ -508,8 +522,8 @@ watch(
   min-width: 0;
   align-items: center;
   gap: 9px;
-  grid-template-columns: 20px minmax(0, 1fr);
-  padding: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  padding: 9px 10px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
@@ -525,17 +539,33 @@ watch(
   color: #3979ed;
 }
 
-.agent-detail__session-list > button > svg {
-  font-size: 14px;
+.agent-detail__session-avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .agent-detail__session-list > button > span {
   display: grid;
   min-width: 0;
-  gap: 5px;
+  gap: 4px;
+}
+
+.agent-detail__session-title {
+  display: flex !important;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .agent-detail__session-list strong {
+  min-width: 0;
   overflow: hidden;
   color: #3f4653;
   font-size: 11px;
@@ -544,8 +574,17 @@ watch(
   white-space: nowrap;
 }
 
+.agent-detail__session-list > button > span > small {
+  overflow: hidden;
+  color: #939ba8;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .agent-detail__session-list small {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 4px;
   color: #9aa2af;
@@ -632,6 +671,24 @@ watch(
   font-size: 9px;
   font-style: normal;
   font-weight: 700;
+}
+
+.agent-detail__cost {
+  display: inline-flex;
+  height: 25px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 9px;
+  border: 1px solid #f5dfa6;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: #d99705;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.agent-detail__cost > svg {
+  font-size: 11px;
 }
 
 .agent-detail__conversation {
