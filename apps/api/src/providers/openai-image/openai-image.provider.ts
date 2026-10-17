@@ -21,7 +21,7 @@ export class OpenAiImageProvider implements ImageProvider {
   constructor(private readonly configService: ConfigService) {}
 
   async generateImage(input: GenerateImageInput): Promise<GeneratedImage> {
-    const apiKeys = this.apiKeys();
+    const apiKeys = this.apiKeys(input.providerKeyRef);
 
     if (apiKeys.length === 0) {
       throw this.createError('IMAGE_NOT_CONFIGURED', '图片生成服务尚未配置');
@@ -50,7 +50,9 @@ export class OpenAiImageProvider implements ImageProvider {
     const timeout = setTimeout(() => timeoutController.abort(), timeoutMs);
 
     try {
-      const baseUrl = this.configService.getOrThrow<string>('IMAGE_BASE_URL').replace(/\/+$/, '');
+      const baseUrl = (
+        input.providerBaseUrl?.trim() || this.configService.getOrThrow<string>('IMAGE_BASE_URL')
+      ).replace(/\/+$/, '');
       const payload = this.createPayload(input);
       const actor = this.configService.get<string>('IMAGE_ACTOR_AUTHORIZATION');
       const response = await fetch(
@@ -190,7 +192,15 @@ export class OpenAiImageProvider implements ImageProvider {
     return normalizeImage(buffer, contentType);
   }
 
-  private apiKeys(): string[] {
+  private apiKeys(providerKeyRef?: string): string[] {
+    const configuredKeyRef = providerKeyRef?.trim();
+
+    if (configuredKeyRef) {
+      return [this.configService.get<string>(configuredKeyRef)].filter((key): key is string =>
+        Boolean(key?.trim()),
+      );
+    }
+
     return [
       this.configService.get<string>('IMAGE_API_KEY'),
       this.configService.get<string>('IMAGE_FALLBACK_API_KEY'),

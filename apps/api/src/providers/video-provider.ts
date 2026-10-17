@@ -8,6 +8,8 @@ export interface GenerateVideoInput {
   lastFrameImage?: VideoSourceImage;
   model?: string;
   parameters?: Record<string, unknown>;
+  providerBaseUrl?: string;
+  providerKeyRef?: string;
   prompt: string;
   sourceImage?: VideoSourceImage;
 }
@@ -30,7 +32,13 @@ export interface VideoGenerationSnapshot {
 export interface VideoProvider {
   readonly supportsLastFrame?: boolean;
   createGeneration(input: GenerateVideoInput): Promise<VideoGenerationSnapshot>;
-  pollGeneration(requestId: string): Promise<VideoGenerationSnapshot>;
+  pollGeneration(
+    requestId: string,
+    options?: {
+      providerBaseUrl?: string;
+      providerKeyRef?: string;
+    },
+  ): Promise<VideoGenerationSnapshot>;
 }
 
 export const VIDEO_PROVIDER = Symbol('VIDEO_PROVIDER');

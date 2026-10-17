@@ -342,6 +342,8 @@ export class VideoTasksService implements OnModuleInit {
             : undefined,
           model: model.providerModel,
           parameters: this.toRecord(task.parameters),
+          providerBaseUrl: model.baseUrl,
+          providerKeyRef: model.keyRef,
           prompt: task.prompt,
           sourceImage: task.sourceFile
             ? {
@@ -382,7 +384,10 @@ export class VideoTasksService implements OnModuleInit {
           return;
         }
 
-        const snapshot = await this.videoProvider.pollGeneration(providerRequestId);
+        const snapshot = await this.videoProvider.pollGeneration(providerRequestId, {
+          providerBaseUrl: model.baseUrl,
+          providerKeyRef: model.keyRef,
+        });
         progress = Math.max(progress, snapshot.progress);
 
         await this.prismaService.videoTask.updateMany({

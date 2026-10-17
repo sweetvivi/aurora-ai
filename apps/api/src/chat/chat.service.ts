@@ -32,7 +32,9 @@ interface PreparedChat {
   messages: ChatMessage[];
   modelAlias: string;
   pointsCost: number;
+  providerBaseUrl?: string;
   providerCode: string;
+  providerKeyRef?: string;
   providerModel: string;
   reservationId: string;
   temperature?: number;
@@ -270,7 +272,9 @@ export class ChatService {
       ],
       modelAlias: model.alias,
       pointsCost,
+      providerBaseUrl: model.baseUrl,
       providerCode: model.providerCode,
+      providerKeyRef: model.keyRef,
       providerModel: model.providerModel,
       reservationId: reservation.id,
       temperature: input.temperature,
@@ -298,7 +302,9 @@ export class ChatService {
       for await (const event of this.llmProvider.streamChat({
         messages: prepared.messages,
         model: prepared.providerModel,
+        providerBaseUrl: prepared.providerBaseUrl,
         providerCode: prepared.providerCode,
+        providerKeyRef: prepared.providerKeyRef,
         signal,
         temperature: prepared.temperature,
       })) {

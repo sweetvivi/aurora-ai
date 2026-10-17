@@ -24,7 +24,7 @@ export class XaiVideoProvider implements VideoProvider {
       );
     }
 
-    const apiKey = this.configService.get<string>('VIDEO_API_KEY')?.trim();
+    const apiKey = this.resolveApiKey(input.providerKeyRef);
 
     if (!apiKey) {
       throw this.createError('VIDEO_NOT_CONFIGURED', '视频生成服务尚未配置');
@@ -33,7 +33,7 @@ export class XaiVideoProvider implements VideoProvider {
     const timeoutController = this.createTimeoutController();
 
     try {
-      const response = await fetch(`${this.baseUrl()}/videos/generations`, {
+      const response = await fetch(`${this.baseUrl(input.providerBaseUrl)}/videos/generations`, {
         body: JSON.stringify(this.createPayload(input)),
         headers: {
           authorization: `Bearer ${apiKey}`,
@@ -73,8 +73,14 @@ export class XaiVideoProvider implements VideoProvider {
     }
   }
 
-  async pollGeneration(requestId: string): Promise<VideoGenerationSnapshot> {
-    const apiKey = this.configService.get<string>('VIDEO_API_KEY')?.trim();
+  async pollGeneration(
+    requestId: string,
+    options?: {
+      providerBaseUrl?: string;
+      providerKeyRef?: string;
+    },
+  ): Promise<VideoGenerationSnapshot> {
+    const apiKey = this.resolveApiKey(options?.providerKeyRef);
 
     if (!apiKey) {
       throw this.createError('VIDEO_NOT_CONFIGURED', '视频生成服务尚未配置');
@@ -83,14 +89,17 @@ export class XaiVideoProvider implements VideoProvider {
     const timeoutController = this.createTimeoutController();
 
     try {
-      const response = await fetch(`${this.baseUrl()}/videos/${encodeURIComponent(requestId)}`, {
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          accept: 'application/json',
+      const response = await fetch(
+        `${this.baseUrl(options?.providerBaseUrl)}/videos/${encodeURIComponent(requestId)}`,
+        {
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            accept: 'application/json',
+          },
+          method: 'GET',
+          signal: timeoutController.signal,
         },
-        method: 'GET',
-        signal: timeoutController.signal,
-      });
+      );
 
       if (response.status === 202) {
         return {
@@ -231,8 +240,16 @@ export class XaiVideoProvider implements VideoProvider {
     };
   }
 
-  private baseUrl(): string {
-    return this.configService.getOrThrow<string>('VIDEO_BASE_URL').replace(/\/+$/, '');
+  private baseUrl(providerBaseUrl?: string): string {
+    return (
+      providerBaseUrl?.trim() || this.configService.getOrThrow<string>('VIDEO_BASE_URL')
+    ).replace(/\/+$/, '');
+  }
+
+  private resolveApiKey(providerKeyRef?: string): string | undefined {
+    const configuredKeyRef = providerKeyRef?.trim();
+
+    return this.configService.get<string>(configuredKeyRef || 'VIDEO_API_KEY')?.trim();
   }
 
   private createTimeoutController(): { signal: AbortSignal; timer: NodeJS.Timeout } {

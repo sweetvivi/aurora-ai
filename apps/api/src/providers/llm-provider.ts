@@ -7,6 +7,8 @@ export interface StreamChatRequest {
   messages: ChatMessage[];
   model: string;
   providerCode?: string;
+  providerBaseUrl?: string;
+  providerKeyRef?: string;
   signal?: AbortSignal;
   temperature?: number;
 }

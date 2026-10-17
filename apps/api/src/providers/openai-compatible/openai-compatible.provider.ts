@@ -43,7 +43,7 @@ export class OpenAiCompatibleProvider implements LlmProvider {
       return;
     }
 
-    const credentials = this.resolveCredentials(request.providerCode);
+    const credentials = this.resolveCredentials(request);
     const apiKey = credentials.apiKey;
 
     if (!apiKey) {
@@ -162,27 +162,30 @@ export class OpenAiCompatibleProvider implements LlmProvider {
     return 'LLM_REQUEST_ERROR';
   }
 
-  private resolveCredentials(providerCode?: string): {
+  private resolveCredentials(request: StreamChatRequest): {
     apiKey?: string;
     apiKeyName: string;
     baseUrl: string;
   } {
-    const source = PROVIDER_CREDENTIAL_SOURCES[providerCode ?? ''] ?? DEFAULT_CREDENTIAL_SOURCE;
-    const apiKey = this.configService.get<string>(source.apiKeyName)?.trim() || undefined;
+    const source =
+      PROVIDER_CREDENTIAL_SOURCES[request.providerCode ?? ''] ?? DEFAULT_CREDENTIAL_SOURCE;
+    const apiKeyName = request.providerKeyRef?.trim() || source.apiKeyName;
+    const apiKey = this.configService.get<string>(apiKeyName)?.trim() || undefined;
     const configuredBaseUrl =
+      request.providerBaseUrl?.trim() ||
       this.configService.get<string>(source.baseUrlName)?.trim() ||
       this.configService.get<string>('LLM_BASE_URL');
 
     if (!configuredBaseUrl) {
       throw new ServiceUnavailableException({
         code: 'LLM_NOT_CONFIGURED',
-        message: `${source.baseUrlName} is not configured`,
+        message: `${request.providerBaseUrl ? 'provider base URL' : source.baseUrlName} is not configured`,
       });
     }
 
     return {
       apiKey,
-      apiKeyName: source.apiKeyName,
+      apiKeyName,
       baseUrl: configuredBaseUrl,
     };
   }

@@ -271,6 +271,8 @@ export class ImageTasksService implements OnModuleInit {
       const generated = await this.imageProvider.generateImage({
         model: model.providerModel,
         parameters: this.toRecord(task.parameters),
+        providerBaseUrl: model.baseUrl,
+        providerKeyRef: model.keyRef,
         prompt: task.prompt,
         sourceImages: sourceImages.length > 0 ? sourceImages : undefined,
       });

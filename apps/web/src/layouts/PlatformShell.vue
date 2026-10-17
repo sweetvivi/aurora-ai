@@ -18,10 +18,12 @@ import {
   ThunderboltOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons-vue';
+import { storeToRefs } from 'pinia';
 import type { Component } from 'vue';
 import { computed } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
 import GlobalTopbar from '@/components/GlobalTopbar.vue';
+import { useSessionStore } from '@/stores/session';
 
 interface NavigationItem {
   badge?: string;
@@ -36,6 +38,8 @@ interface NavigationGroup {
 }
 
 const route = useRoute();
+const sessionStore = useSessionStore();
+const { user } = storeToRefs(sessionStore);
 
 const navigationGroups: NavigationGroup[] = [
   {
@@ -63,6 +67,7 @@ const navigationGroups: NavigationGroup[] = [
 ];
 
 const currentTitle = computed(() => String(route.meta.title ?? '工作台'));
+const isAdmin = computed(() => user.value?.role === 'ADMIN');
 const showCampaign = computed(() => ['/', '/draw', '/agents'].includes(route.path));
 const pageTheme = computed(() => {
   if (route.path.startsWith('/chat')) {
@@ -121,6 +126,17 @@ function isActivePath(path: string, target: string): boolean {
               <component :is="item.icon" class="platform-sidebar__icon" />
               <span class="platform-sidebar__label">{{ item.label }}</span>
               <span v-if="item.badge" class="platform-sidebar__badge">{{ item.badge }}</span>
+            </RouterLink>
+          </section>
+          <section v-if="isAdmin">
+            <span class="platform-sidebar__group-label">系统管理</span>
+            <RouterLink
+              to="/admin"
+              class="platform-sidebar__link"
+              :class="{ 'platform-sidebar__link--active': isActivePath(route.path, '/admin') }"
+            >
+              <SettingOutlined class="platform-sidebar__icon" />
+              <span class="platform-sidebar__label">管理后台</span>
             </RouterLink>
           </section>
         </nav>

@@ -21,6 +21,86 @@ export interface HealthSnapshot {
   timestamp: string;
 }
 
+export interface AdminOverview {
+  models: {
+    enabled: number;
+    total: number;
+  };
+  orders: {
+    enabled: false;
+    status: 'not_enabled';
+  };
+  points: {
+    balanceTotal: number;
+  };
+  providers: {
+    enabled: number;
+    total: number;
+  };
+  tasks: {
+    chatRequests: number;
+    imageTasks: number;
+    videoTasks: number;
+  };
+  users: {
+    active: number;
+    admins: number;
+    total: number;
+  };
+}
+
+export interface AdminUser {
+  createdAt: string;
+  displayName: string;
+  email: string | null;
+  id: string;
+  pointsBalance: number;
+  role: 'ADMIN' | 'USER';
+  status: 'ACTIVE' | 'SUSPENDED';
+  updatedAt: string;
+}
+
+export interface AdminUserList {
+  items: AdminUser[];
+  limit: number;
+  offset: number;
+  total: number;
+}
+
+export interface AdminProvider {
+  _count: {
+    models: number;
+  };
+  baseUrl: string;
+  code: string;
+  createdAt: string;
+  displayName: string;
+  enabled: boolean;
+  id: string;
+  keyRef: string;
+  kind: 'OPENAI_COMPATIBLE';
+  priority: number;
+  updatedAt: string;
+}
+
+export interface AdminModel {
+  alias: string;
+  capabilities: Array<'CHAT' | 'EMBEDDING' | 'IMAGE' | 'VIDEO'>;
+  contextWindow: number | null;
+  createdAt: string;
+  displayName: string;
+  enabled: boolean;
+  id: string;
+  provider: {
+    code: string;
+    displayName: string;
+    enabled: boolean;
+    id: string;
+  };
+  providerModel: string;
+  updatedAt: string;
+}
+
 export interface AuthenticatedUser {
   displayName: string;
   email: string | null;
@@ -279,6 +359,148 @@ export async function refreshAuthSession(): Promise<AuthResult> {
 
 export async function fetchHealth(): Promise<HealthSnapshot> {
   const response = await apiClient.get<ApiEnvelope<HealthSnapshot>>('/api/v1/health');
+
+  return response.data.data;
+}
+
+export async function fetchAdminOverview(): Promise<AdminOverview> {
+  const response = await apiClient.get<ApiEnvelope<AdminOverview>>('/api/v1/admin/overview');
+
+  return response.data.data;
+}
+
+export async function fetchAdminUsers(params: {
+  limit?: number;
+  offset?: number;
+  role?: 'ADMIN' | 'USER';
+  search?: string;
+  status?: 'ACTIVE' | 'SUSPENDED';
+}): Promise<AdminUserList> {
+  const response = await apiClient.get<ApiEnvelope<AdminUserList>>('/api/v1/admin/users', {
+    params,
+  });
+
+  return response.data.data;
+}
+
+export async function updateAdminUser(
+  userId: string,
+  input: {
+    displayName?: string;
+    role?: 'ADMIN' | 'USER';
+    status?: 'ACTIVE' | 'SUSPENDED';
+  },
+): Promise<AdminUser> {
+  const response = await apiClient.patch<ApiEnvelope<AdminUser>>(
+    `/api/v1/admin/users/${encodeURIComponent(userId)}`,
+    input,
+  );
+
+  return response.data.data;
+}
+
+export async function adjustAdminUserPoints(
+  userId: string,
+  input: {
+    delta: number;
+    idempotencyKey: string;
+    reason: string;
+  },
+): Promise<{ ledgerEntryId: string; user: AdminUser }> {
+  const response = await apiClient.post<
+    ApiEnvelope<{
+      ledgerEntryId: string;
+      user: AdminUser;
+    }>
+  >(`/api/v1/admin/users/${encodeURIComponent(userId)}/points-adjustments`, input);
+
+  return response.data.data;
+}
+
+export async function fetchAdminProviders(): Promise<{ items: AdminProvider[] }> {
+  const response =
+    await apiClient.get<ApiEnvelope<{ items: AdminProvider[] }>>('/api/v1/admin/providers');
+
+  return response.data.data;
+}
+
+export async function createAdminProvider(input: {
+  baseUrl: string;
+  code: string;
+  displayName: string;
+  enabled: boolean;
+  keyRef: string;
+  priority: number;
+}): Promise<AdminProvider> {
+  const response = await apiClient.post<ApiEnvelope<AdminProvider>>(
+    '/api/v1/admin/providers',
+    input,
+  );
+
+  return response.data.data;
+}
+
+export async function updateAdminProvider(
+  providerId: string,
+  input: {
+    baseUrl?: string;
+    displayName?: string;
+    enabled?: boolean;
+    keyRef?: string;
+    priority?: number;
+  },
+): Promise<AdminProvider> {
+  const response = await apiClient.patch<ApiEnvelope<AdminProvider>>(
+    `/api/v1/admin/providers/${encodeURIComponent(providerId)}`,
+    input,
+  );
+
+  return response.data.data;
+}
+
+export async function fetchAdminModels(params: {
+  capability?: 'chat' | 'embedding' | 'image' | 'video';
+  enabled?: boolean;
+  providerCode?: string;
+  search?: string;
+}): Promise<{ items: AdminModel[] }> {
+  const response = await apiClient.get<ApiEnvelope<{ items: AdminModel[] }>>(
+    '/api/v1/admin/models',
+    { params },
+  );
+
+  return response.data.data;
+}
+
+export async function createAdminModel(input: {
+  alias: string;
+  capabilities: Array<'chat' | 'embedding' | 'image' | 'video'>;
+  contextWindow?: number;
+  displayName: string;
+  enabled: boolean;
+  providerCode: string;
+  providerModel: string;
+}): Promise<AdminModel> {
+  const response = await apiClient.post<ApiEnvelope<AdminModel>>('/api/v1/admin/models', input);
+
+  return response.data.data;
+}
+
+export async function updateAdminModel(
+  modelId: string,
+  input: {
+    capabilities?: Array<'chat' | 'embedding' | 'image' | 'video'>;
+    contextWindow?: number;
+    displayName?: string;
+    enabled?: boolean;
+    providerCode?: string;
+    providerModel?: string;
+  },
+): Promise<AdminModel> {
+  const response = await apiClient.patch<ApiEnvelope<AdminModel>>(
+    `/api/v1/admin/models/${encodeURIComponent(modelId)}`,
+    input,
+  );
 
   return response.data.data;
 }

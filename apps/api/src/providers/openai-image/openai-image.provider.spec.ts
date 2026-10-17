@@ -120,6 +120,29 @@ describe('OpenAiImageProvider', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.mimeType).toBe('image/png');
   });
+
+  it('uses database-provided base URL and key reference when supplied by the model registry', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ b64_json: ONE_PIXEL_PNG_BASE64 }] }), {
+        headers: { 'content-type': 'application/json' },
+        status: 200,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = createProvider();
+    await provider.generateImage({
+      model: 'custom-image-model',
+      prompt: '使用后台厂商配置生成',
+      providerBaseUrl: 'https://custom-image.example/v1/',
+      providerKeyRef: 'CUSTOM_IMAGE_API_KEY',
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://custom-image.example/v1/images/generations');
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
+      authorization: 'Bearer custom-image-key',
+    });
+  });
 });
 
 function createProvider(): OpenAiImageProvider {
@@ -130,6 +153,7 @@ function createProvider(): OpenAiImageProvider {
       IMAGE_BASE_URL: 'https://example.test/v1',
       IMAGE_DEFAULT_MODEL: 'gpt-image-2.5',
       IMAGE_REQUEST_TIMEOUT_MS: 10_000,
+      CUSTOM_IMAGE_API_KEY: 'custom-image-key',
     }),
   );
 }

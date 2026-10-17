@@ -1,6 +1,8 @@
 export interface GenerateImageInput {
   model?: string;
   parameters?: Record<string, unknown>;
+  providerBaseUrl?: string;
+  providerKeyRef?: string;
   prompt: string;
   sourceImages?: Array<{
     buffer: Buffer;

@@ -18,13 +18,21 @@ function createStreamResponse(): Response {
   });
 }
 
-async function collectEvents(provider: OpenAiCompatibleProvider, providerCode: string) {
+async function collectEvents(
+  provider: OpenAiCompatibleProvider,
+  providerCode: string,
+  overrides: {
+    providerBaseUrl?: string;
+    providerKeyRef?: string;
+  } = {},
+) {
   const events = [];
 
   for await (const event of provider.streamChat({
     messages: [{ content: 'hello', role: 'user' }],
     model: 'provider-model',
     providerCode,
+    ...overrides,
   })) {
     events.push(event);
   }
@@ -110,6 +118,32 @@ describe('OpenAI compatible chat provider', () => {
       expect.objectContaining({
         headers: expect.objectContaining({
           authorization: 'Bearer deepseek-key',
+        }),
+      }),
+    );
+  });
+
+  it('uses database-provided base URL and key reference when supplied by the model registry', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createStreamResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new OpenAiCompatibleProvider(
+      new ConfigService({
+        CUSTOM_CHAT_API_KEY: 'custom-key',
+        LLM_API_KEY: 'default-key',
+        LLM_BASE_URL: 'https://default.example/v1',
+      }),
+    );
+
+    await collectEvents(provider, 'custom-provider', {
+      providerBaseUrl: 'https://custom.example/v1/',
+      providerKeyRef: 'CUSTOM_CHAT_API_KEY',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://custom.example/v1/chat/completions',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          authorization: 'Bearer custom-key',
         }),
       }),
     );

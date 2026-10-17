@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
 import { ConversationsModule } from './conversations/conversations.module';
@@ -34,6 +35,7 @@ import { VideoTasksModule } from './video-tasks/video-tasks.module';
     ImageTasksModule,
     VideoTasksModule,
     ProvidersModule,
+    AdminModule,
     AuthModule,
     HealthModule,
   ],

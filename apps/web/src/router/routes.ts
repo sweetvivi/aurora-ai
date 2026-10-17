@@ -96,6 +96,15 @@ export const appRoutes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'admin',
+        name: 'admin',
+        component: () => import('@/views/AdminView.vue'),
+        meta: {
+          requiresAdmin: true,
+          title: '管理后台',
+        },
+      },
+      {
         path: 'music',
         name: 'music',
         component: () => import('@/views/FeaturePlaceholderView.vue'),
