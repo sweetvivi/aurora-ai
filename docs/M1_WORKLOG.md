@@ -59,6 +59,7 @@
 - 2026-10-17：绘图验收脚本改为直接进入生成页，避免经首页提交造成重复任务；桌面两张参考图批量生成和 390px 移动端单张生成均通过，下载文件名、PNG 渲染、余额结算和无横向溢出均符合预期。
 - 2026-10-17：M1-7 完整验证通过，API 29/29、Web 16/16；`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过；当前等待用户确认普通推送。
 - 2026-10-17：核对 GitHub Actions 失败邮件后确认两项环境问题：根级 `storage/` 忽略规则误伤后端存储源码，且 CI 在 Typecheck 前未生成 Prisma Client；现已修正忽略边界、补交源码并增加 CI 生成步骤。
+- 2026-10-17：核对 Run #5 后确认 `data/` 忽略规则误伤 `apps/web/src/data/agents.ts`；现已把运行时目录规则限定到仓库根目录并补交智能体目录源码，准备按 CI 顺序复验。
 
 ## 中断后恢复步骤
 
@@ -82,6 +83,7 @@
 - 2026-10-17：M1-6 完整验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`。测试共通过 39 项：API 29 项、Web 10 项；构建仅保留既有的大 chunk 警告。
 - 2026-10-17：`node outputs/ui-reference/verify-draw.mjs` 通过；桌面完成参考图上传、两张批量生成、真实 Mock PNG 渲染、下载、收藏、删除和 10 积分结算，390px 移动端完成单张生成、95 积分结算和无横向溢出检查。
 - 2026-10-17：M1-7 完整验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`。测试共通过 45 项：API 29 项、Web 16 项；构建仅保留既有的大 chunk 警告。
+- 2026-10-17：Run #5 修复后按 CI 顺序复验通过：Prisma Client 生成、`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm test`；测试为 API 29/29、Web 16/16。
 
 ## 下一步
 

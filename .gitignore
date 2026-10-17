@@ -27,9 +27,9 @@ logs/
 # Local databases and uploads
 *.sqlite
 *.sqlite3
-data/
+/data/
 /storage/
-uploads/
+/uploads/
 
 # Browser and automation
 .edge-*
