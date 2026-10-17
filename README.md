@@ -55,7 +55,7 @@
 - `node outputs/ui-reference/verify-chat-attachments.mjs` 通过，图片上传、预览、发送、消息展示和历史恢复在桌面端与移动端均正常；验收使用 Mock，不调用真实 Provider
 - `node outputs/ui-reference/verify-group-chat.mjs` 通过，超级对话的 3 模型并发、10 模型上限、停止生成、桌面端与移动端响应式布局均正常；验收使用 Playwright 路由拦截，不调用真实 Provider
 - `node outputs/ui-reference/verify-catalog-charts.mjs` 通过，6358 条智能体目录、分页/空态、29 类图表、无错误状态和无横向溢出在桌面端与移动端均正常
-- `node outputs/ui-reference/verify-newdraw-templates.mjs` 通过，`/newdraw` 的 7 分类、17 模板、筛选、回填、示例弹窗、高级设置和顶部跳转在桌面端与移动端均正常
+- `node outputs/ui-reference/verify-newdraw-templates.mjs` 通过，`/newdraw` 的 7 分类、17 模板、筛选、回填、示例弹窗、高级设置和顶部跳转在桌面端与移动端均正常；390px 移动端固定创作栏与底部导航保持至少 8px 间距
 - `node outputs/ui-reference/verify-showcase-assets.mjs` 通过，`/newdraw` 的 34 张预览图和图片生成页的 12 张示例图全部加载，无横向溢出
 - `node outputs/ui-reference/verify-commerce-studio.mjs` 通过，电商工具的空状态、必填参数、素材上传、替换/试穿任务和桌面/移动端布局均正常
 - `node outputs/ui-reference/verify-draw-navigation.mjs` 通过，`/draw` 的三级工具目录、模型/工具搜索、侧栏折叠、工具路由、视频入口和卡片跳转在桌面端与移动端均正常

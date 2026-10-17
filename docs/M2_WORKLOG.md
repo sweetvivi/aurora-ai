@@ -678,6 +678,17 @@ node outputs/ui-reference/verify-video-tasks.mjs
 - Web 测试为 13 个文件 53 项，API 测试为 18 个文件 74 项；格式检查、lint、类型检查、测试和构建全部通过
 - 自动验收全部使用 Mock 或 Playwright 路由拦截，不调用真实图片、视频或对话 Provider，不读取或输出 Key
 
+移动端底部导航遮挡修复：
+
+```text
+node outputs/ui-reference/verify-newdraw-templates.mjs
+```
+
+- `/newdraw` 固定创作栏从 `bottom: 10px` 调整为 `bottom: calc(72px + safe-area)`，移动导航保持 `62px` 高度，两者实测保留 `10px` 净间距
+- `/newdraw` 页面尾部留白提升到 `286px + safe-area`，最后一张效果卡可完整滚动到创作栏和导航上方
+- 390px 移动端滚底审计覆盖 `/chat`、`/draw`、`/newdraw`、`/agents`、`/retouch`、`/image-generation`、`/video`、`/canvas`、`/commerce`，未发现固定或 sticky 创作区与移动导航重叠
+- `verify-newdraw-templates.mjs` 已加入创作栏与导航至少 `8px` 间距的断言，防止后续样式调整回归
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥

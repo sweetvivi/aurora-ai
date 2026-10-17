@@ -5087,7 +5087,7 @@ onBeforeUnmount(() => {
   }
 
   .draw-template-studio {
-    padding-bottom: 170px;
+    padding-bottom: calc(286px + env(safe-area-inset-bottom, 0px));
   }
 
   .draw-template-studio__content {
@@ -5195,7 +5195,7 @@ onBeforeUnmount(() => {
 
   .draw-template-composer {
     right: 10px;
-    bottom: 10px;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
     left: 10px;
     min-height: 191px;
     width: auto;
