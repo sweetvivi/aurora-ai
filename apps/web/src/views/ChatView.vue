@@ -7,25 +7,29 @@ import {
   DownOutlined,
   FileTextOutlined,
   HistoryOutlined,
+  LoadingOutlined,
   MessageOutlined,
   PaperClipOutlined,
   PlusOutlined,
+  ReloadOutlined,
   SearchOutlined,
+  StopOutlined,
   ThunderboltFilled,
 } from '@ant-design/icons-vue';
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { storeToRefs } from 'pinia';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-
-interface ConversationMessage {
-  content: string;
-  id: number;
-  role: 'assistant' | 'user';
-}
+import { useChatWorkspaceStore } from '@/stores/chat-workspace';
+import { useSessionStore } from '@/stores/session';
 
 const route = useRoute();
+const sessionStore = useSessionStore();
+const chatStore = useChatWorkspaceStore();
+const { conversations, error, messages, models, selectedModelAlias, status, streaming } =
+  storeToRefs(chatStore);
+
 const prompt = ref('');
-const messages = ref<ConversationMessage[]>([]);
-const messageId = ref(0);
+const search = ref('');
 const conversationArea = ref<HTMLElement | null>(null);
 
 const suggestions = [
@@ -56,8 +60,56 @@ const suggestions = [
 ];
 
 const hasMessages = computed(() => messages.value.length > 0);
+const selectedModel = computed(() =>
+  models.value.find((model) => model.alias === selectedModelAlias.value),
+);
+const modelOptions = computed(() =>
+  models.value.map((model) => ({
+    label: model.displayName,
+    value: model.alias,
+  })),
+);
+const filteredConversations = computed(() => {
+  const keyword = search.value.trim().toLowerCase();
 
-onMounted(() => {
+  if (!keyword) {
+    return conversations.value;
+  }
+
+  return conversations.value.filter((conversation) =>
+    conversation.title.toLowerCase().includes(keyword),
+  );
+});
+const serviceLabel = computed(() => {
+  if (streaming.value) {
+    return '生成中';
+  }
+
+  if (status.value === 'loading') {
+    return '连接中';
+  }
+
+  if (status.value === 'error') {
+    return '需要处理';
+  }
+
+  return '服务就绪';
+});
+const canSend = computed(
+  () => Boolean(prompt.value.trim()) && !streaming.value && sessionStore.authenticated,
+);
+
+watch(
+  () => messages.value.at(-1)?.content,
+  () => {
+    void scrollToBottom(false);
+  },
+);
+
+onMounted(async () => {
+  await sessionStore.bootstrap();
+  await chatStore.initialize();
+
   const queryPrompt = route.query.prompt;
 
   if (typeof queryPrompt === 'string') {
@@ -72,31 +124,67 @@ function useSuggestion(value: string): void {
 async function sendMessage(): Promise<void> {
   const content = prompt.value.trim();
 
-  if (!content) {
+  if (!content || streaming.value) {
     return;
   }
 
-  messages.value.push({
-    content,
-    id: ++messageId.value,
-    role: 'user',
-  });
   prompt.value = '';
+  await chatStore.sendMessage(content);
+  await scrollToBottom();
+}
 
+async function openConversation(conversationId: string): Promise<void> {
+  await chatStore.openConversation(conversationId);
+  await scrollToBottom();
+}
+
+function startNewConversation(): void {
+  chatStore.newConversation();
+  prompt.value = '';
+  search.value = '';
+  void scrollToBottom(false);
+}
+
+async function retryLastPrompt(): Promise<void> {
+  const lastUserMessage = [...messages.value].reverse().find((message) => message.role === 'user');
+
+  if (!lastUserMessage || streaming.value) {
+    return;
+  }
+
+  await chatStore.sendMessage(lastUserMessage.content);
+  await scrollToBottom();
+}
+
+async function scrollToBottom(smooth = true): Promise<void> {
   await nextTick();
+
   conversationArea.value?.scrollTo({
-    behavior: 'smooth',
+    behavior: smooth ? 'smooth' : 'auto',
     top: conversationArea.value.scrollHeight,
   });
+}
 
-  window.setTimeout(() => {
-    messages.value.push({
-      content:
-        '已收到。当前演示界面使用本地占位回复；接入模型服务后，这里会以流式方式返回真实结果。',
-      id: ++messageId.value,
-      role: 'assistant',
+function formatConversationTime(value: string | null): string {
+  if (!value) {
+    return '刚刚';
+  }
+
+  const date = new Date(value);
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+
+  if (sameDay) {
+    return date.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
     });
-  }, 360);
+  }
+
+  return date.toLocaleDateString('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+  });
 }
 </script>
 
@@ -106,13 +194,7 @@ async function sendMessage(): Promise<void> {
       <header>
         <strong>所有会话</strong>
         <div>
-          <button
-            type="button"
-            @click="
-              messages = [];
-              prompt = '';
-            "
-          >
+          <button type="button" @click="startNewConversation">
             <PlusOutlined />
             新对话
           </button>
@@ -121,14 +203,34 @@ async function sendMessage(): Promise<void> {
           </button>
         </div>
       </header>
+
       <label class="chat-history__search">
         <SearchOutlined />
-        <input placeholder="搜索会话" />
+        <input v-model="search" placeholder="搜索会话" />
       </label>
-      <div class="chat-history__empty">
+
+      <div v-if="filteredConversations.length > 0" class="chat-history__list">
+        <button
+          v-for="conversation in filteredConversations"
+          :key="conversation.id"
+          type="button"
+          :class="{ active: conversation.id === chatStore.currentConversationId }"
+          @click="openConversation(conversation.id)"
+        >
+          <MessageOutlined />
+          <span>
+            <strong>{{ conversation.title }}</strong>
+            <small>{{ formatConversationTime(conversation.lastMessageAt) }}</small>
+          </span>
+        </button>
+      </div>
+
+      <div v-else class="chat-history__empty">
         <MessageOutlined />
-        <strong>暂无历史会话</strong>
-        <span>开始一段对话后，会话会保存在这里。</span>
+        <strong>{{ search ? '没有匹配的会话' : '暂无历史会话' }}</strong>
+        <span>
+          {{ search ? '换一个关键词继续搜索。' : '开始一段对话后，会话会保存在这里。' }}
+        </span>
       </div>
     </aside>
 
@@ -137,19 +239,31 @@ async function sendMessage(): Promise<void> {
         <div>
           <span class="chat-main__mark">极</span>
           <strong>模型对话</strong>
-          <button type="button">
-            GPT-5 系列
-            <DownOutlined />
-          </button>
+          <a-select
+            v-model:value="selectedModelAlias"
+            class="chat-main__model-select"
+            :disabled="hasMessages || streaming"
+            :options="modelOptions"
+            size="small"
+          >
+            <template #suffixIcon>
+              <DownOutlined />
+            </template>
+          </a-select>
         </div>
-        <span class="chat-main__status">
+        <span class="chat-main__status" :class="{ error: status === 'error' }">
           <i />
-          服务就绪
+          {{ serviceLabel }}
         </span>
       </header>
 
       <section ref="conversationArea" class="chat-conversation" :class="{ active: hasMessages }">
-        <div v-if="!hasMessages" class="chat-welcome">
+        <div v-if="status === 'loading' && !hasMessages" class="chat-loading">
+          <LoadingOutlined spin />
+          <span>正在加载会话</span>
+        </div>
+
+        <div v-else-if="!hasMessages" class="chat-welcome">
           <span class="chat-welcome__mark">极</span>
           <h1>今天想从什么开始？</h1>
           <p>选择一种常用能力，或直接在下方描述你的任务。</p>
@@ -175,19 +289,38 @@ async function sendMessage(): Promise<void> {
             v-for="message in messages"
             :key="message.id"
             class="chat-message"
-            :class="`chat-message--${message.role}`"
+            :class="[
+              `chat-message--${message.role}`,
+              { 'chat-message--failed': message.status === 'FAILED' },
+            ]"
           >
             <span>{{ message.role === 'assistant' ? '极' : '我' }}</span>
-            <p>{{ message.content }}</p>
+            <p>
+              {{ message.content }}
+              <i v-if="message.status === 'STREAMING'" class="chat-message__cursor" />
+              <em v-if="message.status === 'PENDING'">正在恢复生成状态...</em>
+            </p>
           </article>
         </div>
       </section>
 
       <footer class="chat-composer">
+        <div v-if="error" class="chat-error">
+          <span>
+            <strong>{{ error.code === 'INSUFFICIENT_POINTS' ? '积分不足' : '生成未完成' }}</strong>
+            {{ error.message }}
+          </span>
+          <button v-if="error.recoverable" type="button" @click="retryLastPrompt">
+            <ReloadOutlined />
+            重试
+          </button>
+        </div>
+
         <div class="chat-composer__inner">
           <textarea
             v-model="prompt"
             rows="3"
+            :disabled="streaming"
             placeholder="输入问题，粘贴材料，或描述你希望完成的任务"
             @keydown.ctrl.enter="sendMessage"
           />
@@ -198,14 +331,25 @@ async function sendMessage(): Promise<void> {
               </button>
               <button type="button">
                 <ThunderboltFilled />
-                智能模式
+                {{ selectedModel?.displayName ?? '智能模式' }}
                 <DownOutlined />
               </button>
             </div>
             <button
+              v-if="streaming"
+              class="chat-composer__send chat-composer__send--stop"
+              type="button"
+              aria-label="停止生成"
+              @click="chatStore.stopStreaming"
+            >
+              <StopOutlined />
+            </button>
+            <button
+              v-else
               class="chat-composer__send"
               type="button"
-              :disabled="!prompt.trim()"
+              :disabled="!canSend"
+              aria-label="发送消息"
               @click="sendMessage"
             >
               <ArrowUpOutlined />
@@ -230,6 +374,7 @@ async function sendMessage(): Promise<void> {
   display: flex;
   min-width: 0;
   flex-direction: column;
+  overflow: hidden;
   border-right: 1px solid #e8ebf0;
   background: #fff;
 }
@@ -296,6 +441,58 @@ async function sendMessage(): Promise<void> {
   font-size: 11px;
 }
 
+.chat-history__list {
+  display: grid;
+  gap: 3px;
+  margin-top: 12px;
+  overflow-y: auto;
+  padding: 0 10px 14px;
+}
+
+.chat-history__list button {
+  display: grid;
+  min-height: 52px;
+  align-items: center;
+  gap: 9px;
+  grid-template-columns: 17px minmax(0, 1fr);
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #596273;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-history__list button:hover,
+.chat-history__list button.active {
+  background: #f1f5ff;
+  color: #356fe0;
+}
+
+.chat-history__list button > svg {
+  font-size: 14px;
+}
+
+.chat-history__list button > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.chat-history__list strong {
+  overflow: hidden;
+  color: #444c5a;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-history__list small {
+  color: #a0a7b3;
+  font-size: 9px;
+}
+
 .chat-history__empty {
   display: grid;
   margin: auto 22px;
@@ -342,6 +539,7 @@ async function sendMessage(): Promise<void> {
 
 .chat-main__toolbar > div {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 10px;
 }
@@ -360,25 +558,21 @@ async function sendMessage(): Promise<void> {
 .chat-main__mark {
   width: 34px;
   height: 34px;
+  flex: 0 0 34px;
   font-size: 13px;
 }
 
 .chat-main__toolbar strong {
   font-size: 14px;
+  white-space: nowrap;
 }
 
-.chat-main__toolbar button {
-  display: inline-flex;
-  height: 30px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 1px solid #e2e6ec;
-  border-radius: 7px;
-  background: #fff;
-  color: #5f6877;
-  font-size: 10px;
-  cursor: pointer;
+.chat-main__model-select {
+  width: 154px;
+}
+
+.chat-main__model-select :deep(.ant-select-selector) {
+  border-color: #e2e6ec !important;
 }
 
 .chat-main__status {
@@ -387,6 +581,7 @@ async function sendMessage(): Promise<void> {
   gap: 6px;
   color: #7c8593;
   font-size: 10px;
+  white-space: nowrap;
 }
 
 .chat-main__status i {
@@ -397,6 +592,15 @@ async function sendMessage(): Promise<void> {
   box-shadow: 0 0 0 3px rgb(37 174 104 / 10%);
 }
 
+.chat-main__status.error {
+  color: #b5534b;
+}
+
+.chat-main__status.error i {
+  background: #e85d5d;
+  box-shadow: 0 0 0 3px rgb(232 93 93 / 10%);
+}
+
 .chat-conversation {
   overflow-y: auto;
   padding: 48px 28px 24px;
@@ -404,6 +608,21 @@ async function sendMessage(): Promise<void> {
 
 .chat-conversation.active {
   padding-top: 30px;
+}
+
+.chat-loading {
+  display: grid;
+  min-height: 280px;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  color: #7c8696;
+  font-size: 12px;
+}
+
+.chat-loading :deep(svg) {
+  color: #4c84ff;
+  font-size: 24px;
 }
 
 .chat-welcome {
@@ -537,12 +756,83 @@ async function sendMessage(): Promise<void> {
   color: #363d48;
   font-size: 12px;
   line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.chat-message--failed p {
+  border: 1px solid #f1d3cf;
+  background: #fff8f7;
+  color: #9d4e48;
+}
+
+.chat-message p em {
+  display: block;
+  margin-top: 5px;
+  color: #a0a7b3;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.chat-message__cursor {
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  margin-left: 3px;
+  vertical-align: -2px;
+  background: #4c84ff;
+  animation: cursor-blink 900ms steps(2, jump-none) infinite;
+}
+
+@keyframes cursor-blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 .chat-composer {
   display: grid;
   justify-items: center;
   padding: 12px 24px 20px;
+}
+
+.chat-error {
+  display: flex;
+  width: min(100%, 820px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+  padding: 9px 11px;
+  border: 1px solid #f1d4d1;
+  border-radius: 9px;
+  background: #fff8f7;
+  color: #9a554f;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.chat-error span {
+  min-width: 0;
+}
+
+.chat-error strong {
+  margin-right: 5px;
+}
+
+.chat-error button {
+  display: inline-flex;
+  height: 27px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid #edc5c0;
+  border-radius: 6px;
+  background: #fff;
+  color: #9a554f;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .chat-composer__inner {
@@ -567,6 +857,11 @@ async function sendMessage(): Promise<void> {
   resize: none;
 }
 
+.chat-composer textarea:disabled {
+  color: #858d9a;
+  cursor: wait;
+}
+
 .chat-composer__footer {
   display: flex;
   min-height: 33px;
@@ -577,6 +872,7 @@ async function sendMessage(): Promise<void> {
 
 .chat-composer__footer > div {
   display: flex;
+  min-width: 0;
   gap: 6px;
 }
 
@@ -609,6 +905,11 @@ async function sendMessage(): Promise<void> {
   color: #fff;
 }
 
+.chat-composer__footer .chat-composer__send--stop {
+  background: #f1f2f4;
+  color: #4e5765;
+}
+
 .chat-composer__send:disabled {
   background: #d6dbe3;
   cursor: not-allowed;
@@ -628,8 +929,8 @@ async function sendMessage(): Promise<void> {
 
 @media (max-width: 720px) {
   .chat-view {
-    min-height: calc(100vh - 56px);
     display: block;
+    min-height: calc(100vh - 56px);
   }
 
   .chat-history {
@@ -643,6 +944,14 @@ async function sendMessage(): Promise<void> {
   .chat-main__toolbar {
     height: 56px;
     padding: 0 14px;
+  }
+
+  .chat-main__toolbar strong {
+    display: none;
+  }
+
+  .chat-main__model-select {
+    width: 134px;
   }
 
   .chat-conversation {
@@ -663,6 +972,10 @@ async function sendMessage(): Promise<void> {
 
   .chat-composer {
     padding: 10px 12px 16px;
+  }
+
+  .chat-error {
+    align-items: flex-start;
   }
 }
 </style>
