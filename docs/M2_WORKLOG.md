@@ -148,6 +148,7 @@
 - 操作能力：商品/服饰与目标素材上传、类目和融合参数、快捷描述、重置/清除、历史记录、帮助弹层、收藏、下载、删除和重试
 - 多参考图：任务请求支持最多 10 张输入图片，后端创建和恢复处理时都会校验文件归属，并依次把主图和参考图传给图片 Provider
 - 任务隔离：复用共享图片任务状态机，使用 `commerce` 工具键隔离记录，不创建页面加载或素材上传阶段的付费任务
+- 初始状态：按参考产品不再默认选择工具，中间操作面板显示“请选择智能体”，面包屑显示“全部 > 请选择智能体”；点击工具后显示对应表单，点击“全部”返回空状态
 
 ### 管理后台厂商模型探测
 
@@ -577,6 +578,23 @@ node outputs/ui-reference/verify-m2-routes.mjs
 - `node outputs/ui-reference/verify-newdraw-templates.mjs` 通过：`/newdraw` 的 7 个分类、17 张模板卡、筛选、模板回填、示例弹窗、高级设置和顶部跳转在桌面端与移动端均正常
 - `node outputs/ui-reference/verify-showcase-assets.mjs` 通过：`/newdraw` 的 34 张预览图全部加载，图片生成页的 12 张示例图全部加载，无横向溢出
 - 多图任务 E2E 覆盖 1 张主图加 9 张参考图的成功创建，以及第 11 张输入被拒绝；自动验收不调用真实生成接口
+
+电商工具初始空状态补充验证：
+
+```text
+pnpm format:check
+pnpm lint
+pnpm --filter @aurora/web typecheck
+pnpm --filter @aurora/web test
+pnpm test
+pnpm build
+node outputs/ui-reference/verify-commerce-studio.mjs
+```
+
+- 默认不选择任何工具，桌面端和移动端面包屑均显示“全部 > 请选择智能体”
+- 点击工具后才渲染操作表单；点击“全部”恢复空状态，已保留素材上传、试穿、替换任务和移动端选择器行为
+- 桌面端 `1440x1000` 和移动端 `390x844` 均无横向溢出或页面脚本错误
+- 自动验收使用 Mock 路由，不调用真实 Provider，不读取或输出 Key
 
 ## 5. 密钥和外部调用边界
 

@@ -370,6 +370,18 @@ const catalogGroups: CatalogGroup[] = [
 ];
 
 const commerceTools = catalogGroups.flatMap((group) => group.items);
+const emptyDisplayTool: CommerceTool = {
+  accent: '#3678e8',
+  description: '智能识别并替换商品图片中的商品，保持场景自然真实。',
+  form: 'background',
+  glyph: '商',
+  icon: ShoppingCartOutlined,
+  label: '商品替换',
+  previewAfterVariant: 0,
+  previewBeforeVariant: 1,
+  prompt: '智能识别并处理商品图片，保持商品主体和场景自然。',
+  value: 'commerce-overview',
+};
 const backgroundCategories = [
   '服饰箱包',
   '美妆护肤',
@@ -477,7 +489,7 @@ const modelCatalog = useModelCatalogStore();
 const sessionStore = useSessionStore();
 
 const searchQuery = ref('');
-const selectedToolKey = ref('background-blend');
+const selectedToolKey = ref('');
 const previewSide = ref<PreviewSide>('after');
 const historyOpen = ref(false);
 const helpOpen = ref(false);
@@ -513,9 +525,10 @@ const imageUploads = ref<Record<UploadRole, UploadState | null>>({
   replacement: null,
 });
 
-const activeTool = computed<CommerceTool>(
-  () => commerceTools.find((tool) => tool.value === selectedToolKey.value) ?? commerceTools[0]!,
+const activeTool = computed<CommerceTool | null>(
+  () => commerceTools.find((tool) => tool.value === selectedToolKey.value) ?? null,
 );
+const displayTool = computed<CommerceTool>(() => activeTool.value ?? emptyDisplayTool);
 const filteredGroups = computed(() => {
   const keyword = searchQuery.value.trim().toLowerCase();
 
@@ -537,19 +550,20 @@ const filteredGroups = computed(() => {
 const filteredToolCount = computed(() =>
   filteredGroups.value.reduce((count, group) => count + group.items.length, 0),
 );
-const isAvailableTool = computed(() => activeTool.value.form !== 'placeholder');
-const isBackgroundTool = computed(() => activeTool.value.form === 'background');
-const isPatternTool = computed(() => activeTool.value.form === 'pattern');
-const isReplaceTool = computed(() => activeTool.value.form === 'replace');
-const isRetouchTool = computed(() => activeTool.value.form === 'retouch');
-const isTryOnTool = computed(() => activeTool.value.form === 'try-on');
+const isToolSelected = computed(() => activeTool.value !== null);
+const isAvailableTool = computed(() => displayTool.value.form !== 'placeholder');
+const isBackgroundTool = computed(() => displayTool.value.form === 'background');
+const isPatternTool = computed(() => displayTool.value.form === 'pattern');
+const isReplaceTool = computed(() => displayTool.value.form === 'replace');
+const isRetouchTool = computed(() => displayTool.value.form === 'retouch');
+const isTryOnTool = computed(() => displayTool.value.form === 'try-on');
 const activeReplacementModes = computed(
   () =>
-    replacementModesByTool[activeTool.value.value] ?? replacementModesByTool['package-replace']!,
+    replacementModesByTool[displayTool.value.value] ?? replacementModesByTool['package-replace']!,
 );
 const activeReplacementProfile = computed(
   () =>
-    replacementUploadProfiles[activeTool.value.value] ??
+    replacementUploadProfiles[displayTool.value.value] ??
     replacementUploadProfiles['package-replace']!,
 );
 const requiredUploads = computed<UploadRole[]>(() => {
@@ -613,12 +627,12 @@ const previewImage = computed(() => {
 });
 const previewVariant = computed(() =>
   previewSide.value === 'before'
-    ? activeTool.value.previewBeforeVariant
-    : activeTool.value.previewAfterVariant,
+    ? displayTool.value.previewBeforeVariant
+    : displayTool.value.previewAfterVariant,
 );
 const previewSideLabel = computed(() => (previewSide.value === 'before' ? 'BEFORE' : 'AFTER'));
 const previewTitle = computed(() =>
-  previewSide.value === 'before' ? '原始素材' : `${activeTool.value.label}效果展示`,
+  previewSide.value === 'before' ? '原始素材' : `${displayTool.value.label}效果展示`,
 );
 const previewDescription = computed(() => {
   if (isBackgroundTool.value) {
@@ -651,7 +665,7 @@ const previewDescription = computed(() => {
       : '虚拟模特试穿会匹配版型、姿态和场景光线';
   }
 
-  return activeTool.value.description;
+  return displayTool.value.description;
 });
 const generationCost = computed(() => selectedAmount.value * IMAGE_TASK_POINTS_COST);
 const submitting = computed(() => workspace.submitting || uploadingRole.value !== null);
@@ -761,6 +775,25 @@ function setTool(tool: CommerceTool): void {
   uploadError.value = '';
 }
 
+function selectToolByKey(value: string): void {
+  const tool = commerceTools.find((item) => item.value === value);
+
+  if (tool) {
+    setTool(tool);
+  }
+}
+
+function handleMobileToolChange(event: Event): void {
+  selectToolByKey((event.target as HTMLSelectElement).value);
+}
+
+function selectAllTools(): void {
+  searchQuery.value = '';
+  selectedToolKey.value = '';
+  previewSide.value = 'after';
+  uploadError.value = '';
+}
+
 function setPromptPreset(value: string): void {
   prompt.value = prompt.value.trim() ? `${prompt.value.trim()}；${value}` : value;
 }
@@ -838,7 +871,7 @@ function isUploading(role: UploadRole): boolean {
 }
 
 function buildPrompt(): string {
-  const parts = [activeTool.value.prompt];
+  const parts = [displayTool.value.prompt];
 
   if (isBackgroundTool.value) {
     parts.push(
@@ -950,7 +983,7 @@ async function submitTask(): Promise<void> {
       backgroundFileId: imageUploads.value.background?.assetId,
       clothingCategory: isPatternTool.value ? clothingCategory.value : undefined,
       fusionMode: isBackgroundTool.value ? fusionMode.value : undefined,
-      mode: activeTool.value.value,
+      mode: displayTool.value.value,
       outputResolution: isBackgroundTool.value
         ? backgroundResolution.value
         : isPatternTool.value
@@ -974,7 +1007,7 @@ async function submitTask(): Promise<void> {
     },
     model: selectedImageModel.value?.alias ?? '',
     modelAlias: selectedImageModel.value?.alias ?? '',
-    modelLabel: selectedImageModel.value?.displayName ?? activeTool.value.label,
+    modelLabel: selectedImageModel.value?.displayName ?? displayTool.value.label,
     prompt: buildPrompt(),
     ratio: selectedRatio.value,
     referenceFileIds: referenceFileId ? [referenceFileId] : undefined,
@@ -1086,9 +1119,12 @@ onBeforeUnmount(() => {
       <nav class="commerce-workbench__breadcrumb" aria-label="当前位置">
         <span>全部</span>
         <RightOutlined />
-        <span>{{ activeTool.form === 'background' ? '商品换背景' : '商品替换' }}</span>
-        <RightOutlined />
-        <strong>{{ activeTool.label }}</strong>
+        <template v-if="activeTool">
+          <span>{{ activeTool.form === 'background' ? '商品换背景' : '商品替换' }}</span>
+          <RightOutlined />
+          <strong>{{ activeTool.label }}</strong>
+        </template>
+        <strong v-else>请选择智能体</strong>
       </nav>
 
       <div class="commerce-workbench__actions">
@@ -1105,7 +1141,8 @@ onBeforeUnmount(() => {
 
     <label class="commerce-mobile-picker">
       <span>选择电商工具</span>
-      <select v-model="selectedToolKey">
+      <select :value="selectedToolKey" @change="handleMobileToolChange">
+        <option value="" disabled>请选择智能体</option>
         <option v-for="tool in commerceTools" :key="tool.value" :value="tool.value">
           {{ tool.label }}
         </option>
@@ -1126,7 +1163,7 @@ onBeforeUnmount(() => {
           type="button"
           class="commerce-catalog__all"
           :class="{ active: selectedToolKey === '' }"
-          @click="searchQuery = ''"
+          @click="selectAllTools"
         >
           <span>
             <AppstoreOutlined />
@@ -1202,7 +1239,16 @@ onBeforeUnmount(() => {
           </div>
         </header>
 
-        <div v-if="isBackgroundTool" class="commerce-editor__content">
+        <div v-if="!isToolSelected" class="commerce-editor__placeholder">
+          <span>
+            <ExperimentOutlined />
+          </span>
+          <strong>请选择智能体</strong>
+          <p>从左侧菜单中选择一个智能体开始使用</p>
+          <small>选择后将显示对应的操作表单</small>
+        </div>
+
+        <div v-else-if="isBackgroundTool" class="commerce-editor__content">
           <section class="commerce-field">
             <label>商品类目 <em>*</em></label>
             <div class="commerce-choice-grid">
@@ -1690,8 +1736,8 @@ onBeforeUnmount(() => {
           <span>
             <ExperimentOutlined />
           </span>
-          <strong>{{ activeTool.label }}</strong>
-          <p>{{ activeTool.description }}</p>
+          <strong>{{ displayTool.label }}</strong>
+          <p>{{ displayTool.description }}</p>
           <small>该功能入口已保留，将在后续模块中接入完整流程。</small>
         </div>
 
@@ -1702,7 +1748,7 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <footer v-if="isAvailableTool" class="commerce-editor__footer">
+        <footer v-if="isToolSelected && isAvailableTool" class="commerce-editor__footer">
           <div>
             <ThunderboltFilled />
             <span>
@@ -1765,7 +1811,7 @@ onBeforeUnmount(() => {
             <CheckCircleOutlined />
             {{ previewSideLabel }}
           </span>
-          <strong>{{ activeTool.label }}</strong>
+          <strong>{{ displayTool.label }}</strong>
           <small>{{ isAvailableTool ? '支持上传素材实时预览' : '示例效果预览' }}</small>
         </div>
 
@@ -1777,21 +1823,21 @@ onBeforeUnmount(() => {
             </span>
           </header>
           <div>
-            <button type="button" @click="selectedToolKey = 'image-cutout'">
+            <button type="button" @click="selectToolByKey('image-cutout')">
               <span class="is-blue">
                 <PictureOutlined />
               </span>
               <strong>商品抠图</strong>
               <small>一键去除背景，保留商品主体</small>
             </button>
-            <button type="button" @click="selectedToolKey = 'style-transfer'">
+            <button type="button" @click="selectToolByKey('style-transfer')">
               <span class="is-purple">
                 <AppstoreOutlined />
               </span>
               <strong>风格转换</strong>
               <small>将商品图转换为不同艺术风格</small>
             </button>
-            <button type="button" @click="selectedToolKey = 'image-upscale'">
+            <button type="button" @click="selectToolByKey('image-upscale')">
               <span class="is-green">
                 <ExperimentOutlined />
               </span>
@@ -1805,14 +1851,14 @@ onBeforeUnmount(() => {
       <aside class="commerce-info commerce-panel">
         <div class="commerce-info__title">
           <span>
-            <component :is="activeTool.icon" />
+            <component :is="displayTool.icon" />
           </span>
-          <strong>{{ activeTool.label }}</strong>
+          <strong>{{ displayTool.label }}</strong>
         </div>
 
         <section>
           <h2>功能介绍</h2>
-          <p>{{ activeTool.description }}支持多种商品类型，适用于电商展示和营销素材制作。</p>
+          <p>{{ displayTool.description }}支持多种商品类型，适用于电商展示和营销素材制作。</p>
         </section>
 
         <section>
