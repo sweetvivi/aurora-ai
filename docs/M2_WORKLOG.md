@@ -194,6 +194,20 @@ AI 画布和电商工具复用同一异步图片任务 Store，并分别使用 `
 - 图片生成的商品摄影示例归类修正为“创意设计”，确保会出现在唯一对应的分类筛选中
 - 视频创作顶部“AI 绘画 / 超级对话 / AI 音乐”按参考产品特殊行为改为新标签页跳转；当前“AI 视频”仍留在本页
 
+### 图片生成空态与智能体密度
+
+- 图片生成创作栏在无生成记录时保持普通文档流，避免遮挡效果示例；存在作品后才使用吸底定位
+- 智能体列表桌面端保持 4 列，`980px` 以下改为 3 列、`760px` 以下改为 2 列、`520px` 以下改为 1 列
+- 卡片间距收紧为 10px，最小高度调整为 164px，保持参考产品的列表密度
+
+### 电商替换工具
+
+- 产品包装替换器、产品部件替换工具和商品材质替换器从占位入口升级为可提交工作流
+- 每个工具包含商品原图、替换参考图、替换类型、替换范围、输出分辨率、快捷要求和额外需求
+- 图片任务会把商品原图作为 `sourceFileId`，替换参考图作为 `referenceFileIds`
+- `extraParameters` 写入 `replacementFileId`、`replacementMode`、`replacementResolution`、`replacementScope`、`mode` 和 `outputResolution`
+- 保留背景融合、图案替换、商品修图、抠图和试穿工具的原有提交流程
+
 ## 4. 验证记录
 
 以下命令已通过：
@@ -303,9 +317,22 @@ node outputs/ui-reference/verify-commerce-studio.mjs
 
 - 桌面端 `1440x1000`：四栏结构正常，可切换智能背景融合和服饰图案替换设计师，上传区、历史抽屉和帮助弹层可用
 - 移动端 `390x844`：顶部工具选择器可切换图案替换工具，历史和帮助弹层可用，无横向溢出和页面脚本错误
+- 三个替换工具均可切换到对应表单，并断言 `package-replace`、`component-replace`、`material-replace` 会进入任务参数
 - 验收覆盖虚拟模特试穿和商品抠图表单，实际上传主服饰与第二张模特参考图，并断言创建任务请求包含 `sourceFileId` 和对应的 `referenceFileIds`
 - API 测试覆盖主图加背景图解析、多重参考图 Provider 字段、其他用户参考图拒绝，以及自由参数注入 `referenceFileIds` 时被忽略
 - 验收使用拦截后的本地图片上传与任务响应，不调用真实生成，不读取或输出 Key
+
+图片生成空态与智能体密度补充验证：
+
+```text
+pnpm --filter @aurora/web typecheck
+pnpm --filter @aurora/web test
+node outputs/ui-reference/verify-commerce-studio.mjs
+```
+
+- Web 测试 6 个文件、24 项通过
+- 电商替换工作台在桌面端 `1440x1000` 和移动端 `390x844` 下无横向溢出
+- 本批不调用真实生成接口，不读取或输出 Key
 
 智能体流式对话补充验证使用 Mock API 完成：
 

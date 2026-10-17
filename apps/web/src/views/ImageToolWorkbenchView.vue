@@ -1159,7 +1159,10 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <footer class="generation-composer">
+    <footer
+      class="generation-composer"
+      :class="{ 'generation-composer--sticky': generationGroups.length > 0 }"
+    >
       <input
         ref="sourceInput"
         type="file"
@@ -3016,8 +3019,7 @@ onBeforeUnmount(() => {
 }
 
 .generation-composer {
-  position: sticky;
-  bottom: 12px;
+  position: relative;
   z-index: 18;
   display: grid;
   width: min(calc(100% - 60px), 1320px);
@@ -3032,6 +3034,11 @@ onBeforeUnmount(() => {
     0 18px 48px rgb(31 80 65 / 14%),
     inset 0 0 0 1px rgb(255 255 255 / 78%);
   backdrop-filter: blur(18px);
+}
+
+.generation-composer--sticky {
+  position: sticky;
+  bottom: 12px;
 }
 
 .generation-composer__source {
@@ -4285,6 +4292,10 @@ onBeforeUnmount(() => {
     bottom: 70px;
     width: calc(100% - 24px);
     margin-bottom: 12px;
+  }
+
+  .generation-composer--sticky {
+    bottom: 70px;
   }
 
   .generation-composer__actions {

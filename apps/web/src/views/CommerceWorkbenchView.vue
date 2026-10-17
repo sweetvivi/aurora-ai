@@ -38,8 +38,8 @@ import {
 } from '@/stores/draw-workspace';
 import { useSessionStore } from '@/stores/session';
 
-type CommerceForm = 'background' | 'pattern' | 'placeholder' | 'retouch' | 'try-on';
-type UploadRole = 'background' | 'clothing' | 'model' | 'pattern' | 'product';
+type CommerceForm = 'background' | 'pattern' | 'placeholder' | 'replace' | 'retouch' | 'try-on';
+type UploadRole = 'background' | 'clothing' | 'model' | 'pattern' | 'product' | 'replacement';
 type PreviewSide = 'after' | 'before';
 
 interface CatalogGroup {
@@ -165,7 +165,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#ee8b32',
         description: '替换商品包装并保留品牌标识。',
-        form: 'placeholder',
+        form: 'replace',
         glyph: '包',
         icon: AppstoreOutlined,
         label: '产品包装替换器',
@@ -177,7 +177,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#c8524e',
         description: '替换指定商品部件和配件。',
-        form: 'placeholder',
+        form: 'replace',
         glyph: '件',
         icon: AppstoreOutlined,
         label: '产品部件替换工具',
@@ -189,7 +189,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#8a7657',
         description: '替换商品材质并保留外形结构。',
-        form: 'placeholder',
+        form: 'replace',
         glyph: '材',
         icon: AppstoreOutlined,
         label: '商品材质替换器',
@@ -402,6 +402,33 @@ const clothingCategories = [
 ];
 const patternStrengths = ['自然贴合', '保持纹理', '强化图案'];
 const patternResolutions = ['1K', '2K', '4K'];
+const replacementModesByTool: Record<string, string[]> = {
+  'package-replace': ['包装整体', '正面标签', '盒型结构', '封口细节'],
+  'component-replace': ['指定部件', '连接配件', '结构细节', '品牌饰件'],
+  'material-replace': ['表面材质', '核心部件材质', '局部纹理', '金属玻璃布料质感'],
+};
+const replacementScopes = ['自动识别', '主体区域', '指定局部', '保留边缘光'];
+const replacementResolutions = ['1K', '2K', '4K'];
+const replacementUploadProfiles: Record<string, UploadMeta & { previewLabel: string }> = {
+  'package-replace': {
+    description: '上传希望替换成的包装、标签或盒型参考图',
+    icon: AppstoreOutlined,
+    label: '上传包装参考图',
+    previewLabel: '包装参考',
+  },
+  'component-replace': {
+    description: '上传目标部件、配件或结构参考图',
+    icon: AppstoreOutlined,
+    label: '上传部件参考图',
+    previewLabel: '部件参考',
+  },
+  'material-replace': {
+    description: '上传希望替换成的材质、纹理或表面参考图',
+    icon: PictureOutlined,
+    label: '上传材质参考图',
+    previewLabel: '材质参考',
+  },
+};
 const retouchModes = ['一键抠图', '商品精修', '高清放大', '背景净化和补光'];
 const retouchResolutions = ['1K', '2K', '4K'];
 const tryOnPoses = ['正面站姿', '自然走姿', '半身展示', '坐姿展示'];
@@ -432,6 +459,11 @@ const uploadMeta: Record<UploadRole, UploadMeta> = {
     icon: FileImageOutlined,
     label: '上传图案素材',
   },
+  replacement: {
+    description: '上传需要替换成的包装、部件或材质参考图',
+    icon: FileImageOutlined,
+    label: '上传替换参考素材',
+  },
   model: {
     description: '可选上传人物或模特参考图',
     icon: UserOutlined,
@@ -459,6 +491,9 @@ const patternApplication = ref(patternApplications[0] ?? '胸前图案');
 const clothingCategory = ref(clothingCategories[0] ?? 'T 恤');
 const patternStrength = ref(patternStrengths[0] ?? '自然贴合');
 const patternResolution = ref('2K');
+const replacementMode = ref(replacementModesByTool['package-replace']?.[0] ?? '包装整体');
+const replacementScope = ref(replacementScopes[0] ?? '自动识别');
+const replacementResolution = ref('2K');
 const retouchMode = ref(retouchModes[0] ?? '一键抠图');
 const retouchResolution = ref('2K');
 const tryOnPose = ref(tryOnPoses[0] ?? '正面站姿');
@@ -472,6 +507,7 @@ const imageUploads = ref<Record<UploadRole, UploadState | null>>({
   model: null,
   pattern: null,
   product: null,
+  replacement: null,
 });
 
 const activeTool = computed<CommerceTool>(
@@ -501,8 +537,18 @@ const filteredToolCount = computed(() =>
 const isAvailableTool = computed(() => activeTool.value.form !== 'placeholder');
 const isBackgroundTool = computed(() => activeTool.value.form === 'background');
 const isPatternTool = computed(() => activeTool.value.form === 'pattern');
+const isReplaceTool = computed(() => activeTool.value.form === 'replace');
 const isRetouchTool = computed(() => activeTool.value.form === 'retouch');
 const isTryOnTool = computed(() => activeTool.value.form === 'try-on');
+const activeReplacementModes = computed(
+  () =>
+    replacementModesByTool[activeTool.value.value] ?? replacementModesByTool['package-replace']!,
+);
+const activeReplacementProfile = computed(
+  () =>
+    replacementUploadProfiles[activeTool.value.value] ??
+    replacementUploadProfiles['package-replace']!,
+);
 const requiredUploads = computed<UploadRole[]>(() => {
   if (isBackgroundTool.value) {
     return ['product', 'background'];
@@ -510,6 +556,10 @@ const requiredUploads = computed<UploadRole[]>(() => {
 
   if (isPatternTool.value) {
     return ['clothing', 'pattern'];
+  }
+
+  if (isReplaceTool.value) {
+    return ['product', 'replacement'];
   }
 
   if (isRetouchTool.value) {
@@ -538,6 +588,12 @@ const previewImage = computed(() => {
     return previewSide.value === 'before'
       ? imageUploads.value.clothing?.url
       : imageUploads.value.pattern?.url;
+  }
+
+  if (isReplaceTool.value) {
+    return previewSide.value === 'before'
+      ? imageUploads.value.product?.url
+      : imageUploads.value.replacement?.url;
   }
 
   if (isRetouchTool.value) {
@@ -572,6 +628,12 @@ const previewDescription = computed(() => {
     return previewSide.value === 'before'
       ? '上传需要替换图案的基础服饰'
       : '图案自然贴合面料，同时保留服饰版型和褶皱';
+  }
+
+  if (isReplaceTool.value) {
+    return previewSide.value === 'before'
+      ? '上传需要替换包装、部件或材质的商品原图'
+      : `${activeReplacementProfile.value.previewLabel}会先被分析，再匹配商品结构与光影`;
   }
 
   if (isRetouchTool.value) {
@@ -613,6 +675,15 @@ const toolSteps = computed(() => {
     ];
   }
 
+  if (isReplaceTool.value) {
+    return [
+      '上传包含完整结构的商品原图',
+      `上传${activeReplacementProfile.value.previewLabel}`,
+      '选择替换类型、替换范围和输出分辨率',
+      '点击开始处理，等待 AI 完成结构匹配',
+    ];
+  }
+
   if (isRetouchTool.value) {
     return [
       '上传需要处理的商品图片',
@@ -650,6 +721,14 @@ const toolTips = computed(() => {
     ];
   }
 
+  if (isReplaceTool.value) {
+    return [
+      '原图主体完整、边缘清晰时结构识别更准确',
+      `${activeReplacementProfile.value.previewLabel}与目标区域方向一致会更自然`,
+      '复杂材质和透明区域建议补充额外要求',
+    ];
+  }
+
   if (isRetouchTool.value) {
     return [
       '商品主体越完整，边缘处理越准确',
@@ -671,6 +750,9 @@ const toolTips = computed(() => {
 
 function setTool(tool: CommerceTool): void {
   selectedToolKey.value = tool.value;
+  if (tool.form === 'replace') {
+    replacementMode.value = replacementModesByTool[tool.value]?.[0] ?? '包装整体';
+  }
   prompt.value = '';
   previewSide.value = 'after';
   uploadError.value = '';
@@ -774,6 +856,15 @@ function buildPrompt(): string {
     );
   }
 
+  if (isReplaceTool.value) {
+    parts.push(
+      `替换类型：${replacementMode.value}。`,
+      `替换范围：${replacementScope.value}。`,
+      `输出分辨率：${replacementResolution.value}。`,
+      '保持商品原有轮廓、结构关系、品牌信息和透视，替换区域边缘与材质过渡自然。',
+    );
+  }
+
   if (isRetouchTool.value) {
     parts.push(
       `处理方式：${retouchMode.value}。`,
@@ -807,6 +898,10 @@ function sourceRole(): UploadRole | null {
     return 'clothing';
   }
 
+  if (isReplaceTool.value) {
+    return 'product';
+  }
+
   if (isRetouchTool.value) {
     return 'product';
   }
@@ -834,7 +929,9 @@ async function submitTask(): Promise<void> {
     ? imageUploads.value.background?.assetId
     : isPatternTool.value
       ? imageUploads.value.pattern?.assetId
-      : imageUploads.value.model?.assetId;
+      : isReplaceTool.value
+        ? imageUploads.value.replacement?.assetId
+        : imageUploads.value.model?.assetId;
 
   if (!primaryRole || !primaryImage) {
     uploadError.value = '缺少主素材，请重新上传';
@@ -853,10 +950,18 @@ async function submitTask(): Promise<void> {
       mode: activeTool.value.value,
       outputResolution: isBackgroundTool.value
         ? backgroundResolution.value
-        : patternResolution.value,
+        : isPatternTool.value
+          ? patternResolution.value
+          : isReplaceTool.value
+            ? replacementResolution.value
+            : retouchResolution.value,
       patternApplication: isPatternTool.value ? patternApplication.value : undefined,
       patternFileId: imageUploads.value.pattern?.assetId,
       patternStrength: isPatternTool.value ? patternStrength.value : undefined,
+      replacementFileId: isReplaceTool.value ? imageUploads.value.replacement?.assetId : undefined,
+      replacementMode: isReplaceTool.value ? replacementMode.value : undefined,
+      replacementResolution: isReplaceTool.value ? replacementResolution.value : undefined,
+      replacementScope: isReplaceTool.value ? replacementScope.value : undefined,
       retouchMode: isRetouchTool.value ? retouchMode.value : undefined,
       retouchResolution: isRetouchTool.value ? retouchResolution.value : undefined,
       sourceRole: primaryRole,
@@ -873,9 +978,11 @@ async function submitTask(): Promise<void> {
       ? backgroundResolution.value
       : isPatternTool.value
         ? patternResolution.value
-        : isRetouchTool.value
-          ? retouchResolution.value
-          : tryOnResolution.value,
+        : isReplaceTool.value
+          ? replacementResolution.value
+          : isRetouchTool.value
+            ? retouchResolution.value
+            : tryOnResolution.value,
     sourceFileId: primaryImage.assetId,
     toolKey: 'commerce',
   });
@@ -901,6 +1008,7 @@ function resetForm(): void {
     model: null,
     pattern: null,
     product: null,
+    replacement: null,
   };
   prompt.value = '';
   uploadError.value = '';
@@ -912,6 +1020,9 @@ function resetForm(): void {
   clothingCategory.value = clothingCategories[0] ?? 'T 恤';
   patternStrength.value = patternStrengths[0] ?? '自然贴合';
   patternResolution.value = '2K';
+  replacementMode.value = replacementModesByTool['package-replace']?.[0] ?? '包装整体';
+  replacementScope.value = replacementScopes[0] ?? '自动识别';
+  replacementResolution.value = '2K';
   retouchMode.value = retouchModes[0] ?? '一键抠图';
   retouchResolution.value = '2K';
   tryOnPose.value = tryOnPoses[0] ?? '正面站姿';
@@ -1298,6 +1409,113 @@ onBeforeUnmount(() => {
               placeholder="例如：图案颜色降低一点，保留面料褶皱"
             />
           </label>
+        </div>
+
+        <div v-else-if="isReplaceTool" class="commerce-editor__content">
+          <label class="commerce-field">
+            <span>替换类型 <em>*</em></span>
+            <select v-model="replacementMode">
+              <option v-for="mode in activeReplacementModes" :key="mode" :value="mode">
+                {{ mode }}
+              </option>
+            </select>
+          </label>
+
+          <label class="commerce-field">
+            <span>替换范围 <em>*</em></span>
+            <select v-model="replacementScope">
+              <option v-for="scope in replacementScopes" :key="scope" :value="scope">
+                {{ scope }}
+              </option>
+            </select>
+          </label>
+
+          <label class="commerce-field">
+            <span>输出分辨率</span>
+            <select v-model="replacementResolution">
+              <option
+                v-for="resolution in replacementResolutions"
+                :key="resolution"
+                :value="resolution"
+              >
+                {{ resolution }}
+              </option>
+            </select>
+          </label>
+
+          <div
+            class="commerce-upload"
+            :class="{ filled: imageUploads.product }"
+            @dragover.prevent
+            @drop.prevent="handleDrop('product', $event)"
+          >
+            <div v-if="imageUploads.product" class="commerce-upload__preview">
+              <img :src="imageUploads.product.url" :alt="imageUploads.product.name" />
+              <button type="button" aria-label="移除商品图片" @click="removeUpload('product')">
+                <CloseOutlined />
+              </button>
+              <span>商品原图</span>
+            </div>
+            <button v-else type="button" @click="openUpload('product')">
+              <LoadingOutlined v-if="isUploading('product')" />
+              <UploadOutlined v-else />
+              <strong>{{ isUploading('product') ? '正在上传' : uploadMeta.product.label }}</strong>
+              <small>{{ uploadMeta.product.description }}</small>
+              <em>0 / 1</em>
+            </button>
+          </div>
+
+          <div
+            class="commerce-upload"
+            :class="{ filled: imageUploads.replacement }"
+            @dragover.prevent
+            @drop.prevent="handleDrop('replacement', $event)"
+          >
+            <div v-if="imageUploads.replacement" class="commerce-upload__preview">
+              <img :src="imageUploads.replacement.url" :alt="imageUploads.replacement.name" />
+              <button
+                type="button"
+                :aria-label="`移除${activeReplacementProfile.previewLabel}`"
+                @click="removeUpload('replacement')"
+              >
+                <CloseOutlined />
+              </button>
+              <span>{{ activeReplacementProfile.previewLabel }}</span>
+            </div>
+            <button v-else type="button" @click="openUpload('replacement')">
+              <LoadingOutlined v-if="isUploading('replacement')" />
+              <UploadOutlined v-else />
+              <strong>{{
+                isUploading('replacement') ? '正在上传' : activeReplacementProfile.label
+              }}</strong>
+              <small>{{ activeReplacementProfile.description }}</small>
+              <em>0 / 1</em>
+            </button>
+          </div>
+
+          <label class="commerce-field">
+            <span>额外需求</span>
+            <textarea
+              v-model="prompt"
+              maxlength="600"
+              placeholder="例如：保留包装文字和结构，只替换正面视觉"
+            />
+          </label>
+
+          <div class="commerce-presets">
+            <span>快捷要求</span>
+            <div>
+              <button
+                v-for="preset in promptPresets"
+                :key="preset"
+                type="button"
+                @click="setPromptPreset(preset)"
+              >
+                <PlusOutlined />
+                {{ preset }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div v-else-if="isRetouchTool" class="commerce-editor__content">

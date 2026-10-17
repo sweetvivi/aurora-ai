@@ -964,14 +964,14 @@ function applyHotSearch(keyword: string): void {
 
 .agents-grid {
   display: grid;
-  gap: 11px;
+  gap: 10px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .agent-card {
   display: grid;
   min-width: 0;
-  min-height: 174px;
+  min-height: 164px;
   align-content: start;
   padding: 14px;
   border: 1px solid #e3e9e6;
@@ -1213,10 +1213,6 @@ function applyHotSearch(keyword: string): void {
   .agents-hot-search {
     display: none;
   }
-
-  .agents-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 980px) {
@@ -1233,7 +1229,7 @@ function applyHotSearch(keyword: string): void {
   }
 
   .agents-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1303,6 +1299,10 @@ function applyHotSearch(keyword: string): void {
 
   .agents-results__heading {
     align-items: flex-start;
+  }
+
+  .agents-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .agents-callout {
