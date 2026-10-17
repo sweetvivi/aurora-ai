@@ -238,6 +238,7 @@ describe('OpenAI compatible chat provider', () => {
       messages,
       model: 'provider-model',
       providerCode: 'jiguang',
+      reasoningEffort: 'high',
     })) {
       // Consume the stream so the request is sent.
     }
@@ -245,8 +246,10 @@ describe('OpenAI compatible chat provider', () => {
     const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const requestBody = JSON.parse(String(requestInit.body)) as {
       messages: unknown;
+      reasoning_effort: string;
     };
 
     expect(requestBody.messages).toEqual(messages);
+    expect(requestBody.reasoning_effort).toBe('high');
   });
 });

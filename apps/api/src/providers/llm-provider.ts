@@ -11,6 +11,8 @@ export type ChatContentPart =
       type: 'image_url';
     };
 
+export type ReasoningEffort = 'high' | 'low' | 'medium';
+
 export interface ChatMessage {
   content: ChatContentPart[] | string;
   role: 'assistant' | 'system' | 'user';
@@ -22,6 +24,7 @@ export interface StreamChatRequest {
   providerCode?: string;
   providerBaseUrl?: string;
   providerKeyRef?: string;
+  reasoningEffort?: ReasoningEffort;
   signal?: AbortSignal;
   temperature?: number;
 }

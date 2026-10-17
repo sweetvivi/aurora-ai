@@ -1,19 +1,24 @@
 <script setup lang="ts">
 import {
   ArrowUpOutlined,
+  BorderOutlined,
   CloseOutlined,
   DownOutlined,
   LoadingOutlined,
   PaperClipOutlined,
   ReloadOutlined,
   StopOutlined,
-  ThunderboltFilled,
 } from '@ant-design/icons-vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
-import { uploadImageFile, type FileAsset } from '@/app/api';
+import { uploadImageFile, type FileAsset, type ReasoningEffort } from '@/app/api';
 import type { ChatAttachment } from '@/stores/chat-workspace';
 
 const MAX_ATTACHMENTS = 3;
+const reasoningOptions: Array<{ label: string; value: ReasoningEffort }> = [
+  { label: '低', value: 'low' },
+  { label: '中', value: 'medium' },
+  { label: '高', value: 'high' },
+];
 
 interface ComposerError {
   code: string;
@@ -35,17 +40,18 @@ const props = withDefaults(
     attachmentEnabled?: boolean;
     canSend: boolean;
     error?: ComposerError | null;
-    modelName?: string;
     placeholder?: string;
     placement?: 'docked' | 'welcome';
+    reasoningEffort?: ReasoningEffort;
     streaming: boolean;
+    taskMode?: boolean;
   }>(),
   {
     attachmentEnabled: true,
     error: null,
-    modelName: '智能模式',
     placeholder: '输入问题，粘贴材料，或描述你希望完成的任务',
     placement: 'docked',
+    taskMode: false,
   },
 );
 
@@ -53,14 +59,25 @@ const emit = defineEmits<{
   retry: [];
   send: [payload: { fileIds: string[] }];
   stop: [];
+  'update:reasoningEffort': [value: ReasoningEffort];
+  'update:taskMode': [value: boolean];
 }>();
 
 const prompt = defineModel<string>({ required: true });
 const attachments = ref<LocalAttachment[]>([]);
 const fileInput = ref<HTMLInputElement | null>(null);
 const input = ref<HTMLTextAreaElement | null>(null);
+const thinkingOpen = ref(false);
 const hasUploadingAttachment = computed(() =>
   attachments.value.some((attachment) => attachment.status === 'uploading'),
+);
+const reasoningEffortLabel = computed(
+  () =>
+    ({
+      high: '高',
+      low: '低',
+      medium: '中',
+    })[props.reasoningEffort ?? 'low'],
 );
 const sendDisabled = computed(
   () => !props.canSend || props.streaming || hasUploadingAttachment.value,
@@ -173,6 +190,15 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 }
 
+function selectReasoningEffort(value: ReasoningEffort): void {
+  emit('update:reasoningEffort', value);
+  thinkingOpen.value = false;
+}
+
+function toggleTaskMode(): void {
+  emit('update:taskMode', !props.taskMode);
+}
+
 function focus(): void {
   input.value?.focus();
 }
@@ -189,7 +215,7 @@ function createAttachmentId(): string {
 </script>
 
 <template>
-  <div class="chat-composer" :class="`chat-composer--${placement}`">
+  <div class="chat-composer" :class="`chat-composer--${placement}`" @click="thinkingOpen = false">
     <div v-if="error" class="chat-error">
       <span>
         <strong>{{ error.code === 'INSUFFICIENT_POINTS' ? '积分不足' : '生成未完成' }}</strong>
@@ -240,7 +266,7 @@ function createAttachmentId(): string {
         @keydown="handleKeydown"
       />
       <div class="chat-composer__footer">
-        <div>
+        <div class="chat-composer__footer-left">
           <input
             ref="fileInput"
             class="chat-composer__file-input"
@@ -250,6 +276,44 @@ function createAttachmentId(): string {
             @change="handleFileInput"
           />
           <button
+            class="chat-composer__task-mode"
+            type="button"
+            :aria-pressed="Boolean(taskMode)"
+            :disabled="streaming"
+            @click.stop="toggleTaskMode"
+          >
+            <BorderOutlined />
+            任务模式
+          </button>
+        </div>
+        <div class="chat-composer__footer-right">
+          <div class="chat-composer__thinking">
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              :aria-expanded="thinkingOpen"
+              :disabled="streaming"
+              @click.stop="thinkingOpen = !thinkingOpen"
+            >
+              思考 · {{ reasoningEffortLabel }}
+              <DownOutlined />
+            </button>
+            <div v-if="thinkingOpen" class="chat-composer__thinking-menu" role="listbox">
+              <button
+                v-for="option in reasoningOptions"
+                :key="option.value"
+                type="button"
+                role="option"
+                :aria-selected="(reasoningEffort ?? 'low') === option.value"
+                @click="selectReasoningEffort(option.value)"
+              >
+                <span>{{ option.label }}</span>
+                <i v-if="(reasoningEffort ?? 'low') === option.value" />
+              </button>
+            </div>
+          </div>
+          <button
+            class="chat-composer__attachment-button"
             type="button"
             aria-label="上传图片"
             :disabled="streaming || !attachmentEnabled || attachments.length >= MAX_ATTACHMENTS"
@@ -258,35 +322,30 @@ function createAttachmentId(): string {
                 ? `每条消息最多上传 ${MAX_ATTACHMENTS} 张图片`
                 : '上传图片'
             "
-            @click="openFilePicker"
+            @click.stop="openFilePicker"
           >
             <PaperClipOutlined />
           </button>
-          <button type="button">
-            <ThunderboltFilled />
-            {{ modelName }}
-            <DownOutlined />
+          <button
+            v-if="streaming"
+            class="chat-composer__send chat-composer__send--stop"
+            type="button"
+            aria-label="停止生成"
+            @click.stop="emit('stop')"
+          >
+            <StopOutlined />
+          </button>
+          <button
+            v-else
+            class="chat-composer__send"
+            type="button"
+            :disabled="sendDisabled"
+            aria-label="发送消息"
+            @click.stop="handleSend"
+          >
+            <ArrowUpOutlined />
           </button>
         </div>
-        <button
-          v-if="streaming"
-          class="chat-composer__send chat-composer__send--stop"
-          type="button"
-          aria-label="停止生成"
-          @click="emit('stop')"
-        >
-          <StopOutlined />
-        </button>
-        <button
-          v-else
-          class="chat-composer__send"
-          type="button"
-          :disabled="sendDisabled"
-          aria-label="发送消息"
-          @click="handleSend"
-        >
-          <ArrowUpOutlined />
-        </button>
       </div>
     </div>
     <small v-if="placement === 'docked'">内容由 AI 生成，请注意核验重要信息</small>
@@ -480,10 +539,16 @@ function createAttachmentId(): string {
   gap: 10px;
 }
 
-.chat-composer__footer > div {
+.chat-composer__footer-left,
+.chat-composer__footer-right {
   display: flex;
   min-width: 0;
+  align-items: center;
   gap: 6px;
+}
+
+.chat-composer__footer-right {
+  justify-content: flex-end;
 }
 
 .chat-composer__footer button {
@@ -501,14 +566,82 @@ function createAttachmentId(): string {
   cursor: pointer;
 }
 
+.chat-composer__footer .chat-composer__task-mode {
+  border: 1px solid #d9e3f7;
+  background: #f8faff;
+  color: #4e6fa7;
+  font-weight: 750;
+}
+
+.chat-composer__footer .chat-composer__task-mode:hover,
+.chat-composer__footer .chat-composer__task-mode[aria-pressed='true'] {
+  border-color: #a9c4ff;
+  background: #edf3ff;
+  color: #356fe0;
+}
+
 .chat-composer__footer button:disabled {
   color: #aeb6c2;
   cursor: not-allowed;
 }
 
-.chat-composer__footer > div button:first-child {
+.chat-composer__attachment-button {
   width: 31px;
   padding: 0;
+  border-radius: 50% !important;
+  background: #f2f4f7 !important;
+}
+
+.chat-composer__thinking {
+  position: relative;
+}
+
+.chat-composer__footer .chat-composer__thinking > button {
+  border: 1px solid #e4e7ec;
+  background: #f7f8fa;
+  color: #737b88;
+  font-weight: 650;
+}
+
+.chat-composer__thinking-menu {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  bottom: 39px;
+  display: grid;
+  width: 112px;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid #e1e5eb;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgb(28 43 69 / 14%);
+}
+
+.chat-composer__thinking-menu button {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  justify-content: space-between;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #596273;
+  font-size: 11px;
+}
+
+.chat-composer__thinking-menu button:hover {
+  background: #f1f5ff;
+  color: #356fe0;
+}
+
+.chat-composer__thinking-menu i {
+  width: 6px;
+  height: 6px;
+  align-self: center;
+  border-radius: 50%;
+  background: #4c84ff;
 }
 
 .chat-composer__footer .chat-composer__send {
@@ -554,10 +687,15 @@ function createAttachmentId(): string {
   }
 
   .chat-composer__footer button {
-    max-width: 170px;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .chat-composer__footer .chat-composer__task-mode {
+    padding: 0 8px;
+  }
+
+  .chat-composer__footer .chat-composer__thinking > button {
+    padding: 0 8px;
   }
 
   .chat-error {

@@ -29,7 +29,9 @@ interface StreamChatInput {
   fileIds?: string[];
   idempotencyKey: string;
   modelAlias?: string;
+  reasoningEffort?: 'high' | 'low' | 'medium';
   systemPrompt?: string;
+  taskMode?: boolean;
   temperature?: number;
   userId: string;
 }
@@ -46,6 +48,7 @@ interface PreparedChat {
   providerCode: string;
   providerKeyRef?: string;
   providerModel: string;
+  reasoningEffort?: 'high' | 'low' | 'medium';
   reservationId: string;
   temperature?: number;
   userId: string;
@@ -227,6 +230,10 @@ export class ChatService {
     const occurredAt = new Date();
     const content = input.content.trim();
     const systemPrompt = input.systemPrompt?.trim();
+    const taskModePrompt = input.taskMode
+      ? '当前请求处于任务模式。请先理解目标，必要时拆解步骤，给出可直接执行的方案，并在回答末尾列出关键验收点。'
+      : undefined;
+    const combinedSystemPrompt = [taskModePrompt, systemPrompt].filter(Boolean).join('\n\n');
     const recentHistoryAttachmentIds = collectRecentHistoryAttachmentIds(history);
     const historyMessages: ChatMessage[] = [];
 
@@ -356,10 +363,10 @@ export class ChatService {
       chatRequestId,
       conversationId: conversation.id,
       messages: [
-        ...(systemPrompt
+        ...(combinedSystemPrompt
           ? [
               {
-                content: systemPrompt,
+                content: combinedSystemPrompt,
                 role: 'system' as const,
               },
             ]
@@ -379,6 +386,7 @@ export class ChatService {
       providerCode: model.providerCode,
       providerKeyRef: model.keyRef,
       providerModel: model.providerModel,
+      reasoningEffort: input.reasoningEffort,
       reservationId: reservation.id,
       temperature: input.temperature,
       userId: input.userId,
@@ -408,6 +416,7 @@ export class ChatService {
         providerBaseUrl: prepared.providerBaseUrl,
         providerCode: prepared.providerCode,
         providerKeyRef: prepared.providerKeyRef,
+        reasoningEffort: prepared.reasoningEffort,
         signal,
         temperature: prepared.temperature,
       })) {

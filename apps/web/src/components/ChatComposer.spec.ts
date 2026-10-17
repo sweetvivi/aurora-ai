@@ -58,4 +58,25 @@ describe('ChatComposer attachments', () => {
       }),
     ]);
   });
+
+  it('exposes task mode and reasoning level controls', async () => {
+    const wrapper = mount(ChatComposer, {
+      props: {
+        canSend: true,
+        modelValue: '',
+        streaming: false,
+      },
+    });
+
+    await wrapper.get('.chat-composer__task-mode').trigger('click');
+    expect(wrapper.emitted('update:taskMode')).toEqual([[true]]);
+
+    await wrapper.get('.chat-composer__thinking > button').trigger('click');
+    const options = wrapper.findAll('.chat-composer__thinking-menu button');
+
+    expect(options.map((option) => option.text())).toEqual(['低', '中', '高']);
+
+    await options[1]?.trigger('click');
+    expect(wrapper.emitted('update:reasoningEffort')).toEqual([['medium']]);
+  });
 });

@@ -8,6 +8,7 @@ import {
   fetchConversation,
   fetchConversations,
   fetchModels,
+  type ReasoningEffort,
   streamChat,
 } from '@/app/api';
 import { useSessionStore } from './session';
@@ -144,6 +145,8 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
         appendUser?: boolean;
         attachments?: ChatAttachment[];
         fileIds?: string[];
+        reasoningEffort?: ReasoningEffort;
+        taskMode?: boolean;
       } = {},
     ): Promise<void> {
       const content = rawContent.trim();
@@ -207,6 +210,8 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
             conversationId: this.currentConversationId ?? undefined,
             fileIds: fileIds.length > 0 ? fileIds : undefined,
             modelAlias: this.selectedModelAlias || undefined,
+            reasoningEffort: options.reasoningEffort,
+            taskMode: options.taskMode,
           },
           {
             onDelta: (event) => {

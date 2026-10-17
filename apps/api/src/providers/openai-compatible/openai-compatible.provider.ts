@@ -68,6 +68,7 @@ export class OpenAiCompatibleProvider implements LlmProvider {
         body: JSON.stringify({
           messages: request.messages,
           model: request.model,
+          reasoning_effort: request.reasoningEffort,
           stream: true,
           temperature: request.temperature,
         }),

@@ -2,6 +2,8 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayUnique,
+  IsBoolean,
+  IsIn,
   IsArray,
   IsNumber,
   IsOptional,
@@ -13,6 +15,10 @@ import {
 } from 'class-validator';
 
 export class StreamChatDto {
+  @IsOptional()
+  @IsBoolean()
+  taskMode?: boolean;
+
   @IsOptional()
   @IsString()
   @MaxLength(128)
@@ -47,4 +53,8 @@ export class StreamChatDto {
   @Min(0)
   @Max(2)
   temperature?: number;
+
+  @IsOptional()
+  @IsIn(['low', 'medium', 'high'])
+  reasoningEffort?: 'high' | 'low' | 'medium';
 }

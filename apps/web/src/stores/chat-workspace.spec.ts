@@ -360,10 +360,14 @@ describe('chat workspace store', () => {
     await chatStore.initialize();
     await chatStore.sendMessage('请分析图片', {
       attachments: [localAttachment],
+      reasoningEffort: 'high',
+      taskMode: true,
     });
 
     expect(streamInput).toMatchObject({
       fileIds: ['file-1'],
+      reasoningEffort: 'high',
+      taskMode: true,
     });
     expect(chatStore.messages[0]?.attachments[0]).toMatchObject(localAttachment);
 

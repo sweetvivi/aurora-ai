@@ -257,6 +257,8 @@ export interface ChatStreamError {
   requestId: string;
 }
 
+export type ReasoningEffort = 'high' | 'low' | 'medium';
+
 export interface StreamChatHandlers {
   onDelta: (event: ChatStreamDelta) => void;
   onDone: (event: ChatStreamDone) => void;
@@ -829,7 +831,9 @@ export async function streamChat(
     conversationId?: string;
     fileIds?: string[];
     modelAlias?: string;
+    reasoningEffort?: ReasoningEffort;
     systemPrompt?: string;
+    taskMode?: boolean;
     temperature?: number;
   },
   handlers: StreamChatHandlers,

@@ -31,6 +31,7 @@ import MarkdownMessage from '@/components/MarkdownMessage.vue';
 import MessageAttachments from '@/components/MessageAttachments.vue';
 import { useChatWorkspaceStore } from '@/stores/chat-workspace';
 import { useSessionStore } from '@/stores/session';
+import type { ReasoningEffort } from '@/app/api';
 
 const route = useRoute();
 const sessionStore = useSessionStore();
@@ -39,6 +40,8 @@ const { conversations, error, messages, models, selectedModelAlias, status, stre
   storeToRefs(chatStore);
 
 const prompt = ref('');
+const reasoningEffort = ref<ReasoningEffort>();
+const taskMode = ref(false);
 const search = ref('');
 const conversationArea = ref<HTMLElement | null>(null);
 const composerInput = ref<InstanceType<typeof ChatComposer> | null>(null);
@@ -333,6 +336,8 @@ async function sendMessage(payload: { fileIds: string[] } = { fileIds: [] }): Pr
   await chatStore.sendMessage(content, {
     attachments,
     fileIds,
+    reasoningEffort: reasoningEffort.value,
+    taskMode: taskMode.value,
   });
   await scrollToBottom();
 }
@@ -539,10 +544,13 @@ function formatConversationTime(value: string | null): string {
             :attachment-enabled="sessionStore.authenticated"
             :can-send="canSend"
             :error="error"
-            :model-name="selectedModel?.displayName ?? '智能模式'"
             :placeholder="`给 ${selectedModel?.displayName ?? '当前模型'} 发消息`"
             placement="welcome"
+            :reasoning-effort="reasoningEffort"
             :streaming="streaming"
+            :task-mode="taskMode"
+            @update:reasoning-effort="reasoningEffort = $event"
+            @update:task-mode="taskMode = $event"
             @retry="retryLastPrompt"
             @send="sendMessage"
             @stop="chatStore.stopStreaming"
@@ -689,10 +697,13 @@ function formatConversationTime(value: string | null): string {
         :attachment-enabled="sessionStore.authenticated"
         :can-send="canSend"
         :error="error"
-        :model-name="selectedModel?.displayName ?? '智能模式'"
         :placeholder="`给 ${selectedModel?.displayName ?? '当前模型'} 发消息`"
         placement="docked"
+        :reasoning-effort="reasoningEffort"
         :streaming="streaming"
+        :task-mode="taskMode"
+        @update:reasoning-effort="reasoningEffort = $event"
+        @update:task-mode="taskMode = $event"
         @retry="retryLastPrompt"
         @send="sendMessage"
         @stop="chatStore.stopStreaming"

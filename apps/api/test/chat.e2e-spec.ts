@@ -458,6 +458,8 @@ describe('chat and conversation endpoints', () => {
       .send({
         content: '你好，介绍一下你自己',
         modelAlias: 'openai-gpt-6-astra',
+        reasoningEffort: 'high',
+        taskMode: true,
         temperature: 0.4,
       })
       .expect(200);
@@ -486,7 +488,12 @@ describe('chat and conversation endpoints', () => {
     });
     expect(lastProviderRequest).toMatchObject({
       model: 'gpt-6-astra',
+      reasoningEffort: 'high',
       temperature: 0.4,
+    });
+    expect(lastProviderRequest?.messages[0]).toMatchObject({
+      content: expect.stringContaining('任务模式'),
+      role: 'system',
     });
     expect(lastProviderRequest?.messages.at(-1)).toEqual({
       content: '你好，介绍一下你自己',

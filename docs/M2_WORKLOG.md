@@ -215,6 +215,20 @@ AI 画布和电商工具复用同一异步图片任务 Store，并分别使用 `
 - 移动端压缩能力入口和图表网格，保持输入区、模型选择和模式切换可用且无横向溢出
 - 2026-10-17 复核：`1440x1000` 与 `390x844` 下空态结构正常，输入框位于能力条上方，页面无横向溢出；输入成功流和移动端错误流继续通过 `verify-chat-m1.mjs`
 
+### 对话输入区任务模式与思考等级
+
+- 页面：`apps/web/src/views/ChatView.vue`
+- 输入组件：`apps/web/src/components/ChatComposer.vue`
+- Store：`apps/web/src/stores/chat-workspace.ts`
+- 后端契约：`apps/api/src/chat/dto/stream-chat.dto.ts`
+- 后端处理：`apps/api/src/chat/chat.service.ts`
+- Provider：`apps/api/src/providers/openai-compatible/openai-compatible.provider.ts`
+- 输入区左下新增“任务模式”，右下新增“思考 · 低/中/高”菜单；附件和发送/停止按钮保持原位置
+- 任务模式会生成临时 system prompt，可与智能体已有角色提示词合并，但不会写入用户会话历史
+- 思考等级只允许 `low`、`medium`、`high`；默认界面显示低档，未主动选择时不发送 `reasoningEffort`
+- Provider 仅在收到思考等级时写入 `reasoning_effort`，不影响无该参数的既有模型和 Mock 链路
+- 验收：`verify-chat-composer-controls.mjs` 在 `1440x1000` 和 `390x844` 下确认控件状态、请求参数、消息态保留状态和无横向溢出；使用 Playwright 路由拦截，不调用真实 Provider
+
 ### 安全 Markdown 对话渲染
 
 - 组件：`apps/web/src/components/MarkdownMessage.vue`
