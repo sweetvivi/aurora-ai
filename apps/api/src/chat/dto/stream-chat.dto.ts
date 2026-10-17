@@ -18,6 +18,11 @@ export class StreamChatDto {
   modelAlias?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(20_000)
+  systemPrompt?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)

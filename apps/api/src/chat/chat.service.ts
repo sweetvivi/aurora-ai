@@ -19,6 +19,7 @@ interface StreamChatInput {
   conversationId?: string;
   idempotencyKey: string;
   modelAlias?: string;
+  systemPrompt?: string;
   temperature?: number;
   userId: string;
 }
@@ -159,6 +160,7 @@ export class ChatService {
     const pointsCost = this.configService.get<number>('CHAT_POINTS_COST', 1);
     const occurredAt = new Date();
     const content = input.content.trim();
+    const systemPrompt = input.systemPrompt?.trim();
 
     if (!content) {
       throw new ConflictException({
@@ -248,6 +250,14 @@ export class ChatService {
       chatRequestId,
       conversationId: conversation.id,
       messages: [
+        ...(systemPrompt
+          ? [
+              {
+                content: systemPrompt,
+                role: 'system' as const,
+              },
+            ]
+          : []),
         ...history.map((message) => ({
           content: message.content,
           role: message.role.toLowerCase() as ChatMessage['role'],

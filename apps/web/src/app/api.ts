@@ -407,6 +407,7 @@ export async function streamChat(
     content: string;
     conversationId?: string;
     modelAlias?: string;
+    systemPrompt?: string;
     temperature?: number;
   },
   handlers: StreamChatHandlers,

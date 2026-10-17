@@ -4,6 +4,7 @@ export interface AgentCatalogItem {
   description: string;
   glyph: string;
   id: string;
+  instructions?: string;
   name: string;
   opening: string;
   rating: number;

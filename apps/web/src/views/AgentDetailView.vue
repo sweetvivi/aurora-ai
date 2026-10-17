@@ -7,8 +7,9 @@ import {
   PlusOutlined,
   SearchOutlined,
   SendOutlined,
+  StopOutlined,
 } from '@ant-design/icons-vue';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getAgentById } from '@/data/agents';
 import { useAgentWorkspaceStore } from '@/stores/agent-workspace';
@@ -22,6 +23,7 @@ const activeSessionId = ref<string | null>(null);
 const conversationArea = ref<HTMLElement | null>(null);
 const consumedRoutePrompt = ref('');
 const sessionSearchInput = ref<HTMLInputElement | null>(null);
+const streaming = computed(() => workspace.streamingSessionId !== null);
 
 const agent = computed(
   () =>
@@ -88,18 +90,26 @@ function useStarter(starter: string): void {
   prompt.value = starter;
 }
 
-function sendMessage(): void {
+async function sendMessage(): Promise<void> {
   const content = prompt.value.trim();
 
-  if (!content || !agent.value) {
+  if (!content || !agent.value || streaming.value) {
     return;
   }
 
-  const session = workspace.sendMessage(agent.value, content, activeSessionId.value ?? undefined);
+  const session = await workspace.sendMessage(
+    agent.value,
+    content,
+    activeSessionId.value ?? undefined,
+  );
 
   activeSessionId.value = session.id;
   prompt.value = '';
-  void scrollToLatest();
+  await scrollToLatest();
+}
+
+function stopStreaming(): void {
+  workspace.stopStreaming();
 }
 
 async function consumeRoutePrompt(): Promise<void> {
@@ -116,11 +126,15 @@ async function consumeRoutePrompt(): Promise<void> {
   }
 
   consumedRoutePrompt.value = routeKey;
-  const session = workspace.sendMessage(agent.value, queryPrompt.trim());
+  const session = await workspace.sendMessage(agent.value, queryPrompt.trim());
   activeSessionId.value = session.id;
   prompt.value = '';
   await scrollToLatest();
 }
+
+onMounted(() => {
+  void workspace.initialize();
+});
 
 watch(
   () => [route.params.id, route.query.prompt, route.query.start, route.query.session],
@@ -205,6 +219,9 @@ watch(
         </span>
         <strong>{{ agent.name }}</strong>
         <em>{{ agent.tags[0] }}</em>
+        <span class="agent-detail__status" :class="{ active: streaming }">
+          {{ streaming ? '正在生成' : '服务就绪' }}
+        </span>
       </header>
 
       <section ref="conversationArea" class="agent-detail__conversation">
@@ -238,13 +255,19 @@ watch(
             </span>
             <div>
               <strong>{{ message.role === 'assistant' ? agent.name : '你' }}</strong>
-              <p>{{ message.content }}</p>
+              <p>
+                {{ message.content }}
+                <i v-if="message.status === 'STREAMING'" class="agent-detail__cursor" />
+              </p>
             </div>
           </article>
         </div>
       </section>
 
       <footer class="agent-detail__composer">
+        <div v-if="workspace.error" class="agent-detail__error">
+          {{ workspace.error }}
+        </div>
         <div class="agent-detail__composer-actions">
           <button type="button" class="active" @click="startNewSession">
             <MessageOutlined />
@@ -259,6 +282,7 @@ watch(
           <textarea
             v-model="prompt"
             rows="2"
+            :disabled="streaming"
             :placeholder="`请输入问题，例如：${agent.starterPrompts[0]}`"
             @keydown.enter.exact.prevent="sendMessage"
           />
@@ -275,11 +299,12 @@ watch(
             </div>
             <button
               type="button"
-              :disabled="!prompt.trim()"
-              aria-label="发送消息"
-              @click="sendMessage"
+              :disabled="!streaming && !prompt.trim()"
+              :aria-label="streaming ? '停止生成' : '发送消息'"
+              @click="streaming ? stopStreaming() : sendMessage()"
             >
-              <SendOutlined />
+              <StopOutlined v-if="streaming" />
+              <SendOutlined v-else />
             </button>
           </div>
         </div>
