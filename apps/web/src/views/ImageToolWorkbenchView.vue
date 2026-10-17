@@ -75,6 +75,7 @@ interface GenerationShowcase {
   category: string;
   description: string;
   id: string;
+  image: string;
   label: string;
   preview: 'fashion' | 'landscape' | 'portrait' | 'poster' | 'product' | 'repair';
   prompt: string;
@@ -105,6 +106,7 @@ const generationShowcases: GenerationShowcase[] = [
     category: 'portrait',
     description: '修复肤质与光影，保留自然五官和发丝细节',
     id: 'portrait-enhance',
+    image: '/showcase/portrait-v1.png',
     label: '人像精修',
     preview: 'portrait',
     prompt: '自然精修人物肖像，保留真实五官与发丝细节，柔化肤色和光线，高清商业摄影质感。',
@@ -114,6 +116,7 @@ const generationShowcases: GenerationShowcase[] = [
     category: 'style',
     description: '保持人物主体，生成自然的服装与造型变化',
     id: 'fashion-change',
+    image: '/showcase/fashion-v1.png',
     label: '服饰换装',
     preview: 'fashion',
     prompt: '保持人物身份、姿态和光影不变，将服装替换为清新的浅色礼服，材质自然，画面真实。',
@@ -123,6 +126,7 @@ const generationShowcases: GenerationShowcase[] = [
     category: 'scene',
     description: '从参考构图延伸出完整的高级风景画面',
     id: 'landscape-extend',
+    image: '/showcase/landscape-v1.png',
     label: '场景延展',
     preview: 'landscape',
     prompt: '延展远处山脉和云海，保留原始构图与光影方向，生成清晨薄雾中的电影感风景。',
@@ -132,6 +136,7 @@ const generationShowcases: GenerationShowcase[] = [
     category: 'creative',
     description: '生成干净背景、商业棚拍光与产品卖点构图',
     id: 'product-shot',
+    image: '/showcase/product-v1.png',
     label: '商品摄影',
     preview: 'product',
     prompt: '高级极简商品摄影，透明玻璃瓶置于浅色石材台面，柔和棚拍光，清晰材质细节。',
@@ -141,6 +146,7 @@ const generationShowcases: GenerationShowcase[] = [
     category: 'paint',
     description: '把文字创意转化成有层次的概念插画',
     id: 'poster-art',
+    image: '/showcase/concept-v1.png',
     label: '概念海报',
     preview: 'poster',
     prompt: '未来城市与漂浮岛屿的科幻概念海报，克制蓝紫配色，纵深构图，精细光影层次。',
@@ -150,6 +156,7 @@ const generationShowcases: GenerationShowcase[] = [
     category: 'repair',
     description: '移除瑕疵并自然补全背景纹理',
     id: 'image-repair',
+    image: '/showcase/restore-v1.png',
     label: '图片修复',
     preview: 'repair',
     prompt: '移除画面中的干扰物和瑕疵，自然补全背景纹理，保持原有清晰度、色彩和构图。',
@@ -1034,11 +1041,11 @@ onBeforeUnmount(() => {
             >
               <div class="generation-showcase-card__frame generation-showcase-card__frame--before">
                 <span>原图</span>
-                <i />
+                <img :src="showcase.image" alt="" loading="lazy" />
               </div>
               <div class="generation-showcase-card__frame generation-showcase-card__frame--after">
                 <span>效果图</span>
-                <i />
+                <img :src="showcase.image" alt="" loading="lazy" />
               </div>
             </div>
             <footer>
@@ -2732,106 +2739,54 @@ onBeforeUnmount(() => {
   background: rgb(109 62 199 / 86%);
 }
 
-.generation-showcase-card__frame > i {
+.generation-showcase-card__frame > img {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 220ms ease;
 }
 
-.generation-showcase-card__frame--before > i {
-  filter: saturate(0.76) brightness(0.96);
+.generation-showcase-card__frame--before > img {
+  filter: saturate(0.68) brightness(0.92) contrast(0.96);
+  transform: scale(1.025);
 }
 
-.generation-showcase-card__frame--after > i {
-  filter: saturate(1.08) brightness(1.04);
+.generation-showcase-card__frame--after > img {
+  filter: saturate(1.06) brightness(1.03);
 }
 
-.generation-showcase-card__visual--portrait .generation-showcase-card__frame > i {
-  background:
-    radial-gradient(circle at 50% 31%, #e7b89e 0 11%, transparent 11.5%),
-    radial-gradient(ellipse at 50% 24%, #3d2f34 0 13%, transparent 13.5%),
-    radial-gradient(ellipse at 50% 76%, #d9d6df 0 30%, transparent 30.5%),
-    linear-gradient(145deg, #f0e6e2, #b7c8c6);
+.generation-showcase-card:hover .generation-showcase-card__frame > img {
+  transform: scale(1.045);
 }
 
-.generation-showcase-card__visual--portrait .generation-showcase-card__frame--after > i {
-  background:
-    radial-gradient(circle at 50% 31%, #f1c9ad 0 11%, transparent 11.5%),
-    radial-gradient(ellipse at 50% 23%, #5b4249 0 14%, transparent 14.5%),
-    radial-gradient(ellipse at 50% 76%, #f4f2ef 0 31%, transparent 31.5%),
-    linear-gradient(145deg, #f9f1ed, #d8e5e2);
+.generation-showcase-card:hover .generation-showcase-card__frame--before > img {
+  transform: scale(1.055);
 }
 
-.generation-showcase-card__visual--fashion .generation-showcase-card__frame > i {
-  background:
-    radial-gradient(circle at 50% 25%, #ecc7b6 0 10%, transparent 10.5%),
-    radial-gradient(ellipse at 50% 69%, #b64d5d 0 29%, transparent 29.5%),
-    linear-gradient(145deg, #e9e2df, #b8cdd3);
+.generation-showcase-card__visual--portrait .generation-showcase-card__frame > img {
+  object-position: 50% 20%;
 }
 
-.generation-showcase-card__visual--fashion .generation-showcase-card__frame--after > i {
-  background:
-    radial-gradient(circle at 50% 25%, #f0cdb9 0 10%, transparent 10.5%),
-    radial-gradient(ellipse at 50% 69%, #e7e1d3 0 30%, transparent 30.5%),
-    linear-gradient(145deg, #f3f0ea, #d4dfe0);
+.generation-showcase-card__visual--fashion .generation-showcase-card__frame > img {
+  object-position: 50% 24%;
 }
 
-.generation-showcase-card__visual--landscape .generation-showcase-card__frame > i {
-  background:
-    linear-gradient(155deg, transparent 0 52%, #5a7380 52.5% 68%, transparent 68.5%),
-    linear-gradient(205deg, transparent 0 54%, #465d6c 54.5% 72%, transparent 72.5%),
-    linear-gradient(#cad7df, #e8efef 62%, #879f8c 62.5%);
+.generation-showcase-card__visual--landscape .generation-showcase-card__frame > img {
+  object-position: 50% 57%;
 }
 
-.generation-showcase-card__visual--landscape .generation-showcase-card__frame--after > i {
-  background:
-    radial-gradient(circle at 74% 20%, #fff5cd 0 5%, transparent 5.5%),
-    linear-gradient(155deg, transparent 0 52%, #6e9192 52.5% 68%, transparent 68.5%),
-    linear-gradient(205deg, transparent 0 54%, #587874 54.5% 72%, transparent 72.5%),
-    linear-gradient(#c9ddeb, #eef3ed 62%, #91aa8e 62.5%);
+.generation-showcase-card__visual--product .generation-showcase-card__frame > img {
+  object-position: 50% 52%;
 }
 
-.generation-showcase-card__visual--product .generation-showcase-card__frame > i {
-  background:
-    linear-gradient(90deg, transparent 43%, #97afc4 43% 57%, transparent 57%) 50% 59% / 42% 30%
-      no-repeat,
-    linear-gradient(145deg, #e5e8e6, #b7c0bb);
+.generation-showcase-card__visual--poster .generation-showcase-card__frame > img {
+  object-position: 50% 52%;
 }
 
-.generation-showcase-card__visual--product .generation-showcase-card__frame--after > i {
-  background:
-    radial-gradient(circle at 62% 32%, rgb(255 255 255 / 90%), transparent 32%),
-    linear-gradient(90deg, transparent 42%, #91a9be 42% 58%, transparent 58%) 50% 59% / 42% 31%
-      no-repeat,
-    linear-gradient(145deg, #f3f1ea, #d5d1c7);
-}
-
-.generation-showcase-card__visual--poster .generation-showcase-card__frame > i {
-  background:
-    radial-gradient(circle at 62% 32%, #f49d78 0 10%, transparent 10.5%),
-    linear-gradient(148deg, transparent 0 54%, #384a7a 54.5% 72%, transparent 72.5%),
-    linear-gradient(210deg, transparent 0 58%, #25345f 58.5% 76%, transparent 76.5%),
-    linear-gradient(145deg, #b7bce1, #666b9d);
-}
-
-.generation-showcase-card__visual--poster .generation-showcase-card__frame--after > i {
-  background:
-    radial-gradient(circle at 62% 28%, #ffd08b 0 11%, transparent 11.5%),
-    linear-gradient(148deg, transparent 0 54%, #475c9a 54.5% 72%, transparent 72.5%),
-    linear-gradient(210deg, transparent 0 58%, #2f427e 58.5% 76%, transparent 76.5%),
-    linear-gradient(145deg, #c6cbf1, #7379b3);
-}
-
-.generation-showcase-card__visual--repair .generation-showcase-card__frame > i {
-  background:
-    linear-gradient(105deg, transparent 42%, #98a198 42% 47%, transparent 47%),
-    linear-gradient(30deg, transparent 54%, #c0b0a2 54% 59%, transparent 59%),
-    linear-gradient(145deg, #dce2dd, #a8b7ad);
-}
-
-.generation-showcase-card__visual--repair .generation-showcase-card__frame--after > i {
-  background:
-    radial-gradient(circle at 72% 28%, #f8f0d2 0 8%, transparent 8.5%),
-    linear-gradient(145deg, #e9eee8, #b8c8bd);
+.generation-showcase-card__visual--repair .generation-showcase-card__frame > img {
+  object-position: 50% 50%;
 }
 
 .generation-showcase-card footer {

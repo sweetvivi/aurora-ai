@@ -67,6 +67,7 @@ interface EffectTemplate {
   category: string;
   description: string;
   id: string;
+  image: string;
   label: string;
   mode: string;
   prompt: string;
@@ -124,6 +125,7 @@ const effectTemplates: EffectTemplate[] = [
     category: '人像美化',
     description: '保留人物脸型与原始光线，自然替换发型、发色和发量。',
     id: 'hair-style',
+    image: '/showcase/portrait-v1.png',
     label: '发型变换',
     mode: '参考图重绘',
     prompt: '保留照片中的人物脸型、姿势和背景，将发型自然替换为柔和的大波浪卷发，发丝细节清晰。',
@@ -135,6 +137,7 @@ const effectTemplates: EffectTemplate[] = [
     category: '人像美化',
     description: '快速更换服装款式与颜色，并保持人物姿态和身体比例自然。',
     id: 'outfit-change',
+    image: '/showcase/fashion-v1.png',
     label: '服装换装',
     mode: '参考图重绘',
     prompt: '保持照片中的人物姿态、面部和背景不变，将服装替换为轻盈的碎花连衣裙，布料细节真实。',
@@ -146,6 +149,7 @@ const effectTemplates: EffectTemplate[] = [
     category: '场景优化',
     description: '识别天空区域并替换为蓝天白云、晚霞或电影感天空。',
     id: 'sky-replace',
+    image: '/showcase/landscape-v1.png',
     label: '天空替换',
     mode: '参考图重绘',
     prompt: '识别照片中的天空区域，替换为明亮的蓝天白云，保留山体、建筑和前景细节，光线自然统一。',
@@ -157,6 +161,7 @@ const effectTemplates: EffectTemplate[] = [
     category: '创意设计',
     description: '为商品补充适配的广告场景，统一光影、材质与品牌氛围。',
     id: 'product-scene',
+    image: '/showcase/product-v1.png',
     label: '商品场景',
     mode: '商品图处理',
     prompt: '保留商品主体、包装文字和外观细节，放置到简洁明亮的现代商业摄影场景中，柔和棚拍光。',
@@ -168,6 +173,7 @@ const effectTemplates: EffectTemplate[] = [
     category: '风格迁移',
     description: '把照片转换为动漫、水彩、插画或电影概念风格。',
     id: 'anime-style',
+    image: '/showcase/concept-v1.png',
     label: '动漫风格',
     mode: '参考图重绘',
     prompt: '将上传照片转换为精致的日系动漫插画，保留人物特征和构图，线条干净、色彩通透。',
@@ -179,6 +185,7 @@ const effectTemplates: EffectTemplate[] = [
     category: '图片修复',
     description: '修复旧照片划痕、噪点和模糊，同时恢复自然的面部细节。',
     id: 'old-photo',
+    image: '/showcase/restore-v1.png',
     label: '老照片修复',
     mode: '参考图重绘',
     prompt: '修复照片中的划痕、噪点和褪色，提升清晰度并恢复自然面部与衣物细节，不改变人物身份。',
@@ -959,7 +966,18 @@ onBeforeUnmount(() => {
                 :class="`draw-effect-card__visual--${template.visualClass}`"
               >
                 <span>原图</span>
-                <i />
+                <img
+                  class="draw-effect-card__visual-before"
+                  :src="template.image"
+                  alt=""
+                  loading="lazy"
+                />
+                <img
+                  class="draw-effect-card__visual-after"
+                  :src="template.image"
+                  alt=""
+                  loading="lazy"
+                />
                 <em>效果图</em>
               </div>
               <div class="draw-effect-card__copy">
@@ -2107,68 +2125,54 @@ onBeforeUnmount(() => {
     linear-gradient(145deg, var(--effect-a), #f4f6f8 48%, var(--effect-b));
 }
 
-.draw-effect-card__visual::before {
-  position: absolute;
-  inset: 18% 12% 0;
-  border-radius: 46% 46% 0 0;
-  background:
-    linear-gradient(150deg, rgb(255 255 255 / 64%), transparent 28%),
-    linear-gradient(180deg, #efc4b0 0 12%, #303845 13% 28%, #e4a3b5 29% 100%);
-  box-shadow: 0 15px 25px rgb(39 49 66 / 13%);
-  content: '';
-}
-
-.draw-effect-card__visual > i {
+.draw-effect-card__visual > img {
   position: absolute;
   top: 0;
-  right: 0;
   bottom: 0;
-  left: 50%;
-  border-left: 3px solid rgb(255 255 255 / 86%);
-  background:
-    radial-gradient(circle at 61% 22%, rgb(255 255 255 / 70%), transparent 18%),
-    linear-gradient(
-      145deg,
-      var(--effect-b),
-      #fff 50%,
-      color-mix(in srgb, var(--effect-b) 62%, #ffe9c7)
-    );
+  width: 50%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 220ms ease;
 }
 
-.draw-effect-card__visual > i::after {
-  position: absolute;
-  inset: 16% 12% 0;
-  border-radius: 46% 46% 0 0;
-  background:
-    linear-gradient(150deg, rgb(255 255 255 / 65%), transparent 29%),
-    linear-gradient(180deg, #f2c9b5 0 12%, #6d4a52 13% 28%, var(--effect-b) 29% 100%);
-  box-shadow: 0 15px 25px rgb(39 49 66 / 12%);
-  content: '';
+.draw-effect-card__visual-before {
+  left: 0;
+  filter: saturate(0.68) brightness(0.92) contrast(0.97);
+}
+
+.draw-effect-card__visual-after {
+  right: 0;
+  left: 50%;
+  border-left: 3px solid rgb(255 255 255 / 86%);
+  filter: saturate(1.06) brightness(1.03);
+}
+
+.draw-effect-card:hover .draw-effect-card__visual > img {
+  transform: scale(1.045);
 }
 
 .draw-effect-card__visual--outfit {
-  --effect-a: #e8d7ca;
-  --effect-b: #9dd8c3;
+  --effect-position: 50% 24%;
 }
 
 .draw-effect-card__visual--sky {
-  --effect-a: #c4c9bf;
-  --effect-b: #79c7e6;
+  --effect-position: 50% 57%;
 }
 
 .draw-effect-card__visual--product {
-  --effect-a: #dbdce0;
-  --effect-b: #f0cf91;
+  --effect-position: 50% 52%;
 }
 
 .draw-effect-card__visual--anime {
-  --effect-a: #d6dbe5;
-  --effect-b: #cf9ce7;
+  --effect-position: 50% 52%;
 }
 
 .draw-effect-card__visual--restore {
-  --effect-a: #aca39a;
-  --effect-b: #e0c7a8;
+  --effect-position: 50% 50%;
+}
+
+.draw-effect-card__visual > img {
+  object-position: var(--effect-position, 50% 20%);
 }
 
 .draw-effect-card__visual > span,
