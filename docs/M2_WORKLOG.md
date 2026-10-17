@@ -11,6 +11,7 @@
 - 当前批次基线：`6c3b3c0 docs: sync project status and module coverage`
 - 画布增强批次基线：`60f470d feat: complete commerce replacement tools`
 - 运行时模型目录批次基线：`136e1f5 feat: add configurable platform modules`
+- 超级对话批次基线：`d87fefd feat: expand newdraw template studio`
 - 当前阶段：M2 工具套件闭环收尾；智能体、图片和视频优先链路已打通
 
 ## 2. 本批范围
@@ -195,6 +196,21 @@ AI 画布和电商工具复用同一异步图片任务 Store，并分别使用 `
 - 真实联调：通过本地 API 和 `http://127.0.0.1:5173/chat` 选择 `Qwen 3.8 Max` 完成一次真实 SSE 对话，浏览器收到 `OK`，无页面错误或横向溢出
 - 可用性：GPT 和 DeepSeek 组当前受上游服务影响分别返回不可用或限流并自动退款；千问组已验证 4 个模型均可返回 `OK`
 
+### 多模型超级对话
+
+- 路由：`/chat/groups`，参考产品对应 `/newchat/groups`
+- 页面：`apps/web/src/views/GroupChatView.vue`
+- Store：`apps/web/src/stores/group-chat-workspace.ts`
+- 入口：模型对话和视频创作顶部的“超级对话”统一进入 `/chat/groups`
+- 模型选择：按模型分组展示，支持最多选择 10 个、全选、清空和取消选择，并在切换页面后保留可用模型选择
+- 请求方式：对每个选中模型并发调用现有 `/api/v1/chat/stream`，每个回答独立展示增量内容、完成、失败、取消和复制状态
+- 控制能力：支持统一停止全部生成，以及按轮次重新生成全部回答；单模型失败不会覆盖其他模型的成功结果
+- 积分同步：每个模型按现有对话计费链路独立冻结和结算，收到 `meta`、`done` 或 `error` 后同步服务端余额
+- 界面：空态复用模型对话的能力入口、示例提示词和图表类型；进入会话后按轮次展示用户问题与多模型回答卡片
+- 响应式：桌面端多列回答卡，移动端切换为单列；模型选择面板和顶部模式切换在 `390x844` 下无横向溢出
+- 当前边界：每个模型分别创建会话，不共享 `conversationId` 和上下文；多选模型会按模型数量分别消耗积分
+- 历史边界：超级对话轮次当前保存在 Store 内存中，页面刷新后的历史恢复能力弱于普通模型对话
+
 ### 智能体助手消息操作
 
 - 页面：`apps/web/src/views/AgentDetailView.vue`
@@ -287,7 +303,7 @@ pnpm test
 
 测试规模：
 
-- Web：12 个测试文件，45 项通过
+- Web：13 个测试文件，49 项通过
 - API：18 个测试文件，74 项通过
 
 页面验收脚本：
@@ -296,11 +312,13 @@ pnpm test
 outputs/ui-reference/verify-m2-routes.mjs
 outputs/ui-reference/verify-chat-markdown.mjs
 outputs/ui-reference/verify-chat-attachments.mjs
+outputs/ui-reference/verify-group-chat.mjs
 ```
 
 使用本地开发服务器 `http://127.0.0.1:5173/` 检查了以下路由的 `1440x1000` 桌面端和 `390x844` 移动端：
 
 - `/chat`
+- `/chat/groups`
 - `/draw`
 - `/agents`
 - `/retouch`
@@ -471,6 +489,17 @@ node outputs/ui-reference/verify-image-workbench-detail.mjs
 - 移动端 `390x844`：高级设置、存储选择和效果示例可用，页面无横向溢出；处理方式在右栏内横向排列
 - 验收不创建真实生成任务，不读取或输出 Key
 
+多模型超级对话补充验证：
+
+```text
+node outputs/ui-reference/verify-group-chat.mjs
+```
+
+- 桌面端 `1440x1000`：选择 3 个模型并发提问，确认每个回答独立流式展示、完成态和复制入口
+- 移动端 `390x844`：确认模型选择面板、模式切换、回答单列布局和无横向溢出
+- 验证 10 个模型上限、全选、清空、停止生成和整轮重试
+- 验收全程使用 Playwright 路由拦截，不调用真实对话 Provider、不读取或输出 Key
+
 运行时模型目录补充验证：
 
 ```text
@@ -562,6 +591,8 @@ node outputs/ui-reference/verify-m2-routes.mjs
 - 参考产品仍有未排期板块，当前只保留入口位置
 - 本批已完成本地验证，提交和推送状态以 Git 日志为准
 - 智能体真实流式链路的自动化验收目前使用 Mock；需要在后续联调阶段再决定是否做一次最低成本真实对话验收
+- 超级对话当前每个模型使用独立会话，尚未实现共享会话上下文、批量服务端请求和历史持久化恢复
+- 超级对话会按选中模型数量分别计费，发起前仍需在界面中保持模型数量与费用关系的明确提示
 
 ## 7. 中断恢复
 

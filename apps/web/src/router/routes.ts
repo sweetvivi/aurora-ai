@@ -31,6 +31,14 @@ export const appRoutes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'chat/groups',
+        name: 'group-chat',
+        component: () => import('@/views/GroupChatView.vue'),
+        meta: {
+          title: '超级对话',
+        },
+      },
+      {
         path: 'agents',
         name: 'agents',
         component: () => import('@/views/AgentsView.vue'),

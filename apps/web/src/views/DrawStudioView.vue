@@ -880,7 +880,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="draw-studio">
+  <div class="draw-studio" :class="{ 'draw-studio--template': isTemplateView }">
     <aside class="draw-library">
       <header class="draw-library__header">
         <span class="draw-library__mark">
@@ -944,14 +944,27 @@ onBeforeUnmount(() => {
     <main class="draw-main">
       <section v-if="isTemplateView" class="draw-template-studio">
         <header class="draw-template-studio__header">
-          <button type="button" class="draw-generator__back" @click="leaveGenerator">
-            <ArrowLeftOutlined />
-            返回创作中心
-          </button>
-          <strong>极光 AI 智能生图</strong>
+          <strong class="draw-template-studio__brand">
+            <PictureOutlined />
+            极光 AI 智能生图
+          </strong>
           <div>
-            <button type="button" @click="openGenerator({ mode: '文生图' })">旧文生图</button>
-            <button type="button" @click="openTemplateRetouch">新版修图</button>
+            <button
+              type="button"
+              class="draw-template-studio__action draw-template-studio__action--legacy"
+              @click="openGenerator({ mode: '文生图' })"
+            >
+              <StarOutlined />
+              旧文生图
+            </button>
+            <button
+              type="button"
+              class="draw-template-studio__action draw-template-studio__action--retouch"
+              @click="openTemplateRetouch"
+            >
+              <HighlightOutlined />
+              新版修图
+            </button>
           </div>
         </header>
 
@@ -1934,6 +1947,14 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 
+.draw-studio--template {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.draw-studio--template .draw-library {
+  display: none;
+}
+
 .draw-library {
   position: sticky;
   top: 56px;
@@ -2198,16 +2219,23 @@ onBeforeUnmount(() => {
   min-height: 58px;
   align-items: center;
   gap: 18px;
-  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   padding: 0 22px;
   border-bottom: 1px solid #e7eaee;
   background: rgb(255 255 255 / 96%);
   backdrop-filter: blur(10px);
 }
 
-.draw-template-studio__header > strong {
+.draw-template-studio__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   color: #23936f;
   font-size: 18px;
+}
+
+.draw-template-studio__brand > :deep(svg) {
+  font-size: 21px;
 }
 
 .draw-template-studio__header > div {
@@ -2226,6 +2254,33 @@ onBeforeUnmount(() => {
   font-size: 12px;
   font-weight: 720;
   cursor: pointer;
+}
+
+.draw-template-studio__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.draw-template-studio__action--legacy {
+  border-color: #f0e4c7;
+  background: #fffaf0;
+  color: #7f6735;
+}
+
+.draw-template-studio__action--legacy :deep(svg) {
+  color: #d7a52d;
+}
+
+.draw-template-studio__action--retouch {
+  border-color: #d2eee4;
+  background: #eef9f5;
+  color: #287f65;
+}
+
+.draw-template-studio__action--retouch :deep(svg) {
+  color: #2b9b7a;
 }
 
 .draw-template-studio__content {
@@ -2524,7 +2579,7 @@ onBeforeUnmount(() => {
   position: fixed;
   right: 26px;
   bottom: 16px;
-  left: 506px;
+  left: 266px;
   z-index: 9;
   display: grid;
   min-height: 126px;
@@ -4676,6 +4731,10 @@ onBeforeUnmount(() => {
     width: calc(100% - 44px);
   }
 
+  .draw-studio--template .draw-template-composer {
+    left: 22px;
+  }
+
   .draw-main__inner {
     padding-right: 20px;
     padding-left: 20px;
@@ -4846,6 +4905,10 @@ onBeforeUnmount(() => {
     width: auto;
     grid-template-columns: 62px minmax(0, 1fr);
     padding: 10px;
+  }
+
+  .draw-studio--template .draw-template-composer {
+    left: 10px;
   }
 
   .draw-template-composer__upload {

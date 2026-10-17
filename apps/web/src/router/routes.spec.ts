@@ -17,6 +17,8 @@ describe('application routes', () => {
     expect(router.resolve('/workbench').matched[0]?.meta.shell).toBe('workbench');
     expect(router.resolve('/draw').matched[0]?.meta.shell).toBe('platform');
     expect(router.resolve('/newdraw').matched[0]?.meta.shell).toBe('platform');
+    expect(router.resolve('/chat/groups').matched[0]?.meta.shell).toBe('platform');
+    expect(router.resolve('/chat/groups').name).toBe('group-chat');
     expect(router.resolve('/video').matched[0]?.meta.shell).toBe('platform');
     expect(router.resolve('/retouch').matched[0]?.meta.shell).toBe('platform');
     expect(router.resolve('/image-generation').matched[0]?.meta.shell).toBe('platform');

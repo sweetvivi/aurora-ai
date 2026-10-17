@@ -513,7 +513,7 @@ function formatConversationTime(value: string | null): string {
             <MessageOutlined />
             模型对话
           </RouterLink>
-          <RouterLink to="/agents">
+          <RouterLink to="/chat/groups">
             <AppstoreOutlined />
             超级对话
           </RouterLink>

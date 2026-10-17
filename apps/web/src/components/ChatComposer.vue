@@ -43,15 +43,19 @@ const props = withDefaults(
     placeholder?: string;
     placement?: 'docked' | 'welcome';
     reasoningEffort?: ReasoningEffort;
+    reasoningEnabled?: boolean;
     streaming: boolean;
     taskMode?: boolean;
+    taskModeEnabled?: boolean;
   }>(),
   {
     attachmentEnabled: true,
     error: null,
     placeholder: '输入问题，粘贴材料，或描述你希望完成的任务',
     placement: 'docked',
+    reasoningEnabled: true,
     taskMode: false,
+    taskModeEnabled: true,
   },
 );
 
@@ -276,6 +280,7 @@ function createAttachmentId(): string {
             @change="handleFileInput"
           />
           <button
+            v-if="taskModeEnabled"
             class="chat-composer__task-mode"
             type="button"
             :aria-pressed="Boolean(taskMode)"
@@ -289,6 +294,7 @@ function createAttachmentId(): string {
         <div class="chat-composer__footer-right">
           <div class="chat-composer__thinking">
             <button
+              v-if="reasoningEnabled"
               type="button"
               aria-haspopup="listbox"
               :aria-expanded="thinkingOpen"
