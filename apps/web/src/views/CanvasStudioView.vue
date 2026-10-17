@@ -44,13 +44,15 @@ import {
   type DrawWorkStatus,
 } from '@/stores/draw-workspace';
 
-type CanvasNodeKind = 'image' | 'output' | 'prompt';
+type CanvasNodeKind = 'image' | 'output' | 'prompt' | 'video';
 type CanvasNodeStatus = 'done' | 'failed' | 'generating' | 'idle' | 'queued';
 type CanvasAssetCategory = 'all' | 'character' | 'item' | 'other' | 'scene' | 'sound' | 'style';
 type HistoryTab = 'image' | 'video';
+type NodeGenerationAction = 'angle' | 'image' | 'local-image' | 'local-video' | 'text' | 'video';
 
 interface CanvasNode {
   createdAt: number;
+  generationMode?: string;
   height: number;
   id: string;
   kind: CanvasNodeKind;
@@ -185,10 +187,13 @@ const activeHistoryTab = ref<HistoryTab>('image');
 const activeWorkflowTab = ref<'mine' | 'samples'>('mine');
 const canvasTitle = ref('新建画布');
 const selectedNodeId = ref('');
+const nodeMenuNodeId = ref('');
 const connectionFromId = ref('');
 const inspirationOpen = ref(false);
 const inspirationMessage = ref('');
 const composerPrompt = ref('');
+const composerSourceNodeId = ref('');
+const composerTargetNodeId = ref('');
 const selectedModel = ref(generationModels[0]?.value ?? 'canvas-aurora-3');
 const selectedRatio = ref('16:9');
 const selectedSize = ref('1K');
@@ -207,6 +212,12 @@ const assetUploadInput = ref<HTMLInputElement | null>(null);
 const fileUrls = ref<Record<string, string>>({});
 const undoStack = ref<CanvasSnapshot[]>([]);
 const redoStack = ref<CanvasSnapshot[]>([]);
+const angleDialogOpen = ref(false);
+const angleDialogNodeId = ref('');
+const angleRotation = ref(24);
+const angleTilt = ref(12);
+const angleGenerating = ref(false);
+const angleError = ref('');
 const loadedFileIds = new Set<string>();
 const objectUrls = new Set<string>();
 let dragState:
@@ -230,6 +241,15 @@ let saveTimer: number | undefined;
 let hydrated = false;
 
 const selectedNode = computed(() => nodes.value.find((node) => node.id === selectedNodeId.value));
+const angleDialogNode = computed(() =>
+  nodes.value.find((node) => node.id === angleDialogNodeId.value),
+);
+const anglePreviewLabel = computed(
+  () =>
+    `Rotate ${angleRotation.value >= 0 ? '+' : ''}${angleRotation.value}° · Tilt ${
+      angleTilt.value >= 0 ? '+' : ''
+    }${angleTilt.value}°`,
+);
 const selectedModelLabel = computed(
   () =>
     generationModels.find((model) => model.value === selectedModel.value)?.label ??
@@ -339,6 +359,9 @@ function replaceSnapshot(snapshot: CanvasSnapshot): void {
   nodes.value = snapshot.nodes.map((node) => ({ ...node }));
   edges.value = snapshot.edges.map((edge) => ({ ...edge }));
   selectedNodeId.value = '';
+  nodeMenuNodeId.value = '';
+  composerTargetNodeId.value = '';
+  composerSourceNodeId.value = '';
 }
 
 function commitHistory(): void {
@@ -438,6 +461,8 @@ function readJson<T>(key: string): T | null {
 }
 
 function openRail(action: RailAction['value']): void {
+  nodeMenuNodeId.value = '';
+
   if (action === 'inspiration') {
     activeRailMenu.value = null;
     inspirationOpen.value = !inspirationOpen.value;
@@ -449,6 +474,7 @@ function openRail(action: RailAction['value']): void {
 
 function closeRailMenu(): void {
   activeRailMenu.value = null;
+  nodeMenuNodeId.value = '';
 }
 
 function createCanvas(): void {
@@ -459,6 +485,9 @@ function createCanvas(): void {
   nodes.value = seed.nodes;
   edges.value = seed.edges;
   selectedNodeId.value = '';
+  nodeMenuNodeId.value = '';
+  composerTargetNodeId.value = '';
+  composerSourceNodeId.value = '';
   connectionFromId.value = '';
   viewport.value = { scale: 1, x: 28, y: 32 };
   persistCanvas();
@@ -476,6 +505,9 @@ function loadWorkflow(workflow: CanvasWorkflow): void {
       nodes.value.some((node) => node.id === edge.to),
   );
   selectedNodeId.value = '';
+  nodeMenuNodeId.value = '';
+  composerTargetNodeId.value = '';
+  composerSourceNodeId.value = '';
   activeRailMenu.value = null;
   persistCanvas();
 }
@@ -555,6 +587,11 @@ function deleteSelectedNode(): void {
   nodes.value = nodes.value.filter((node) => node.id !== nodeId);
   edges.value = edges.value.filter((edge) => edge.from !== nodeId && edge.to !== nodeId);
   selectedNodeId.value = '';
+  nodeMenuNodeId.value = '';
+  composerTargetNodeId.value =
+    composerTargetNodeId.value === nodeId ? '' : composerTargetNodeId.value;
+  composerSourceNodeId.value =
+    composerSourceNodeId.value === nodeId ? '' : composerSourceNodeId.value;
   connectionFromId.value = '';
 }
 
@@ -610,6 +647,7 @@ function connectNode(targetId: string): void {
 
   connectionFromId.value = '';
   selectedNodeId.value = targetId;
+  nodeMenuNodeId.value = '';
 }
 
 function handleNodePointerDown(event: PointerEvent, node: CanvasNode): void {
@@ -625,6 +663,7 @@ function handleNodePointerDown(event: PointerEvent, node: CanvasNode): void {
   }
 
   selectedNodeId.value = node.id;
+  nodeMenuNodeId.value = '';
   commitHistory();
   dragState = {
     id: node.id,
@@ -643,6 +682,7 @@ function handleCanvasPointerDown(event: PointerEvent): void {
   selectedNodeId.value = '';
   connectionFromId.value = '';
   activeRailMenu.value = null;
+  nodeMenuNodeId.value = '';
   panState = {
     originX: viewport.value.x,
     originY: viewport.value.y,
@@ -859,9 +899,241 @@ function downloadSelectedNode(): void {
 function editSelectedNode(): void {
   if (selectedNode.value?.prompt) {
     composerPrompt.value = selectedNode.value.prompt;
+    composerTargetNodeId.value = selectedNode.value.id;
+    composerSourceNodeId.value =
+      selectedNode.value.kind === 'image' || selectedNode.value.kind === 'output'
+        ? selectedNode.value.id
+        : '';
   }
 
   closeRailMenu();
+}
+
+function closeNodeGenerationMenu(): void {
+  nodeMenuNodeId.value = '';
+}
+
+function toggleNodeGenerationMenu(nodeId: string): void {
+  selectedNodeId.value = nodeId;
+  nodeMenuNodeId.value = nodeMenuNodeId.value === nodeId ? '' : nodeId;
+}
+
+function nodeSourceFileId(node: CanvasNode | undefined): string | undefined {
+  return node?.sourceFileId ?? node?.resultFileId;
+}
+
+function appendNodeWithEdge(
+  node: CanvasNode,
+  sourceNode?: CanvasNode,
+  options: { commit?: boolean } = {},
+): void {
+  if (options.commit !== false) {
+    commitHistory();
+  }
+
+  nodes.value = [...nodes.value, node];
+  selectedNodeId.value = node.id;
+  nodeMenuNodeId.value = '';
+
+  if (sourceNode) {
+    edges.value = [
+      ...edges.value,
+      {
+        from: sourceNode.id,
+        id: createId('edge'),
+        to: node.id,
+      },
+    ];
+  }
+}
+
+function createOutputNodeFromSource(
+  sourceNode: CanvasNode | undefined,
+  options: {
+    prompt: string;
+    status?: CanvasNodeStatus;
+    title: string;
+  },
+): CanvasNode {
+  const sourceX = sourceNode?.x ?? 430 - viewport.value.x / viewport.value.scale;
+  const sourceY = sourceNode?.y ?? 200 - viewport.value.y / viewport.value.scale;
+
+  return {
+    createdAt: Date.now(),
+    generationMode: 'source-image',
+    height: 225,
+    id: createId('output'),
+    kind: 'output',
+    prompt: options.prompt,
+    sourceFileId: nodeSourceFileId(sourceNode),
+    status: options.status ?? 'idle',
+    title: options.title,
+    width: 330,
+    x: Math.round(sourceX + 390),
+    y: Math.round(sourceY - 18),
+  };
+}
+
+function prepareImageNodeGeneration(sourceNode: CanvasNode, title = '图像生成'): void {
+  const outputNode = createOutputNodeFromSource(sourceNode, {
+    prompt: sourceNode.prompt,
+    title,
+  });
+
+  appendNodeWithEdge(outputNode, sourceNode);
+  composerPrompt.value = sourceNode.prompt;
+  composerSourceNodeId.value = sourceNode.id;
+  composerTargetNodeId.value = outputNode.id;
+}
+
+function createTextGenerationNode(sourceNode: CanvasNode): void {
+  const promptNode = addPromptNode(
+    `围绕“${sourceNode.prompt.slice(0, 80)}”提炼文案方向和可延展的表达。`,
+  );
+
+  composerPrompt.value = promptNode.prompt;
+  composerSourceNodeId.value = sourceNode.id;
+  composerTargetNodeId.value = '';
+  edges.value = [
+    ...edges.value,
+    {
+      from: sourceNode.id,
+      id: createId('edge'),
+      to: promptNode.id,
+    },
+  ];
+  closeNodeGenerationMenu();
+}
+
+function createVideoNodeFromSource(sourceNode: CanvasNode, local = false): void {
+  const videoNode: CanvasNode = {
+    createdAt: Date.now(),
+    generationMode: local ? 'local-video' : 'image-to-video',
+    height: 225,
+    id: createId('video'),
+    kind: 'video',
+    prompt: sourceNode.prompt,
+    sourceFileId: nodeSourceFileId(sourceNode),
+    status: 'idle',
+    title: local ? '本地视频模型' : '图生视频',
+    width: 330,
+    x: sourceNode.x + 390,
+    y: sourceNode.y + 62,
+  };
+
+  appendNodeWithEdge(videoNode, sourceNode);
+}
+
+function openAngleDialog(sourceNode: CanvasNode): void {
+  angleDialogNodeId.value = sourceNode.id;
+  angleRotation.value = 24;
+  angleTilt.value = 12;
+  angleError.value = '';
+  angleDialogOpen.value = true;
+  closeNodeGenerationMenu();
+}
+
+function closeAngleDialog(): void {
+  if (angleGenerating.value) {
+    return;
+  }
+
+  angleDialogOpen.value = false;
+  angleDialogNodeId.value = '';
+  angleError.value = '';
+}
+
+function runNodeGenerationAction(action: NodeGenerationAction, sourceNode: CanvasNode): void {
+  if (action === 'text') {
+    createTextGenerationNode(sourceNode);
+    return;
+  }
+
+  if (action === 'video') {
+    createVideoNodeFromSource(sourceNode);
+    return;
+  }
+
+  if (action === 'local-video') {
+    createVideoNodeFromSource(sourceNode, true);
+    return;
+  }
+
+  if (action === 'angle') {
+    openAngleDialog(sourceNode);
+    return;
+  }
+
+  prepareImageNodeGeneration(
+    sourceNode,
+    action === 'local-image' ? '本地图像模型' : '从该节点生成',
+  );
+}
+
+async function generateAngleView(): Promise<void> {
+  const sourceNode = angleDialogNode.value;
+
+  if (!sourceNode || angleGenerating.value) {
+    return;
+  }
+
+  const sourceFileId = nodeSourceFileId(sourceNode);
+
+  if (!sourceFileId) {
+    angleError.value = '当前节点没有可用于生成新视角的图片，请先上传或生成图片。';
+    return;
+  }
+
+  angleGenerating.value = true;
+  angleError.value = '';
+
+  const prompt = `${sourceNode.prompt}；将镜头水平旋转 ${angleRotation.value} 度，垂直俯仰 ${angleTilt.value} 度，生成同一主体和场景的新视角，保持材质、光线和身份一致。`;
+  const outputNode = createOutputNodeFromSource(sourceNode, {
+    prompt,
+    status: 'queued',
+    title: '新视角',
+  });
+
+  outputNode.generationMode = 'angle';
+  appendNodeWithEdge(outputNode, sourceNode);
+
+  try {
+    await workspace.initialize();
+
+    const createdWorks = await workspace.createGenerationWorks({
+      amount: 1,
+      extraParameters: {
+        canvasNodeId: outputNode.id,
+        mode: 'canvas-angle',
+        rotation: angleRotation.value,
+        tilt: angleTilt.value,
+      },
+      model: selectedModel.value,
+      modelLabel: '3D 视角控制',
+      prompt,
+      ratio: selectedRatio.value,
+      size: selectedSize.value,
+      sourceFileId,
+      toolKey: 'canvas',
+    });
+    const createdWork = createdWorks[0];
+
+    if (!createdWork) {
+      throw new Error('任务提交失败，请稍后重试');
+    }
+
+    outputNode.workId = createdWork.id;
+    outputNode.resultFileId = createdWork.resultFileId;
+    outputNode.status = 'queued';
+    angleDialogOpen.value = false;
+    angleDialogNodeId.value = '';
+    persistCanvas();
+  } catch (error) {
+    outputNode.status = 'failed';
+    angleError.value = error instanceof Error ? error.message : '新视角生成失败';
+  } finally {
+    angleGenerating.value = false;
+  }
 }
 
 async function uploadAssetFiles(
@@ -921,34 +1193,46 @@ async function submitComposer(): Promise<void> {
     return;
   }
 
-  const promptNode = addPromptNode(prompt);
-  const outputNode: CanvasNode = {
-    createdAt: Date.now(),
-    height: 225,
-    id: createId('output'),
-    kind: 'output',
-    prompt,
-    status: 'queued',
-    title: selectedModelLabel.value,
-    width: 330,
-    x: promptNode.x + 420,
-    y: promptNode.y - 70,
-  };
+  const sourceNode =
+    nodes.value.find((node) => node.id === composerSourceNodeId.value) ??
+    (selectedNode.value?.kind === 'image' || selectedNode.value?.kind === 'output'
+      ? selectedNode.value
+      : undefined);
+  const preparedTarget = nodes.value.find(
+    (node) => node.id === composerTargetNodeId.value && node.kind === 'output',
+  );
+  let outputNode = preparedTarget;
 
-  nodes.value = [...nodes.value, outputNode];
-  edges.value = [
-    ...edges.value,
-    {
-      from: promptNode.id,
-      id: createId('edge'),
-      to: outputNode.id,
-    },
-  ];
-  selectedNodeId.value = outputNode.id;
+  if (outputNode) {
+    commitHistory();
+    Object.assign(outputNode, {
+      prompt,
+      sourceFileId: outputNode.sourceFileId ?? nodeSourceFileId(sourceNode),
+      status: 'queued',
+      title: selectedModelLabel.value,
+    });
+    selectedNodeId.value = outputNode.id;
+  } else {
+    const promptNode = addPromptNode(prompt);
+
+    outputNode = {
+      createdAt: Date.now(),
+      height: 225,
+      id: createId('output'),
+      kind: 'output',
+      prompt,
+      sourceFileId: nodeSourceFileId(sourceNode),
+      status: 'queued',
+      title: selectedModelLabel.value,
+      width: 330,
+      x: promptNode.x + 420,
+      y: promptNode.y - 70,
+    };
+    appendNodeWithEdge(outputNode, promptNode, { commit: false });
+  }
 
   await workspace.initialize();
 
-  const sourceNode = selectedNode.value?.kind === 'image' ? selectedNode.value : undefined;
   const createdWorks = await workspace.createGenerationWorks({
     amount: 1,
     extraParameters: {
@@ -960,7 +1244,7 @@ async function submitComposer(): Promise<void> {
     prompt,
     ratio: selectedRatio.value,
     size: selectedSize.value,
-    sourceFileId: sourceNode?.sourceFileId ?? sourceNode?.resultFileId,
+    sourceFileId: nodeSourceFileId(sourceNode),
     toolKey: 'canvas',
   });
   const createdWork = createdWorks[0];
@@ -970,6 +1254,8 @@ async function submitComposer(): Promise<void> {
     outputNode.status = 'queued';
     outputNode.resultFileId = createdWork.resultFileId;
     composerPrompt.value = '';
+    composerSourceNodeId.value = '';
+    composerTargetNodeId.value = '';
   } else {
     outputNode.status = 'failed';
   }
@@ -1011,6 +1297,17 @@ function handleKeyboard(event: KeyboardEvent): void {
   const target = event.target as HTMLElement | null;
   const isEditing =
     target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable;
+
+  if (event.key === 'Escape') {
+    if (angleDialogOpen.value) {
+      closeAngleDialog();
+    } else if (nodeMenuNodeId.value) {
+      closeNodeGenerationMenu();
+    } else {
+      closeRailMenu();
+    }
+    return;
+  }
 
   if (isEditing) {
     return;
@@ -1447,6 +1744,7 @@ onBeforeUnmount(() => {
             `canvas-node--${node.kind}`,
             {
               'canvas-node--connecting': connectionFromId === node.id,
+              'canvas-node--menu-open': nodeMenuNodeId === node.id,
               'canvas-node--selected': selectedNodeId === node.id,
             },
           ]"
@@ -1459,6 +1757,15 @@ onBeforeUnmount(() => {
           @pointerdown="handleNodePointerDown($event, node)"
         >
           <div v-if="selectedNodeId === node.id" class="canvas-node__toolbar" @pointerdown.stop>
+            <button
+              type="button"
+              class="canvas-node__toolbar-generate"
+              aria-label="从该节点生成"
+              @click="toggleNodeGenerationMenu(node.id)"
+            >
+              <ThunderboltFilled />
+              <span>从该节点生成</span>
+            </button>
             <button type="button" aria-label="调整视角" @click="resetViewport">
               <ExpandOutlined />
               <span>调整视角</span>
@@ -1484,6 +1791,79 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
+          <Transition name="canvas-pop">
+            <section
+              v-if="nodeMenuNodeId === node.id"
+              class="canvas-node__generate-menu"
+              aria-label="从该节点生成"
+              @pointerdown.stop
+            >
+              <header>
+                <strong>从该节点生成</strong>
+                <button type="button" aria-label="关闭生成菜单" @click="closeNodeGenerationMenu">
+                  <CloseOutlined />
+                </button>
+              </header>
+
+              <div class="canvas-node__generate-group">
+                <button type="button" @click="runNodeGenerationAction('text', node)">
+                  <span><EditOutlined /></span>
+                  <span>
+                    <strong>文本生成</strong>
+                    <small>提炼文案、广告语与品牌表达</small>
+                  </span>
+                </button>
+                <button type="button" @click="runNodeGenerationAction('image', node)">
+                  <span><PictureOutlined /></span>
+                  <span>
+                    <strong>图像生成</strong>
+                    <small>基于当前图片继续创作</small>
+                  </span>
+                </button>
+                <button type="button" @click="runNodeGenerationAction('video', node)">
+                  <span><VideoCameraOutlined /></span>
+                  <span>
+                    <strong>视频生成</strong>
+                    <small>将当前画面延展为视频任务</small>
+                  </span>
+                </button>
+              </div>
+
+              <h4>本地模型（开源）</h4>
+              <div class="canvas-node__generate-group">
+                <button type="button" @click="runNodeGenerationAction('local-image', node)">
+                  <span><FileImageOutlined /></span>
+                  <span>
+                    <strong>本地图像模型</strong>
+                    <small>使用本地部署的图像模型</small>
+                  </span>
+                  <em>新</em>
+                </button>
+                <button type="button" @click="runNodeGenerationAction('local-video', node)">
+                  <span><VideoCameraOutlined /></span>
+                  <span>
+                    <strong>本地视频模型</strong>
+                    <small>本地动画与视频生成流程</small>
+                  </span>
+                  <em>新</em>
+                </button>
+              </div>
+
+              <div
+                v-if="node.kind === 'image' || node.kind === 'output'"
+                class="canvas-node__generate-angle"
+              >
+                <button type="button" @click="runNodeGenerationAction('angle', node)">
+                  <span><ExpandOutlined /></span>
+                  <span>
+                    <strong>调整角度</strong>
+                    <small>通过 3D 视角控制生成新视角</small>
+                  </span>
+                </button>
+              </div>
+            </section>
+          </Transition>
+
           <button
             class="canvas-node__port canvas-node__port--in"
             type="button"
@@ -1494,9 +1874,9 @@ onBeforeUnmount(() => {
           <button
             class="canvas-node__port canvas-node__port--out"
             type="button"
-            aria-label="输出连接点"
+            aria-label="从该节点生成"
             @pointerdown.stop
-            @click.stop="startConnection(node.id)"
+            @click.stop="toggleNodeGenerationMenu(node.id)"
           >
             <PlusOutlined />
           </button>
@@ -1533,8 +1913,14 @@ onBeforeUnmount(() => {
           </div>
 
           <div v-else class="canvas-node__visual">
+            <video
+              v-if="node.kind === 'video' && nodeStatus(node) === 'done' && node.previewUrl"
+              :src="node.previewUrl"
+              controls
+              muted
+            />
             <img
-              v-if="nodeImageUrl(node) && nodeStatus(node) === 'done'"
+              v-else-if="nodeImageUrl(node) && nodeStatus(node) === 'done'"
               :src="nodeImageUrl(node)"
               :alt="node.prompt"
               draggable="false"
@@ -1552,6 +1938,14 @@ onBeforeUnmount(() => {
               <strong>生成失败</strong>
               <small>{{ nodeError(node) || '请调整参数后重试' }}</small>
             </div>
+            <div
+              v-else-if="node.kind === 'video'"
+              class="canvas-node__state canvas-node__state--video"
+            >
+              <VideoCameraOutlined />
+              <strong>{{ node.title }}</strong>
+              <small>等待视频任务生成</small>
+            </div>
             <div v-else class="canvas-node__state canvas-node__state--loading">
               <LoadingOutlined />
               <strong>{{ statusLabel(nodeStatus(node)) }}</strong>
@@ -1560,7 +1954,7 @@ onBeforeUnmount(() => {
           </div>
 
           <footer v-if="node.kind !== 'prompt'" class="canvas-node__meta">
-            <span>Image</span>
+            <span>{{ node.kind === 'video' ? 'Video' : 'Image' }}</span>
             <small>{{ node.width }} × {{ node.height }}</small>
           </footer>
         </article>
@@ -1710,6 +2104,119 @@ onBeforeUnmount(() => {
     >
       <BulbOutlined />
     </button>
+
+    <Transition name="canvas-fade">
+      <div
+        v-if="angleDialogOpen"
+        class="canvas-angle-backdrop"
+        @pointerdown.self="closeAngleDialog"
+      >
+        <section
+          class="canvas-angle-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="canvas-angle-title"
+          @pointerdown.stop
+        >
+          <header>
+            <div>
+              <strong id="canvas-angle-title">3D 视角控制</strong>
+              <small>调整镜头位置，生成同一主体的新视角</small>
+            </div>
+            <div>
+              <button
+                type="button"
+                :disabled="angleGenerating"
+                @click="
+                  angleRotation = 24;
+                  angleTilt = 12;
+                "
+              >
+                重置
+              </button>
+              <button
+                type="button"
+                aria-label="关闭 3D 视角控制"
+                :disabled="angleGenerating"
+                @click="closeAngleDialog"
+              >
+                <CloseOutlined />
+              </button>
+            </div>
+          </header>
+
+          <div class="canvas-angle-dialog__legend">
+            <span><i class="rotation" />Rotation (+/-)</span>
+            <span><i class="tilt" />Vertical Tilt (+/-)</span>
+          </div>
+
+          <div class="canvas-angle-stage">
+            <div class="canvas-angle-stage__grid" />
+            <span class="canvas-angle-stage__orbit canvas-angle-stage__orbit--pink" />
+            <span class="canvas-angle-stage__orbit canvas-angle-stage__orbit--green" />
+            <span
+              class="canvas-angle-stage__camera"
+              :style="{
+                transform: `translate(-50%, -50%) rotate(${angleRotation}deg) translateX(102px) rotate(${-angleRotation}deg) translateY(${angleTilt * 0.45}px)`,
+              }"
+            >
+              <i />
+            </span>
+            <span class="canvas-angle-stage__axis canvas-angle-stage__axis--x" />
+            <span class="canvas-angle-stage__axis canvas-angle-stage__axis--y" />
+            <span class="canvas-angle-stage__axis canvas-angle-stage__axis--z" />
+            <span class="canvas-angle-stage__subject">
+              <PictureOutlined />
+              <i />
+            </span>
+            <span class="canvas-angle-stage__target" />
+            <output>{{ anglePreviewLabel }}</output>
+          </div>
+
+          <div class="canvas-angle-dialog__controls">
+            <label>
+              <span>横向旋转</span>
+              <input
+                v-model.number="angleRotation"
+                type="range"
+                min="-90"
+                max="90"
+                step="1"
+                :disabled="angleGenerating"
+              />
+              <strong>{{ angleRotation >= 0 ? '+' : '' }}{{ angleRotation }}°</strong>
+            </label>
+            <label>
+              <span>垂直俯仰</span>
+              <input
+                v-model.number="angleTilt"
+                type="range"
+                min="-45"
+                max="45"
+                step="1"
+                :disabled="angleGenerating"
+              />
+              <strong>{{ angleTilt >= 0 ? '+' : '' }}{{ angleTilt }}°</strong>
+            </label>
+          </div>
+
+          <p v-if="angleError" class="canvas-angle-dialog__error" role="alert">
+            {{ angleError }}
+          </p>
+
+          <button
+            type="button"
+            class="canvas-angle-dialog__submit"
+            :disabled="angleGenerating"
+            @click="generateAngleView"
+          >
+            <LoadingOutlined v-if="angleGenerating" />
+            <ExpandOutlined v-else />
+            {{ angleGenerating ? '正在提交新视角' : '生成新视角' }}
+          </button>
+        </section>
+      </div>
+    </Transition>
   </section>
 </template>
 
@@ -2460,7 +2967,8 @@ onBeforeUnmount(() => {
 }
 
 .canvas-node--image,
-.canvas-node--output {
+.canvas-node--output,
+.canvas-node--video {
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -2468,12 +2976,14 @@ onBeforeUnmount(() => {
 }
 
 .canvas-node--image .canvas-node__header,
-.canvas-node--output .canvas-node__header {
+.canvas-node--output .canvas-node__header,
+.canvas-node--video .canvas-node__header {
   display: none;
 }
 
 .canvas-node--image .canvas-node__visual,
-.canvas-node--output .canvas-node__visual {
+.canvas-node--output .canvas-node__visual,
+.canvas-node--video .canvas-node__visual {
   height: 100%;
   overflow: hidden;
   border: 1px solid rgb(255 255 255 / 10%);
@@ -2484,8 +2994,10 @@ onBeforeUnmount(() => {
 
 .canvas-node--image.canvas-node--selected .canvas-node__visual,
 .canvas-node--output.canvas-node--selected .canvas-node__visual,
+.canvas-node--video.canvas-node--selected .canvas-node__visual,
 .canvas-node--image.canvas-node--connecting .canvas-node__visual,
-.canvas-node--output.canvas-node--connecting .canvas-node__visual {
+.canvas-node--output.canvas-node--connecting .canvas-node__visual,
+.canvas-node--video.canvas-node--connecting .canvas-node__visual {
   border-color: #4b82ff;
   box-shadow:
     0 0 0 1px #4b82ff,
@@ -2493,7 +3005,8 @@ onBeforeUnmount(() => {
 }
 
 .canvas-node--image.canvas-node--connecting .canvas-node__visual,
-.canvas-node--output.canvas-node--connecting .canvas-node__visual {
+.canvas-node--output.canvas-node--connecting .canvas-node__visual,
+.canvas-node--video.canvas-node--connecting .canvas-node__visual {
   border-color: #8f6fff;
   box-shadow:
     0 0 0 1px #8f6fff,
@@ -2501,16 +3014,22 @@ onBeforeUnmount(() => {
 }
 
 .canvas-node--image .canvas-node__toolbar,
-.canvas-node--output .canvas-node__toolbar {
+.canvas-node--output .canvas-node__toolbar,
+.canvas-node--video .canvas-node__toolbar {
   top: -43px;
 }
 
 .canvas-node--selected,
 .canvas-node--connecting {
+  z-index: 5;
   border-color: #4b82ff;
   box-shadow:
     0 0 0 1px #4b82ff,
     0 20px 50px rgb(0 0 0 / 42%);
+}
+
+.canvas-node--menu-open {
+  z-index: 20;
 }
 
 .canvas-node--connecting {
@@ -2586,6 +3105,7 @@ onBeforeUnmount(() => {
 }
 
 .canvas-node__visual > img,
+.canvas-node__visual > video,
 .canvas-node__visual > :deep(svg) {
   width: 100%;
   height: 100%;
@@ -2637,6 +3157,18 @@ onBeforeUnmount(() => {
   color: #f1a29c;
 }
 
+.canvas-node__state--video {
+  background:
+    radial-gradient(circle at 50% 22%, rgb(81 120 255 / 30%), transparent 42%),
+    linear-gradient(145deg, #151a29, #20233b 58%, #171a29);
+  color: #d8e1ff;
+}
+
+.canvas-node__state--video :deep(svg) {
+  color: #87a4ff;
+  font-size: 24px;
+}
+
 @keyframes canvas-node-loading {
   0% {
     background-position: 130% 0;
@@ -2659,7 +3191,8 @@ onBeforeUnmount(() => {
 }
 
 .canvas-node--image .canvas-node__meta,
-.canvas-node--output .canvas-node__meta {
+.canvas-node--output .canvas-node__meta,
+.canvas-node--video .canvas-node__meta {
   top: 9px;
   right: auto;
   bottom: auto;
@@ -2670,7 +3203,8 @@ onBeforeUnmount(() => {
 }
 
 .canvas-node--image .canvas-node__meta span,
-.canvas-node--output .canvas-node__meta span {
+.canvas-node--output .canvas-node__meta span,
+.canvas-node--video .canvas-node__meta span {
   padding: 0;
   background: transparent;
   color: #8c929e;
@@ -2679,7 +3213,8 @@ onBeforeUnmount(() => {
 }
 
 .canvas-node--image .canvas-node__meta small,
-.canvas-node--output .canvas-node__meta small {
+.canvas-node--output .canvas-node__meta small,
+.canvas-node--video .canvas-node__meta small {
   display: none;
 }
 
@@ -2779,6 +3314,161 @@ onBeforeUnmount(() => {
 
 .canvas-node__toolbar button:nth-last-child(2) {
   background: #2384e8;
+}
+
+.canvas-node__toolbar .canvas-node__toolbar-generate {
+  padding-right: 9px;
+  background: #2c2e35;
+  color: #f3f4f7;
+}
+
+.canvas-node__toolbar .canvas-node__toolbar-generate :deep(svg) {
+  color: #9481ff;
+}
+
+.canvas-node__toolbar .canvas-node__toolbar-generate:hover {
+  background: #3b3d45;
+}
+
+.canvas-node__generate-menu {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 29px);
+  z-index: 18;
+  display: grid;
+  width: 276px;
+  max-height: min(520px, calc(100vh - 150px));
+  gap: 8px;
+  padding: 10px;
+  overflow-y: auto;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 11px;
+  background: rgb(37 38 43 / 99%);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 48%);
+  color: #f2f3f6;
+  cursor: default;
+  transform: translateY(-50%);
+}
+
+.canvas-node__generate-menu > header {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 6px 7px;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+}
+
+.canvas-node__generate-menu > header strong {
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.canvas-node__generate-menu > header button {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #8d929d;
+  cursor: pointer;
+}
+
+.canvas-node__generate-menu > header button:hover {
+  background: #393b43;
+  color: #fff;
+}
+
+.canvas-node__generate-menu h4 {
+  margin: 3px 7px -1px;
+  color: #8a8f9a;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.canvas-node__generate-group {
+  display: grid;
+  gap: 3px;
+}
+
+.canvas-node__generate-group button,
+.canvas-node__generate-angle button {
+  position: relative;
+  display: grid;
+  min-height: 55px;
+  align-items: center;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #f0f1f5;
+  text-align: left;
+  cursor: pointer;
+}
+
+.canvas-node__generate-group button:hover,
+.canvas-node__generate-angle button:hover {
+  background: #34363d;
+}
+
+.canvas-node__generate-group button > span:first-child,
+.canvas-node__generate-angle button > span:first-child {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 7px;
+  background: #202126;
+  color: #f4f5f8;
+  font-size: 15px;
+}
+
+.canvas-node__generate-group button > span:nth-child(2),
+.canvas-node__generate-angle button > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.canvas-node__generate-group strong,
+.canvas-node__generate-angle strong {
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-node__generate-group small,
+.canvas-node__generate-angle small {
+  overflow: hidden;
+  color: #7f8490;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-node__generate-group em {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #33353b;
+  color: #b6bac4;
+  font-size: 7px;
+  font-style: normal;
+}
+
+.canvas-node__generate-angle {
+  padding-top: 4px;
+  border-top: 1px solid rgb(255 255 255 / 7%);
+}
+
+.canvas-node__generate-angle button > span:first-child {
+  color: #c9b9ff;
 }
 
 .canvas-node__port {
@@ -3253,6 +3943,344 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+.canvas-angle-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(3 4 7 / 64%);
+  backdrop-filter: blur(5px);
+}
+
+.canvas-angle-dialog {
+  display: grid;
+  width: min(420px, calc(100vw - 32px));
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 14px;
+  background: #28292e;
+  box-shadow: 0 34px 90px rgb(0 0 0 / 64%);
+  color: #f3f4f7;
+}
+
+.canvas-angle-dialog > header {
+  display: flex;
+  min-height: 40px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.canvas-angle-dialog > header > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.canvas-angle-dialog > header strong {
+  font-size: 13px;
+}
+
+.canvas-angle-dialog > header small {
+  color: #9297a2;
+  font-size: 8px;
+}
+
+.canvas-angle-dialog > header > div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.canvas-angle-dialog > header button {
+  display: inline-grid;
+  min-width: 27px;
+  height: 27px;
+  place-items: center;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #9ea3ae;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.canvas-angle-dialog > header button:hover:not(:disabled) {
+  background: #3b3d45;
+  color: #fff;
+}
+
+.canvas-angle-dialog > header button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.canvas-angle-dialog__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  color: #c7cad2;
+  font-size: 8px;
+}
+
+.canvas-angle-dialog__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.canvas-angle-dialog__legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  box-shadow: 0 0 10px currentcolor;
+}
+
+.canvas-angle-dialog__legend i.rotation {
+  background: #ff4aa5;
+  color: #ff4aa5;
+}
+
+.canvas-angle-dialog__legend i.tilt {
+  background: #35e59d;
+  color: #35e59d;
+}
+
+.canvas-angle-stage {
+  position: relative;
+  height: 268px;
+  overflow: hidden;
+  border: 1px solid rgb(118 101 255 / 18%);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 45%, rgb(92 68 208 / 18%), transparent 46%),
+    linear-gradient(145deg, #272a54, #202243 58%, #20203d);
+  perspective: 760px;
+}
+
+.canvas-angle-stage__grid {
+  position: absolute;
+  inset: 31% 16% 15%;
+  transform: rotateX(62deg);
+  transform-style: preserve-3d;
+  background-image:
+    linear-gradient(rgb(96 104 183 / 16%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(96 104 183 / 16%) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.canvas-angle-stage__orbit {
+  position: absolute;
+  top: 49%;
+  left: 50%;
+  border: 2px solid;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) rotate(-11deg);
+}
+
+.canvas-angle-stage__orbit--pink {
+  width: 214px;
+  height: 133px;
+  border-color: #ff42a2;
+  box-shadow: 0 0 18px rgb(255 66 162 / 20%);
+}
+
+.canvas-angle-stage__orbit--green {
+  width: 258px;
+  height: 85px;
+  border-color: #39dc9c;
+  transform: translate(-50%, -50%) rotate(12deg);
+  box-shadow: 0 0 18px rgb(57 220 156 / 16%);
+}
+
+.canvas-angle-stage__camera {
+  position: absolute;
+  top: 49%;
+  left: 50%;
+  z-index: 4;
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 50%;
+  background: #58d5f2;
+  box-shadow:
+    0 0 0 4px rgb(88 213 242 / 15%),
+    0 0 18px rgb(88 213 242 / 55%);
+  transform-origin: center;
+}
+
+.canvas-angle-stage__camera i {
+  width: 11px;
+  height: 7px;
+  border: 2px solid #173350;
+  border-radius: 2px;
+}
+
+.canvas-angle-stage__camera i::after {
+  display: block;
+  width: 3px;
+  height: 3px;
+  margin: -5px 0 0 2px;
+  border: 1px solid #173350;
+  border-radius: 50%;
+  content: '';
+}
+
+.canvas-angle-stage__axis {
+  position: absolute;
+  top: 49%;
+  left: 50%;
+  width: 1px;
+  height: 178px;
+  background: linear-gradient(transparent, rgb(153 164 236 / 43%), transparent);
+  transform-origin: 50% 50%;
+}
+
+.canvas-angle-stage__axis--x {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.canvas-angle-stage__axis--y {
+  transform: translate(-50%, -50%);
+}
+
+.canvas-angle-stage__axis--z {
+  height: 132px;
+  transform: translate(-50%, -50%) rotate(38deg);
+}
+
+.canvas-angle-stage__subject {
+  position: absolute;
+  top: 43%;
+  left: 50%;
+  z-index: 3;
+  display: grid;
+  width: 42px;
+  height: 64px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 6px;
+  background: linear-gradient(145deg, rgb(255 255 255 / 18%), rgb(139 121 255 / 26%));
+  box-shadow: 0 13px 28px rgb(0 0 0 / 34%);
+  color: #eff0ff;
+  font-size: 18px;
+  transform: translate(-50%, -50%);
+}
+
+.canvas-angle-stage__subject i {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  left: 5px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 45%);
+}
+
+.canvas-angle-stage__target {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  z-index: 2;
+  width: 30px;
+  height: 18px;
+  border-radius: 3px;
+  background: #191a20;
+  box-shadow: 0 7px 18px rgb(0 0 0 / 34%);
+  transform: translate(-50%, -50%) rotate(-8deg);
+}
+
+.canvas-angle-stage output {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  min-width: 224px;
+  padding: 8px 13px;
+  border: 1px solid rgb(126 110 255 / 54%);
+  border-radius: 7px;
+  background: rgb(38 41 72 / 88%);
+  color: #9db4ff;
+  font-size: 9px;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.canvas-angle-dialog__controls {
+  display: grid;
+  gap: 8px;
+}
+
+.canvas-angle-dialog__controls label {
+  display: grid;
+  align-items: center;
+  gap: 9px;
+  grid-template-columns: 62px minmax(0, 1fr) 42px;
+  color: #adb1bb;
+  font-size: 8px;
+}
+
+.canvas-angle-dialog__controls input {
+  width: 100%;
+  accent-color: #7c65ff;
+}
+
+.canvas-angle-dialog__controls strong {
+  color: #eff0f4;
+  font-size: 8px;
+  font-weight: 650;
+  text-align: right;
+}
+
+.canvas-angle-dialog__error {
+  margin: -2px 0 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: rgb(117 44 49 / 34%);
+  color: #f2adb0;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.canvas-angle-dialog__submit {
+  display: inline-flex;
+  width: 100%;
+  height: 39px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 9px;
+  background: #f0f1f4;
+  color: #1e2026;
+  font-size: 10px;
+  font-weight: 740;
+  cursor: pointer;
+}
+
+.canvas-angle-dialog__submit:hover:not(:disabled) {
+  background: #fff;
+}
+
+.canvas-angle-dialog__submit:disabled {
+  opacity: 0.62;
+  cursor: default;
+}
+
+.canvas-fade-enter-active,
+.canvas-fade-leave-active {
+  transition: opacity 150ms ease;
+}
+
+.canvas-fade-enter-from,
+.canvas-fade-leave-to {
+  opacity: 0;
+}
+
 .canvas-pop-enter-active,
 .canvas-pop-leave-active {
   transition:
@@ -3373,6 +4401,31 @@ onBeforeUnmount(() => {
   .canvas-zoom-control input,
   .canvas-zoom-control strong {
     display: none;
+  }
+
+  .canvas-node__generate-menu {
+    top: calc(50% + 46px);
+    right: -14px;
+    left: auto;
+    width: min(276px, calc(100vw - 82px));
+    max-height: min(470px, calc(100vh - 150px));
+    transform: none;
+  }
+
+  .canvas-angle-backdrop {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .canvas-angle-dialog {
+    width: 100%;
+    max-height: calc(100vh - 20px);
+    overflow-y: auto;
+    border-radius: 14px;
+  }
+
+  .canvas-angle-stage {
+    height: 238px;
   }
 }
 </style>
