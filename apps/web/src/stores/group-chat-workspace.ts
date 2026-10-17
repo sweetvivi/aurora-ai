@@ -19,6 +19,7 @@ export interface GroupModelResponse {
   alias: string;
   assistantMessageId?: string;
   content: string;
+  conversationId?: string;
   createdAt: string;
   displayName: string;
   error?: string;
@@ -46,6 +47,7 @@ interface GroupChatState {
   error: GroupChatError | null;
   initialized: boolean;
   models: ChatModel[];
+  ownerUserId: string | null;
   rounds: GroupChatRound[];
   selectedAliases: string[];
   status: GroupChatStatus;
@@ -59,12 +61,15 @@ interface SendGroupMessageOptions {
 }
 
 let activeControllers = new Map<string, AbortController>();
+const STORAGE_PREFIX = 'aurora.group-chat-workspace.v1';
+const MAX_PERSISTED_ROUNDS = 20;
 
 export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
   state: (): GroupChatState => ({
     error: null,
     initialized: false,
     models: [],
+    ownerUserId: null,
     rounds: [],
     selectedAliases: [],
     status: 'idle',
@@ -79,11 +84,13 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
   },
   actions: {
     async initialize(): Promise<void> {
-      if (this.initialized) {
+      const sessionStore = useSessionStore();
+      const userId = sessionStore.user?.id ?? null;
+
+      if (this.initialized && this.ownerUserId === userId) {
         return;
       }
 
-      const sessionStore = useSessionStore();
       this.status = 'idle';
 
       if (!sessionStore.authenticated) {
@@ -100,6 +107,20 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
         return;
       }
 
+      const authenticatedUserId = sessionStore.user?.id;
+
+      if (!authenticatedUserId) {
+        this.error = {
+          code: 'AUTH_REQUIRED',
+          message: '无法识别当前登录用户，请重新登录后重试',
+          recoverable: true,
+        };
+        this.status = 'error';
+        return;
+      }
+
+      this.ownerUserId = authenticatedUserId;
+      this.hydrateWorkspace(authenticatedUserId);
       this.initialized = true;
       this.status = 'ready';
     },
@@ -111,6 +132,7 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
       const defaults = models.slice(0, 10).map((model) => model.alias);
 
       this.selectedAliases = retained.length > 0 ? retained : defaults;
+      this.persistWorkspace();
     },
     toggleModel(alias: string): void {
       if (!this.models.some((model) => model.alias === alias)) {
@@ -119,24 +141,29 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
 
       if (this.selectedAliases.includes(alias)) {
         this.selectedAliases = this.selectedAliases.filter((item) => item !== alias);
+        this.persistWorkspace();
         return;
       }
 
       if (this.selectedAliases.length < 10) {
         this.selectedAliases = [...this.selectedAliases, alias];
+        this.persistWorkspace();
       }
     },
     selectAllModels(): void {
       this.selectedAliases = this.models.slice(0, 10).map((model) => model.alias);
+      this.persistWorkspace();
     },
     clearModels(): void {
       this.selectedAliases = [];
+      this.persistWorkspace();
     },
     clearConversation(): void {
       this.stopAll();
       this.error = null;
       this.rounds = [];
       this.status = 'ready';
+      this.persistWorkspace();
     },
     async sendMessage(rawContent: string, options: SendGroupMessageOptions = {}): Promise<void> {
       const content = rawContent.trim();
@@ -159,9 +186,20 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
       const createdAt = new Date().toISOString();
       const attachments = options.attachments ?? [];
       const fileIds = options.fileIds ?? attachments.map((attachment) => attachment.fileId);
+      const conversationByAlias = new Map<string, string>();
+
+      for (const previousRound of this.rounds) {
+        for (const response of previousRound.responses) {
+          if (response.conversationId) {
+            conversationByAlias.set(response.alias, response.conversationId);
+          }
+        }
+      }
+
       const responses = selectedModels.map((model) => ({
         alias: model.alias,
         content: '',
+        conversationId: conversationByAlias.get(model.alias),
         createdAt,
         displayName: model.displayName,
         id: createLocalId('group-response'),
@@ -178,6 +216,7 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
       this.error = null;
       this.rounds.push(round);
       this.status = 'streaming';
+      this.persistWorkspace();
 
       await Promise.all(
         round.responses.map((response) =>
@@ -193,6 +232,7 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
       await sessionStore.refreshProfile().catch(() => undefined);
       activeControllers = new Map();
       this.status = 'ready';
+      this.persistWorkspace();
     },
     async runModelResponse(
       roundId: string,
@@ -215,11 +255,13 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
 
       activeControllers.set(responseId, controller);
       response.status = 'STREAMING';
+      this.persistWorkspace();
 
       try {
         await streamChat(
           {
             content: input.content,
+            conversationId: response.conversationId,
             fileIds: input.fileIds.length > 0 ? input.fileIds : undefined,
             modelAlias: response.alias,
             reasoningEffort: input.reasoningEffort,
@@ -243,6 +285,7 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
               }
 
               sessionStore.updatePoints(event.balance);
+              this.persistWorkspace();
             },
             onError: (event) => {
               const target = this.findResponse(roundId, responseId);
@@ -255,16 +298,19 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
               }
 
               sessionStore.updatePoints(event.balance);
+              this.persistWorkspace();
             },
             onMeta: (event) => {
               const target = this.findResponse(roundId, responseId);
 
               if (target) {
                 target.assistantMessageId = event.assistantMessageId;
+                target.conversationId = event.conversationId;
                 target.requestId = event.requestId;
               }
 
               sessionStore.updatePoints(event.balance);
+              this.persistWorkspace();
             },
           },
           controller.signal,
@@ -289,6 +335,7 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
         }
       } finally {
         activeControllers.delete(responseId);
+        this.persistWorkspace();
       }
     },
     retryRound(roundId: string): void {
@@ -301,12 +348,14 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
       round.responses = round.responses.map((response) => ({
         alias: response.alias,
         content: '',
+        conversationId: response.conversationId,
         createdAt: new Date().toISOString(),
         displayName: response.displayName,
         id: createLocalId('group-response'),
         status: 'PENDING',
       }));
       this.status = 'streaming';
+      this.persistWorkspace();
 
       void Promise.all(
         round.responses.map((response) =>
@@ -321,6 +370,7 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
             .refreshProfile()
             .catch(() => undefined);
           this.status = 'ready';
+          this.persistWorkspace();
         })
         .finally(() => {
           activeControllers = new Map();
@@ -336,6 +386,28 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
       if (this.status === 'streaming') {
         this.status = 'ready';
       }
+
+      this.persistWorkspace();
+    },
+    hydrateWorkspace(userId: string): void {
+      const persisted = readPersistedWorkspace(userId);
+
+      if (!persisted) {
+        return;
+      }
+
+      this.rounds = persisted.rounds;
+      this.selectedAliases = persisted.selectedAliases;
+    },
+    persistWorkspace(): void {
+      if (!this.ownerUserId) {
+        return;
+      }
+
+      writePersistedWorkspace(this.ownerUserId, {
+        rounds: this.rounds,
+        selectedAliases: this.selectedAliases,
+      });
     },
     findResponse(roundId: string, responseId: string): GroupModelResponse | undefined {
       return this.rounds
@@ -380,4 +452,213 @@ function createLocalId(prefix: string): string {
     globalThis.crypto?.randomUUID?.().slice(0, 8) ?? Math.random().toString(36).slice(2, 10);
 
   return `${prefix}-${randomPart}`;
+}
+
+interface PersistedGroupChatWorkspace {
+  rounds: GroupChatRound[];
+  selectedAliases: string[];
+}
+
+function readPersistedWorkspace(userId: string): PersistedGroupChatWorkspace | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(storageKey(userId));
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed: unknown = JSON.parse(raw);
+
+    if (!isRecord(parsed)) {
+      return null;
+    }
+
+    const selectedAliases = Array.isArray(parsed.selectedAliases)
+      ? Array.from(
+          new Set(
+            parsed.selectedAliases
+              .filter((alias): alias is string => typeof alias === 'string' && alias.length > 0)
+              .slice(0, 10),
+          ),
+        )
+      : [];
+    const rounds = Array.isArray(parsed.rounds)
+      ? parsed.rounds
+          .map(normalizePersistedRound)
+          .filter((round): round is GroupChatRound => Boolean(round))
+          .slice(-MAX_PERSISTED_ROUNDS)
+      : [];
+
+    return {
+      rounds,
+      selectedAliases,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedWorkspace(userId: string, workspace: PersistedGroupChatWorkspace): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    const rounds = workspace.rounds.slice(-MAX_PERSISTED_ROUNDS).map((round) => ({
+      ...round,
+      attachments: round.attachments.map(
+        ({ previewUrl: _previewUrl, ...attachment }) => attachment,
+      ),
+      responses: round.responses.map((response) => ({
+        ...response,
+        status:
+          response.status === 'PENDING' || response.status === 'STREAMING'
+            ? ('CANCELLED' as const)
+            : response.status,
+      })),
+    }));
+
+    window.localStorage.setItem(
+      storageKey(userId),
+      JSON.stringify({
+        rounds,
+        selectedAliases: workspace.selectedAliases.slice(0, 10),
+      }),
+    );
+  } catch {
+    // Storage quota or policy failures should not interrupt an active chat.
+  }
+}
+
+function storageKey(userId: string): string {
+  return `${STORAGE_PREFIX}:${userId}`;
+}
+
+function normalizePersistedRound(value: unknown): GroupChatRound | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const responses = Array.isArray(value.responses)
+    ? value.responses
+        .map(normalizePersistedResponse)
+        .filter((response): response is GroupModelResponse => Boolean(response))
+    : [];
+
+  if (
+    typeof value.id !== 'string' ||
+    typeof value.content !== 'string' ||
+    typeof value.createdAt !== 'string' ||
+    responses.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    attachments: Array.isArray(value.attachments)
+      ? value.attachments
+          .map(normalizePersistedAttachment)
+          .filter((attachment): attachment is GroupChatAttachment => Boolean(attachment))
+      : [],
+    content: value.content,
+    createdAt: value.createdAt,
+    id: value.id,
+    responses,
+  };
+}
+
+function normalizePersistedResponse(value: unknown): GroupModelResponse | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const status = normalizePersistedResponseStatus(value.status);
+
+  if (
+    typeof value.alias !== 'string' ||
+    typeof value.content !== 'string' ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.displayName !== 'string' ||
+    typeof value.id !== 'string'
+  ) {
+    return null;
+  }
+
+  const normalizedContent =
+    value.content || (status === 'CANCELLED' ? '生成已中断，可重新生成本轮回答' : '');
+
+  return {
+    alias: value.alias,
+    assistantMessageId: optionalString(value.assistantMessageId),
+    content: normalizedContent,
+    conversationId: optionalString(value.conversationId),
+    createdAt: value.createdAt,
+    displayName: value.displayName,
+    error: optionalString(value.error),
+    id: value.id,
+    requestId: optionalString(value.requestId),
+    status,
+  };
+}
+
+function normalizePersistedResponseStatus(value: unknown): GroupModelResponse['status'] {
+  if (
+    value === 'CANCELLED' ||
+    value === 'COMPLETED' ||
+    value === 'FAILED' ||
+    value === 'PENDING' ||
+    value === 'STREAMING'
+  ) {
+    if (value === 'PENDING' || value === 'STREAMING') {
+      return 'CANCELLED';
+    }
+
+    return value;
+  }
+
+  return 'CANCELLED';
+}
+
+function normalizePersistedAttachment(value: unknown): GroupChatAttachment | null {
+  if (
+    !isRecord(value) ||
+    !isRecord(value.file) ||
+    typeof value.fileId !== 'string' ||
+    typeof value.id !== 'string' ||
+    typeof value.sortOrder !== 'number' ||
+    typeof value.file.checksum !== 'string' ||
+    typeof value.file.createdAt !== 'string' ||
+    typeof value.file.id !== 'string' ||
+    typeof value.file.mimeType !== 'string' ||
+    typeof value.file.originalName !== 'string' ||
+    typeof value.file.size !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    file: {
+      checksum: value.file.checksum,
+      createdAt: value.file.createdAt,
+      id: value.file.id,
+      mimeType: value.file.mimeType,
+      originalName: value.file.originalName,
+      size: value.file.size,
+    },
+    fileId: value.fileId,
+    id: value.id,
+    sortOrder: value.sortOrder,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }

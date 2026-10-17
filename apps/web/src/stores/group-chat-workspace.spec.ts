@@ -72,6 +72,7 @@ describe('group chat workspace store', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    window.localStorage.clear();
     apiMocks.fetchCurrentUser.mockResolvedValue(authenticatedUser);
     apiMocks.hasStoredTokens.mockReturnValue(true);
   });
@@ -264,5 +265,79 @@ describe('group chat workspace store', () => {
     expect(apiMocks.fetchCurrentUser).toHaveBeenCalledTimes(1);
     expect(sessionStore.points).toBe(100);
     expect(groupStore.status).toBe('ready');
+  });
+
+  it('restores saved rounds and continues each model conversation after a reload', async () => {
+    const streamInputs: Array<{ conversationId?: string; modelAlias: string }> = [];
+
+    apiMocks.streamChat.mockImplementation(
+      async (input: { conversationId?: string; modelAlias: string }, handlers: StreamHandlers) => {
+        streamInputs.push({
+          conversationId: input.conversationId,
+          modelAlias: input.modelAlias,
+        });
+        handlers.onMeta({
+          assistantMessageId: `assistant-${input.modelAlias}`,
+          balance: 99,
+          conversationId: `conversation-${input.modelAlias}`,
+          modelAlias: input.modelAlias,
+          pointsCost: 1,
+          requestId: `request-${input.modelAlias}`,
+        });
+        handlers.onDelta({ content: `${input.modelAlias} 回答` });
+        handlers.onDone({
+          assistantMessageId: `assistant-${input.modelAlias}`,
+          balance: 99,
+          requestId: `request-${input.modelAlias}`,
+          status: 'COMPLETED',
+        });
+      },
+    );
+
+    const firstSessionStore = useSessionStore();
+    const firstGroupStore = useGroupChatWorkspaceStore();
+
+    firstSessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+
+    await firstGroupStore.initialize();
+    firstGroupStore.syncModels(models.slice(0, 2));
+    await firstGroupStore.sendMessage('第一轮问题');
+
+    setActivePinia(createPinia());
+
+    const restoredSessionStore = useSessionStore();
+    const restoredGroupStore = useGroupChatWorkspaceStore();
+
+    restoredSessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+
+    await restoredGroupStore.initialize();
+    restoredGroupStore.syncModels(models.slice(0, 2));
+
+    expect(restoredGroupStore.rounds).toHaveLength(1);
+    expect(restoredGroupStore.rounds[0]?.content).toBe('第一轮问题');
+    expect(restoredGroupStore.rounds[0]?.responses[0]).toMatchObject({
+      content: 'model-1 回答',
+      conversationId: 'conversation-model-1',
+      status: 'COMPLETED',
+    });
+    expect(restoredGroupStore.selectedAliases).toEqual(['model-1', 'model-2']);
+
+    await restoredGroupStore.sendMessage('第二轮问题');
+
+    expect(streamInputs[2]).toEqual({
+      conversationId: 'conversation-model-1',
+      modelAlias: 'model-1',
+    });
+    expect(streamInputs[3]).toEqual({
+      conversationId: 'conversation-model-2',
+      modelAlias: 'model-2',
+    });
+    expect(restoredGroupStore.rounds).toHaveLength(2);
   });
 });
