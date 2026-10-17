@@ -8,6 +8,23 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://aurora:aurora@127.0.0.1:5432/aurora?schema=public
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: aurora
+          POSTGRES_USER: aurora
+          POSTGRES_PASSWORD: aurora
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aurora -d aurora"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Check out repository
@@ -29,6 +46,9 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm --filter @aurora/api prisma:generate
+
+      - name: Apply database migrations
+        run: pnpm --filter @aurora/api exec prisma migrate deploy
 
       - name: Check formatting
         run: pnpm format:check

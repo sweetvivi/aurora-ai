@@ -82,6 +82,7 @@
 - 2026-10-17：新增可重复执行的绘图桌面与移动端验收脚本，直接进入生成页以避免重复任务，并检查真实 Mock PNG、下载文件名、积分结算和无横向溢出。
 - 2026-10-17：修复 GitHub Actions 首次远端失败：CI 在类型检查前生成 Prisma Client，并将运行时 `storage/` 忽略规则限定到仓库根目录，补交被误忽略的存储 adapter 源码。
 - 2026-10-17：补交被根级 `data/` 规则误忽略的 `apps/web/src/data/agents.ts`，并将 `data/`、`uploads/` 运行时目录规则一并限定到仓库根目录。
+- 2026-10-17：为 GitHub Actions 增加 PostgreSQL 17 服务、健康检查和 Prisma 迁移步骤，使 API e2e 测试在干净 runner 上拥有与本地一致的数据库依赖。
 
 ### Fixed
 
@@ -95,6 +96,7 @@
 - 2026-10-17：修正绘画工作台原先使用本地假定时器生成作品的问题，改为真实后端任务状态；同时修复上传未认证仍继续请求、无限轮询、空结果下载和替换结果文件时 Object URL 未释放等边界问题。
 - 2026-10-17：修正 `.gitignore` 的 `storage/` 规则误匹配 `apps/api/src/storage/`，避免后端存储模块再次被遗漏出提交。
 - 2026-10-17：修正 `.gitignore` 的 `data/` 规则误匹配 `apps/web/src/data/`，消除 GitHub Actions 干净检出时缺少智能体目录模块导致的类型检查失败。
+- 2026-10-17：修正 GitHub Actions 测试阶段缺少 PostgreSQL 导致的 `ECONNREFUSED`，CI 现在会等待数据库健康并执行 `prisma migrate deploy` 后再测试。
 
 ### Removed
 
