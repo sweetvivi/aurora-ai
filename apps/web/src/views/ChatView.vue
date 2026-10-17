@@ -1,25 +1,36 @@
 <script setup lang="ts">
 import {
   AppstoreOutlined,
+  AreaChartOutlined,
   ArrowUpOutlined,
+  BarChartOutlined,
   BulbOutlined,
   CodeOutlined,
   CopyOutlined,
   DislikeOutlined,
+  DotChartOutlined,
   DownOutlined,
   EditOutlined,
+  FilePptOutlined,
   FileTextOutlined,
+  HeatMapOutlined,
   HistoryOutlined,
   LikeOutlined,
+  LineChartOutlined,
   LoadingOutlined,
   MenuOutlined,
   MessageOutlined,
+  MoreOutlined,
   PaperClipOutlined,
+  PictureOutlined,
+  PieChartOutlined,
   PlusOutlined,
+  RadarChartOutlined,
   ReloadOutlined,
   SearchOutlined,
   StopOutlined,
   ThunderboltFilled,
+  VideoCameraOutlined,
 } from '@ant-design/icons-vue';
 import { storeToRefs } from 'pinia';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
@@ -65,6 +76,90 @@ const suggestions = [
     icon: CodeOutlined,
     label: '解决代码问题',
     prompt: '我有一个代码问题，需要你帮助定位原因并给出修复方案。',
+  },
+];
+
+const capabilities = [
+  {
+    icon: BarChartOutlined,
+    label: '图表报告',
+    prompt: '请根据我提供的数据生成一份图表报告，包含关键结论、图表建议和执行摘要。',
+  },
+  {
+    icon: FilePptOutlined,
+    label: '制作 PPT',
+    prompt: '请帮我规划一份结构清晰、重点突出的演示 PPT，并给出每页标题和要点。',
+  },
+  {
+    icon: AppstoreOutlined,
+    label: '应用创作',
+    prompt: '请帮我把一个想法梳理成可落地的应用方案，包含页面、流程和数据结构。',
+  },
+  {
+    icon: PictureOutlined,
+    label: '生图 / 设计',
+    prompt: '请根据产品定位设计一组视觉方向，并给出可用于 AI 生图的详细提示词。',
+  },
+  {
+    icon: VideoCameraOutlined,
+    label: '创意视频',
+    prompt: '请为一段 30 秒创意视频设计分镜、画面描述、字幕和镜头时长。',
+  },
+  {
+    icon: MoreOutlined,
+    label: '更多',
+    prompt: '请询问我的具体任务目标，然后给出最合适的工作流程和步骤。',
+  },
+];
+
+const chartTemplates = [
+  {
+    icon: LineChartOutlined,
+    label: '折线图',
+    prompt: '请把下面的数据整理成折线图分析，说明趋势、拐点和异常值。',
+    preview: 'line',
+  },
+  {
+    icon: BarChartOutlined,
+    label: '柱状图',
+    prompt: '请把下面的数据整理成柱状图分析，对比类别差异并给出结论。',
+    preview: 'bar',
+  },
+  {
+    icon: PieChartOutlined,
+    label: '饼图',
+    prompt: '请把下面的数据整理成占比分析，说明主要构成和变化原因。',
+    preview: 'pie',
+  },
+  {
+    icon: DotChartOutlined,
+    label: '散点图',
+    prompt: '请把下面的数据整理成散点图分析，识别相关性和离群点。',
+    preview: 'scatter',
+  },
+  {
+    icon: HeatMapOutlined,
+    label: '热力图',
+    prompt: '请把下面的数据整理成热力图分析，识别高峰、低谷和明显聚集区域。',
+    preview: 'heat',
+  },
+  {
+    icon: AreaChartOutlined,
+    label: '主题河流图',
+    prompt: '请把下面的数据整理成主题河流图分析，展示多个主题随时间的占比变化。',
+    preview: 'stream',
+  },
+  {
+    icon: RadarChartOutlined,
+    label: '雷达图',
+    prompt: '请把下面的数据整理成雷达图分析，对比各维度优势、短板和综合表现。',
+    preview: 'radar',
+  },
+  {
+    icon: BarChartOutlined,
+    label: '堆积柱状图',
+    prompt: '请把下面的数据整理成堆积柱状图分析，说明总量和各组成部分的变化。',
+    preview: 'stack',
   },
 ];
 
@@ -284,7 +379,7 @@ function formatConversationTime(value: string | null): string {
 
     <main class="chat-main">
       <header class="chat-main__toolbar">
-        <div>
+        <div class="chat-main__identity">
           <button
             class="chat-main__history-toggle"
             type="button"
@@ -293,8 +388,6 @@ function formatConversationTime(value: string | null): string {
           >
             <MenuOutlined />
           </button>
-          <span class="chat-main__mark">极</span>
-          <strong>模型对话</strong>
           <a-select
             v-model:value="selectedModelAlias"
             class="chat-main__model-select"
@@ -307,6 +400,16 @@ function formatConversationTime(value: string | null): string {
             </template>
           </a-select>
         </div>
+        <nav class="chat-mode-switch" aria-label="对话模式">
+          <RouterLink class="active" to="/chat">
+            <MessageOutlined />
+            模型对话
+          </RouterLink>
+          <RouterLink to="/agents">
+            <AppstoreOutlined />
+            超级对话
+          </RouterLink>
+        </nav>
         <span class="chat-main__status" :class="{ error: status === 'error' }">
           <i />
           {{ serviceLabel }}
@@ -324,6 +427,23 @@ function formatConversationTime(value: string | null): string {
           <h1>今天想从什么开始？</h1>
           <p>选择一种常用能力，或直接在下方描述你的任务。</p>
 
+          <div class="chat-capabilities" aria-label="常用能力">
+            <button
+              v-for="item in capabilities"
+              :key="item.label"
+              type="button"
+              @click="useSuggestion(item.prompt)"
+            >
+              <component :is="item.icon" />
+              {{ item.label }}
+            </button>
+          </div>
+
+          <div class="chat-welcome__section-title">
+            <strong>示例提示词</strong>
+            <span>点击即可填入输入框</span>
+          </div>
+
           <div class="chat-suggestions">
             <button
               v-for="item in suggestions"
@@ -336,6 +456,30 @@ function formatConversationTime(value: string | null): string {
               </span>
               <strong>{{ item.label }}</strong>
               <p>{{ item.description }}</p>
+            </button>
+          </div>
+
+          <div class="chat-welcome__section-title chat-welcome__section-title--charts">
+            <strong>支持图表类型</strong>
+            <span>生成报告时可直接指定</span>
+          </div>
+
+          <div class="chat-chart-types">
+            <button
+              v-for="item in chartTemplates"
+              :key="item.label"
+              type="button"
+              :title="`使用${item.label}分析`"
+              @click="useSuggestion(item.prompt)"
+            >
+              <span
+                class="chat-chart-types__preview"
+                :class="`chat-chart-types__preview--${item.preview}`"
+                aria-hidden="true"
+              >
+                <component :is="item.icon" />
+              </span>
+              <strong>{{ item.label }}</strong>
             </button>
           </div>
         </div>
@@ -632,20 +776,21 @@ function formatConversationTime(value: string | null): string {
 }
 
 .chat-main__toolbar {
-  display: flex;
+  display: grid;
   height: 70px;
   align-items: center;
-  justify-content: space-between;
   gap: 20px;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
   padding: 0 28px;
   border-bottom: 1px solid #eef0f4;
 }
 
-.chat-main__toolbar > div {
+.chat-main__identity {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 10px;
+  justify-self: start;
 }
 
 .chat-main__history-toggle {
@@ -685,7 +830,7 @@ function formatConversationTime(value: string | null): string {
 }
 
 .chat-main__model-select {
-  width: 154px;
+  width: 210px;
 }
 
 .chat-main__model-select :deep(.ant-select-selector) {
@@ -696,6 +841,7 @@ function formatConversationTime(value: string | null): string {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  justify-self: end;
   color: #7c8593;
   font-size: 10px;
   white-space: nowrap;
@@ -716,6 +862,41 @@ function formatConversationTime(value: string | null): string {
 .chat-main__status.error i {
   background: #e85d5d;
   box-shadow: 0 0 0 3px rgb(232 93 93 / 10%);
+}
+
+.chat-mode-switch {
+  display: inline-grid;
+  padding: 3px;
+  border: 1px solid #e0e8f7;
+  border-radius: 999px;
+  background: #f7f9fd;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chat-mode-switch a {
+  display: inline-flex;
+  height: 31px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: #6e7787;
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.chat-mode-switch a.active {
+  background: #4c84ff;
+  color: #fff;
+  box-shadow: 0 7px 18px rgb(76 132 255 / 22%);
+}
+
+.chat-mode-switch a:not(.active):hover {
+  background: #edf3ff;
+  color: #356fe0;
 }
 
 .chat-conversation {
@@ -744,7 +925,7 @@ function formatConversationTime(value: string | null): string {
 
 .chat-welcome {
   display: grid;
-  max-width: 760px;
+  max-width: 880px;
   justify-items: center;
   margin: 4vh auto 0;
   text-align: center;
@@ -765,6 +946,70 @@ function formatConversationTime(value: string | null): string {
   margin: 9px 0 0;
   color: #858e9c;
   font-size: 12px;
+}
+
+.chat-capabilities {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.chat-capabilities button {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 13px;
+  border: 1px solid #e1e7f0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+  color: #4e5868;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.chat-capabilities button:hover {
+  border-color: #a9c4ff;
+  color: #356fe0;
+  transform: translateY(-1px);
+}
+
+.chat-capabilities button :deep(svg) {
+  color: #4c84ff;
+  font-size: 13px;
+}
+
+.chat-welcome__section-title {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 28px;
+  text-align: left;
+}
+
+.chat-welcome__section-title--charts {
+  margin-top: 24px;
+}
+
+.chat-welcome__section-title strong {
+  color: #414958;
+  font-size: 12px;
+}
+
+.chat-welcome__section-title span {
+  color: #9aa2af;
+  font-size: 9px;
 }
 
 .chat-suggestions {
@@ -819,6 +1064,81 @@ function formatConversationTime(value: string | null): string {
   color: #8992a0;
   font-size: 9px;
   line-height: 1.55;
+}
+
+.chat-chart-types {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.chat-chart-types button {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  justify-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #5f6877;
+  cursor: pointer;
+}
+
+.chat-chart-types__preview {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1.45;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #e4e8ef;
+  border-radius: 7px;
+  background:
+    linear-gradient(rgb(255 255 255 / 78%), rgb(255 255 255 / 78%)),
+    repeating-linear-gradient(0deg, #dbe3ee 0 1px, transparent 1px 16px),
+    repeating-linear-gradient(90deg, #dbe3ee 0 1px, transparent 1px 18px);
+  color: #4c84ff;
+  font-size: 25px;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.chat-chart-types button:hover .chat-chart-types__preview {
+  border-color: #a9c4ff;
+  box-shadow: 0 9px 18px rgb(41 78 144 / 8%);
+  transform: translateY(-2px);
+}
+
+.chat-chart-types strong {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 9px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-chart-types__preview--line,
+.chat-chart-types__preview--stream {
+  color: #4c84ff;
+}
+
+.chat-chart-types__preview--bar,
+.chat-chart-types__preview--stack {
+  color: #1eae7b;
+}
+
+.chat-chart-types__preview--pie,
+.chat-chart-types__preview--radar {
+  color: #d58a28;
+}
+
+.chat-chart-types__preview--scatter,
+.chat-chart-types__preview--heat {
+  color: #e36e45;
 }
 
 .chat-messages {
@@ -1081,6 +1401,10 @@ function formatConversationTime(value: string | null): string {
   .chat-suggestions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .chat-chart-types {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -1122,11 +1446,17 @@ function formatConversationTime(value: string | null): string {
   }
 
   .chat-main__toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
     height: 56px;
+    gap: 8px;
     padding: 0 14px;
   }
 
-  .chat-main__toolbar strong {
+  .chat-main__identity {
+    gap: 7px;
+  }
+
+  .chat-main__status {
     display: none;
   }
 
@@ -1135,7 +1465,14 @@ function formatConversationTime(value: string | null): string {
   }
 
   .chat-main__model-select {
-    width: 134px;
+    width: 122px;
+  }
+
+  .chat-mode-switch a {
+    height: 29px;
+    gap: 4px;
+    padding: 0 9px;
+    font-size: 10px;
   }
 
   .chat-conversation {
@@ -1152,6 +1489,28 @@ function formatConversationTime(value: string | null): string {
 
   .chat-suggestions {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .chat-capabilities {
+    gap: 6px;
+    margin-top: 18px;
+  }
+
+  .chat-capabilities button {
+    height: 31px;
+    padding: 0 10px;
+  }
+
+  .chat-capabilities button:last-child {
+    display: none;
+  }
+
+  .chat-welcome__section-title {
+    margin-top: 21px;
+  }
+
+  .chat-chart-types {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .chat-composer {

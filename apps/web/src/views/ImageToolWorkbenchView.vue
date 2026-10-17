@@ -66,6 +66,21 @@ interface RetouchModelOption {
   value: string;
 }
 
+interface GenerationCategory {
+  label: string;
+  value: string;
+}
+
+interface GenerationShowcase {
+  category: string;
+  description: string;
+  id: string;
+  label: string;
+  preview: 'fashion' | 'landscape' | 'portrait' | 'poster' | 'product' | 'repair';
+  prompt: string;
+  ratio: string;
+}
+
 const generationModels: ModelOption[] = [
   { accent: '#7157e8', label: '极光光影 2.1', value: 'generation-light-2' },
   { accent: '#2f8ddb', label: '高清写实 4.0', value: 'generation-realistic-4' },
@@ -73,6 +88,73 @@ const generationModels: ModelOption[] = [
   { accent: '#d36c9b', label: '插画设计 3.0', value: 'generation-illustration-3' },
   { accent: '#d99a36', label: '国风水墨 1.8', value: 'generation-ink-1' },
   { accent: '#3979d5', label: '概念场景 2.4', value: 'generation-scene-2' },
+];
+
+const generationCategories: GenerationCategory[] = [
+  { label: '全部', value: 'all' },
+  { label: '人像美化', value: 'portrait' },
+  { label: '场景优化', value: 'scene' },
+  { label: '创意设计', value: 'creative' },
+  { label: '风格迁移', value: 'style' },
+  { label: '图片修复', value: 'repair' },
+  { label: 'AI 绘画', value: 'paint' },
+];
+
+const generationShowcases: GenerationShowcase[] = [
+  {
+    category: 'portrait',
+    description: '修复肤质与光影，保留自然五官和发丝细节',
+    id: 'portrait-enhance',
+    label: '人像精修',
+    preview: 'portrait',
+    prompt: '自然精修人物肖像，保留真实五官与发丝细节，柔化肤色和光线，高清商业摄影质感。',
+    ratio: '3:4',
+  },
+  {
+    category: 'style',
+    description: '保持人物主体，生成自然的服装与造型变化',
+    id: 'fashion-change',
+    label: '服饰换装',
+    preview: 'fashion',
+    prompt: '保持人物身份、姿态和光影不变，将服装替换为清新的浅色礼服，材质自然，画面真实。',
+    ratio: '3:4',
+  },
+  {
+    category: 'scene',
+    description: '从参考构图延伸出完整的高级风景画面',
+    id: 'landscape-extend',
+    label: '场景延展',
+    preview: 'landscape',
+    prompt: '延展远处山脉和云海，保留原始构图与光影方向，生成清晨薄雾中的电影感风景。',
+    ratio: '16:9',
+  },
+  {
+    category: 'creative',
+    description: '生成干净背景、商业棚拍光与产品卖点构图',
+    id: 'product-shot',
+    label: '商品摄影',
+    preview: 'product',
+    prompt: '高级极简商品摄影，透明玻璃瓶置于浅色石材台面，柔和棚拍光，清晰材质细节。',
+    ratio: '1:1',
+  },
+  {
+    category: 'paint',
+    description: '把文字创意转化成有层次的概念插画',
+    id: 'poster-art',
+    label: '概念海报',
+    preview: 'poster',
+    prompt: '未来城市与漂浮岛屿的科幻概念海报，克制蓝紫配色，纵深构图，精细光影层次。',
+    ratio: '3:4',
+  },
+  {
+    category: 'repair',
+    description: '移除瑕疵并自然补全背景纹理',
+    id: 'image-repair',
+    label: '图片修复',
+    preview: 'repair',
+    prompt: '移除画面中的干扰物和瑕疵，自然补全背景纹理，保持原有清晰度、色彩和构图。',
+    ratio: '智能比例',
+  },
 ];
 
 const retouchModels: RetouchModelOption[] = [
@@ -150,6 +232,7 @@ const selectedAmount = ref(1);
 const selectedModel = ref(generationModels[0]?.value ?? 'generation-light-2');
 const selectedRetouchModel = ref(retouchModels[0]?.value ?? 'seedream-5-lite');
 const selectedOperation = ref(retouchOperations[0]?.value ?? 'enhance');
+const activeGenerationCategory = ref('all');
 const selectedRatio = ref('智能比例');
 const selectedSize = ref('2K');
 const retouchStrength = ref(65);
@@ -184,6 +267,13 @@ const activeRetouchModelLabel = computed(
 );
 const generationCost = computed(() =>
   isGeneration.value ? selectedAmount.value * IMAGE_TASK_POINTS_COST : IMAGE_TASK_POINTS_COST,
+);
+const visibleGenerationShowcases = computed(() =>
+  activeGenerationCategory.value === 'all'
+    ? generationShowcases
+    : generationShowcases.filter(
+        (showcase) => showcase.category === activeGenerationCategory.value,
+      ),
 );
 const visibleWorks = computed(() => workspace.works.filter((work) => work.tool === toolKey.value));
 const generationGroups = computed(() => {
@@ -228,6 +318,7 @@ function resetLocalForm(): void {
   prompt.value = '';
   instruction.value = '';
   selectedAmount.value = 1;
+  activeGenerationCategory.value = 'all';
   selectedRatio.value = '智能比例';
   selectedSize.value = '2K';
   retouchStrength.value = 65;
@@ -327,6 +418,12 @@ async function reuseGenerationPrompt(value: string): Promise<void> {
     await clipboard.writeText(value).catch(() => undefined);
   }
 
+  window.scrollTo({ behavior: 'smooth', top: document.body.scrollHeight });
+}
+
+function useGenerationShowcase(showcase: GenerationShowcase): void {
+  prompt.value = showcase.prompt;
+  selectedRatio.value = showcase.ratio;
   window.scrollTo({ behavior: 'smooth', top: document.body.scrollHeight });
 }
 
@@ -768,7 +865,8 @@ onBeforeUnmount(() => {
 
   <section v-else-if="isGeneration" class="generation-studio">
     <header class="generation-studio__header">
-      <div>
+      <div class="generation-studio__title">
+        <span class="generation-studio__title-icon"><EditOutlined /></span>
         <span>AI PLATFORM</span>
         <h1>智能生图</h1>
       </div>
@@ -900,30 +998,59 @@ onBeforeUnmount(() => {
 
       <div v-else class="generation-studio__empty">
         <span><PictureOutlined /></span>
-        <strong>从一句画面描述开始</strong>
-        <p>生成结果会自动按月份整理在这里。</p>
-        <div>
+        <strong>开始生成你的第一张图片吧</strong>
+        <p>输入您的创意描述，开始您的 AI 艺术创作之旅</p>
+
+        <div class="generation-studio__feature-pills">
+          <span><CheckOutlined />支持多种艺术风格</span>
+          <span><ExperimentOutlined />高清画质输出</span>
+          <span><ThunderboltFilled />快速生成</span>
+        </div>
+
+        <div class="generation-category-filter" aria-label="图片生成分类">
           <button
+            v-for="category in generationCategories"
+            :key="category.value"
             type="button"
-            @click="prompt = '夕阳下的海边公路，一辆复古汽车驶向远方，电影感构图'"
+            :class="{ active: activeGenerationCategory === category.value }"
+            @click="activeGenerationCategory = category.value"
           >
-            电影感公路
+            {{ category.label }}
           </button>
-          <button
-            type="button"
-            @click="prompt = '现代极简商品摄影，透明玻璃香水瓶，柔和棚拍光，高级质感'"
+        </div>
+
+        <div v-if="visibleGenerationShowcases.length > 0" class="generation-showcase-grid">
+          <article
+            v-for="showcase in visibleGenerationShowcases"
+            :key="showcase.id"
+            class="generation-showcase-card"
+            tabindex="0"
+            @click="useGenerationShowcase(showcase)"
+            @keydown.enter="useGenerationShowcase(showcase)"
           >
-            商品摄影
-          </button>
-          <button
-            type="button"
-            @click="prompt = '春日樱花树下的白猫，浅景深，柔和的清晨阳光，高清摄影'"
-          >
-            樱花白猫
-          </button>
-          <button type="button" @click="prompt = '未来城市悬浮交通，霓虹雨夜，广角概念场景'">
-            未来城市
-          </button>
+            <div
+              class="generation-showcase-card__visual"
+              :class="`generation-showcase-card__visual--${showcase.preview}`"
+            >
+              <div class="generation-showcase-card__frame generation-showcase-card__frame--before">
+                <span>原图</span>
+                <i />
+              </div>
+              <div class="generation-showcase-card__frame generation-showcase-card__frame--after">
+                <span>效果图</span>
+                <i />
+              </div>
+            </div>
+            <footer>
+              <span>
+                <strong>{{ showcase.label }}</strong>
+                <small>{{ showcase.description }}</small>
+              </span>
+              <button type="button" @click.stop="useGenerationShowcase(showcase)">
+                使用提示词
+              </button>
+            </footer>
+          </article>
         </div>
       </div>
     </div>
@@ -1981,17 +2108,31 @@ onBeforeUnmount(() => {
   padding: 30px 30px 20px;
 }
 
-.generation-studio__header > div {
+.generation-studio__title {
   display: flex;
-  align-items: baseline;
-  gap: 13px;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
 }
 
-.generation-studio__header > div > span {
+.generation-studio__title > span:not(.generation-studio__title-icon) {
   color: #258b70;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.16em;
+}
+
+.generation-studio__title-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border: 1px solid #b9dfd3;
+  border-radius: 8px;
+  background: #eef9f5;
+  color: #1f9471;
+  font-size: 14px;
 }
 
 .generation-studio__header h1 {
@@ -2418,54 +2559,321 @@ onBeforeUnmount(() => {
 
 .generation-studio__empty {
   display: grid;
-  min-height: 470px;
+  min-height: 540px;
   place-items: center;
   align-content: center;
   gap: 10px;
-  padding: 40px 20px;
+  padding: 34px 20px 42px;
   text-align: center;
 }
 
 .generation-studio__empty > span {
   display: grid;
-  width: 64px;
-  height: 64px;
+  width: 76px;
+  height: 76px;
   place-items: center;
-  border: 1px solid #d8e9e3;
-  border-radius: 18px;
-  background: #f0faf7;
+  border: 1px solid #d1e9e2;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 28%, #fff, transparent 36%),
+    linear-gradient(145deg, #eefaf6, #d7f1e9);
   color: #2b9175;
-  font-size: 25px;
+  font-size: 28px;
+  box-shadow: 0 12px 28px rgb(45 145 117 / 10%);
 }
 
 .generation-studio__empty strong {
-  margin-top: 5px;
+  margin-top: 9px;
   color: #37434c;
-  font-size: 16px;
+  font-size: 20px;
+  font-weight: 850;
 }
 
 .generation-studio__empty p {
   margin: 0;
   color: #8b959c;
-  font-size: 10px;
+  font-size: 11px;
 }
 
-.generation-studio__empty > div {
+.generation-studio__feature-pills {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 12px;
+  margin-top: 10px;
 }
 
-.generation-studio__empty button {
+.generation-studio__feature-pills span {
+  display: inline-flex;
   height: 31px;
-  padding: 0 11px;
-  border: 1px solid #dfe6e3;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
   border-radius: 999px;
+  background: #eaf8f4;
+  color: #258b70;
+  font-size: 10px;
+  font-weight: 680;
+}
+
+.generation-studio__feature-pills :deep(svg) {
+  color: #18a178;
+}
+
+.generation-category-filter {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 24px;
+}
+
+.generation-category-filter button {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 19px;
+  border: 1px solid #dde5e2;
+  border-radius: 8px;
   background: #fff;
-  color: #5b6770;
+  color: #58636d;
+  font-size: 11px;
+  font-weight: 720;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.generation-category-filter button:hover {
+  border-color: #9bd1c0;
+  color: #217c62;
+}
+
+.generation-category-filter button.active {
+  border-color: #7f46d9;
+  background: #8752e6;
+  color: #fff;
+  box-shadow: 0 8px 20px rgb(120 74 215 / 16%);
+}
+
+.generation-showcase-grid {
+  display: grid;
+  width: 100%;
+  align-items: start;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 24px;
+  text-align: left;
+}
+
+.generation-showcase-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #dce5e2;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 9px 24px rgb(34 57 50 / 6%);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.generation-showcase-card:hover {
+  border-color: #a8d2c6;
+  box-shadow: 0 14px 30px rgb(34 80 65 / 10%);
+  transform: translateY(-2px);
+}
+
+.generation-showcase-card__visual {
+  display: grid;
+  aspect-ratio: 16 / 7.8;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  overflow: hidden;
+  background: #dfe7e4;
+}
+
+.generation-showcase-card__frame {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: #eef2f1;
+}
+
+.generation-showcase-card__frame > span {
+  position: absolute;
+  top: 8px;
+  z-index: 2;
+  display: inline-flex;
+  height: 23px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 5px;
+  background: rgb(18 22 26 / 76%);
+  color: #fff;
   font-size: 9px;
+  font-weight: 760;
+  backdrop-filter: blur(8px);
+}
+
+.generation-showcase-card__frame--before > span {
+  left: 8px;
+}
+
+.generation-showcase-card__frame--after > span {
+  right: 8px;
+  background: rgb(109 62 199 / 86%);
+}
+
+.generation-showcase-card__frame > i {
+  position: absolute;
+  inset: 0;
+}
+
+.generation-showcase-card__frame--before > i {
+  filter: saturate(0.76) brightness(0.96);
+}
+
+.generation-showcase-card__frame--after > i {
+  filter: saturate(1.08) brightness(1.04);
+}
+
+.generation-showcase-card__visual--portrait .generation-showcase-card__frame > i {
+  background:
+    radial-gradient(circle at 50% 31%, #e7b89e 0 11%, transparent 11.5%),
+    radial-gradient(ellipse at 50% 24%, #3d2f34 0 13%, transparent 13.5%),
+    radial-gradient(ellipse at 50% 76%, #d9d6df 0 30%, transparent 30.5%),
+    linear-gradient(145deg, #f0e6e2, #b7c8c6);
+}
+
+.generation-showcase-card__visual--portrait .generation-showcase-card__frame--after > i {
+  background:
+    radial-gradient(circle at 50% 31%, #f1c9ad 0 11%, transparent 11.5%),
+    radial-gradient(ellipse at 50% 23%, #5b4249 0 14%, transparent 14.5%),
+    radial-gradient(ellipse at 50% 76%, #f4f2ef 0 31%, transparent 31.5%),
+    linear-gradient(145deg, #f9f1ed, #d8e5e2);
+}
+
+.generation-showcase-card__visual--fashion .generation-showcase-card__frame > i {
+  background:
+    radial-gradient(circle at 50% 25%, #ecc7b6 0 10%, transparent 10.5%),
+    radial-gradient(ellipse at 50% 69%, #b64d5d 0 29%, transparent 29.5%),
+    linear-gradient(145deg, #e9e2df, #b8cdd3);
+}
+
+.generation-showcase-card__visual--fashion .generation-showcase-card__frame--after > i {
+  background:
+    radial-gradient(circle at 50% 25%, #f0cdb9 0 10%, transparent 10.5%),
+    radial-gradient(ellipse at 50% 69%, #e7e1d3 0 30%, transparent 30.5%),
+    linear-gradient(145deg, #f3f0ea, #d4dfe0);
+}
+
+.generation-showcase-card__visual--landscape .generation-showcase-card__frame > i {
+  background:
+    linear-gradient(155deg, transparent 0 52%, #5a7380 52.5% 68%, transparent 68.5%),
+    linear-gradient(205deg, transparent 0 54%, #465d6c 54.5% 72%, transparent 72.5%),
+    linear-gradient(#cad7df, #e8efef 62%, #879f8c 62.5%);
+}
+
+.generation-showcase-card__visual--landscape .generation-showcase-card__frame--after > i {
+  background:
+    radial-gradient(circle at 74% 20%, #fff5cd 0 5%, transparent 5.5%),
+    linear-gradient(155deg, transparent 0 52%, #6e9192 52.5% 68%, transparent 68.5%),
+    linear-gradient(205deg, transparent 0 54%, #587874 54.5% 72%, transparent 72.5%),
+    linear-gradient(#c9ddeb, #eef3ed 62%, #91aa8e 62.5%);
+}
+
+.generation-showcase-card__visual--product .generation-showcase-card__frame > i {
+  background:
+    linear-gradient(90deg, transparent 43%, #97afc4 43% 57%, transparent 57%) 50% 59% / 42% 30%
+      no-repeat,
+    linear-gradient(145deg, #e5e8e6, #b7c0bb);
+}
+
+.generation-showcase-card__visual--product .generation-showcase-card__frame--after > i {
+  background:
+    radial-gradient(circle at 62% 32%, rgb(255 255 255 / 90%), transparent 32%),
+    linear-gradient(90deg, transparent 42%, #91a9be 42% 58%, transparent 58%) 50% 59% / 42% 31%
+      no-repeat,
+    linear-gradient(145deg, #f3f1ea, #d5d1c7);
+}
+
+.generation-showcase-card__visual--poster .generation-showcase-card__frame > i {
+  background:
+    radial-gradient(circle at 62% 32%, #f49d78 0 10%, transparent 10.5%),
+    linear-gradient(148deg, transparent 0 54%, #384a7a 54.5% 72%, transparent 72.5%),
+    linear-gradient(210deg, transparent 0 58%, #25345f 58.5% 76%, transparent 76.5%),
+    linear-gradient(145deg, #b7bce1, #666b9d);
+}
+
+.generation-showcase-card__visual--poster .generation-showcase-card__frame--after > i {
+  background:
+    radial-gradient(circle at 62% 28%, #ffd08b 0 11%, transparent 11.5%),
+    linear-gradient(148deg, transparent 0 54%, #475c9a 54.5% 72%, transparent 72.5%),
+    linear-gradient(210deg, transparent 0 58%, #2f427e 58.5% 76%, transparent 76.5%),
+    linear-gradient(145deg, #c6cbf1, #7379b3);
+}
+
+.generation-showcase-card__visual--repair .generation-showcase-card__frame > i {
+  background:
+    linear-gradient(105deg, transparent 42%, #98a198 42% 47%, transparent 47%),
+    linear-gradient(30deg, transparent 54%, #c0b0a2 54% 59%, transparent 59%),
+    linear-gradient(145deg, #dce2dd, #a8b7ad);
+}
+
+.generation-showcase-card__visual--repair .generation-showcase-card__frame--after > i {
+  background:
+    radial-gradient(circle at 72% 28%, #f8f0d2 0 8%, transparent 8.5%),
+    linear-gradient(145deg, #e9eee8, #b8c8bd);
+}
+
+.generation-showcase-card footer {
+  display: flex;
+  min-height: 69px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.generation-showcase-card footer > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.generation-showcase-card footer strong {
+  color: #37434b;
+  font-size: 11px;
+}
+
+.generation-showcase-card footer small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #8a949a;
+  font-size: 8px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.generation-showcase-card footer button {
+  height: 28px;
+  flex: 0 0 auto;
+  padding: 0 9px;
+  border: 1px solid #cce6de;
+  border-radius: 6px;
+  background: #eff9f6;
+  color: #248267;
+  font-size: 8px;
+  font-weight: 750;
   cursor: pointer;
 }
 
@@ -3544,6 +3952,32 @@ onBeforeUnmount(() => {
     padding: 0 16px 20px;
   }
 
+  .generation-studio__empty {
+    min-height: 560px;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .generation-category-filter {
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 3px;
+    scrollbar-width: none;
+  }
+
+  .generation-category-filter::-webkit-scrollbar {
+    display: none;
+  }
+
+  .generation-category-filter button {
+    flex: 0 0 auto;
+  }
+
+  .generation-showcase-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .generation-work-grid {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
@@ -3580,6 +4014,27 @@ onBeforeUnmount(() => {
 
   .image-tool-empty {
     min-height: 360px;
+  }
+
+  .generation-studio__empty {
+    min-height: 610px;
+  }
+
+  .generation-showcase-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .generation-showcase-card__visual {
+    aspect-ratio: 16 / 7.2;
+  }
+
+  .generation-studio__feature-pills {
+    gap: 7px;
+  }
+
+  .generation-studio__feature-pills span {
+    padding: 0 9px;
+    font-size: 9px;
   }
 
   .retouch-studio {

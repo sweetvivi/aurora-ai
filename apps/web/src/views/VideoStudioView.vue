@@ -478,9 +478,9 @@ onBeforeUnmount(() => {
       </div>
       <nav class="video-toolbar__nav" aria-label="创作工具切换">
         <RouterLink class="active" to="/video">AI 视频</RouterLink>
-        <RouterLink to="/draw">AI 绘画</RouterLink>
-        <RouterLink to="/chat">超级对话</RouterLink>
-        <RouterLink to="/music">AI 音乐</RouterLink>
+        <RouterLink to="/retouch" target="_blank" rel="noopener noreferrer">AI 绘画</RouterLink>
+        <RouterLink to="/chat" target="_blank" rel="noopener noreferrer">超级对话</RouterLink>
+        <RouterLink to="/music" target="_blank" rel="noopener noreferrer">AI 音乐</RouterLink>
       </nav>
       <div class="video-toolbar__status">
         <span>
