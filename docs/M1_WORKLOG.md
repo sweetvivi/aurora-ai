@@ -87,9 +87,10 @@
 - 2026-10-17：Run #5 修复后按 CI 顺序复验通过：Prisma Client 生成、`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm test`；测试为 API 29/29、Web 16/16。
 - 2026-10-17：使用临时 PostgreSQL 17 容器从零执行两条迁移并运行完整测试，API 29/29、Web 16/16 通过；临时容器验证后已停止移除。
 - 2026-10-17：CI PostgreSQL 修复经 Run #10、#11、#12 在真实 GitHub runner 验证成功；提交 `e526e11` 已同步到 `main` 和 `feature/m1-vertical-slice`。
+- 2026-10-17：提交 `665cfc6` 已推送到 `origin/main` 和 `origin/feature/m1-vertical-slice`，远端引用一致，M1 竖向闭环完成。
 
 ## 下一步
 
-1. 检查 M1-7 差异和内嵌敏感信息后提交。
-2. 普通推送前再次说明远端、分支、提交范围和提交哈希，等待用户确认。
-3. 推送后关闭 M1，再按参考产品优先顺序规划智能体、图片和视频工作台的后续闭环；4 号 Seedance 测试 Key 只用于后续视频，不用于 M1 生图。
+1. 按参考产品优先顺序规划智能体、图片工作台的后续闭环；视频工作台暂时延后。
+2. 真实供应商集成测试需要单独准备环境变量并明确额度消耗，默认继续使用 Mock provider。
+3. 4 号 Seedance 测试 Key 只用于后续视频，不用于图片或对话。
