@@ -704,6 +704,21 @@ node outputs/ui-reference/verify-draw.mjs
 - `verify-draw.mjs` 的参考图数量断言同步到“已上传 1 / 10 张”，桌面端与移动端 Mock 批量生成链路继续通过
 - 本批仍使用 Mock 或请求拦截，不调用真实图片、视频和对话 Provider
 
+全局搜索补充验证：
+
+```text
+pnpm --filter @aurora/web test
+pnpm --filter @aurora/web typecheck
+node outputs/ui-reference/verify-global-search.mjs
+```
+
+- 顶栏搜索接入全部模块目录，并增加“文生图”“抠图”“做视频”“商品图”“工作流”等常用别名和快捷入口
+- 支持 `Ctrl+K` / `Cmd+K`、方向键、`Enter`、`Escape`、精确标题优先、空查询快速入口和未知词空状态
+- 视频搜索结果通过独立窗口打开 `/video`，当前窗口保持原路由；修正了带 `noopener` 时 `window.open()` 返回空导致重复跳转的兼容问题
+- Edge 自动验收覆盖桌面端 `1440x1000` 与移动端 `390x844`：别名搜索结果正确、`/retouch` 跳转正确、`/video` 弹窗正确、无横向溢出和无页面脚本错误
+- Web 测试扩展为 15 个文件 58 项；定向测试、类型检查和浏览器验收通过
+- 自动验收使用 Playwright 路由拦截，不调用真实 Provider，不读取或输出 Key
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥
