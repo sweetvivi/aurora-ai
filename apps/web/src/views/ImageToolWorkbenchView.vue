@@ -66,6 +66,15 @@ interface RetouchModelOption {
   value: string;
 }
 
+interface RetouchShowcase {
+  id: string;
+  image: string;
+  label: string;
+  operation: string;
+  position: string;
+  variant: 'cutout' | 'hair' | 'outfit' | 'scene';
+}
+
 interface GenerationCategory {
   label: string;
   value: string;
@@ -169,6 +178,41 @@ const retouchModels: RetouchModelOption[] = [
   { description: '更精细的人像与商品细节', label: 'Seedream 5.0 Pro', value: 'seedream-5-pro' },
 ];
 
+const retouchShowcases: RetouchShowcase[] = [
+  {
+    id: 'hair',
+    image: '/showcase/portrait-v1.png',
+    label: '换个发型',
+    operation: 'restyle',
+    position: '50% 20%',
+    variant: 'hair',
+  },
+  {
+    id: 'outfit',
+    image: '/showcase/fashion-v1.png',
+    label: '换个穿搭',
+    operation: 'restyle',
+    position: '50% 27%',
+    variant: 'outfit',
+  },
+  {
+    id: 'scene',
+    image: '/showcase/landscape-v1.png',
+    label: '换个背景',
+    operation: 'background',
+    position: '50% 58%',
+    variant: 'scene',
+  },
+  {
+    id: 'cutout',
+    image: '/showcase/product-v1.png',
+    label: '一键抠图',
+    operation: 'cutout',
+    position: '50% 49%',
+    variant: 'cutout',
+  },
+];
+
 const retouchOperations: RetouchOperation[] = [
   {
     accent: '#258b70',
@@ -247,6 +291,7 @@ const legacyGenerationMode = ref(false);
 const legacyRetouchMode = ref(false);
 const canvasZoom = ref(100);
 const selectedCanvasWorkId = ref('');
+const selectedRetouchShowcaseId = ref('');
 const sourceError = ref('');
 const sourceImage = ref<SourceImage | null>(null);
 const sourceInput = ref<HTMLInputElement | null>(null);
@@ -271,6 +316,9 @@ const activeModelLabel = computed(
 const activeRetouchModelLabel = computed(
   () =>
     retouchModels.find((item) => item.value === selectedRetouchModel.value)?.label ?? '智能修图',
+);
+const selectedRetouchShowcase = computed(() =>
+  retouchShowcases.find((item) => item.id === selectedRetouchShowcaseId.value),
 );
 const generationCost = computed(() =>
   isGeneration.value ? selectedAmount.value * IMAGE_TASK_POINTS_COST : IMAGE_TASK_POINTS_COST,
@@ -307,10 +355,17 @@ const activeCanvasWork = computed(
     ) ?? latestCanvasWork.value,
 );
 const canvasImageUrl = computed(
-  () => activeCanvasWork.value?.artworkUrl ?? sourceImage.value?.url ?? '',
+  () =>
+    activeCanvasWork.value?.artworkUrl ??
+    sourceImage.value?.url ??
+    selectedRetouchShowcase.value?.image ??
+    '',
 );
 const canvasImageName = computed(
-  () => activeCanvasWork.value?.prompt ?? sourceImage.value?.name ?? '',
+  () =>
+    activeCanvasWork.value?.prompt ??
+    sourceImage.value?.name ??
+    (selectedRetouchShowcase.value ? `示例演示 · ${selectedRetouchShowcase.value.label}` : ''),
 );
 const submitting = computed(() => workspace.submitting || uploading.value);
 const canSubmit = computed(() => {
@@ -333,6 +388,7 @@ function resetLocalForm(): void {
   legacyRetouchMode.value = false;
   canvasZoom.value = 100;
   selectedCanvasWorkId.value = '';
+  selectedRetouchShowcaseId.value = '';
   sourceError.value = '';
 
   if (sourceImage.value) {
@@ -413,6 +469,7 @@ function changeCanvasZoom(delta: number): void {
 }
 
 function selectCanvasWork(workId: string): void {
+  selectedRetouchShowcaseId.value = '';
   selectedCanvasWorkId.value = workId;
 }
 
@@ -452,6 +509,7 @@ async function handleSourceUpload(event: Event): Promise<void> {
       URL.revokeObjectURL(sourceImage.value.url);
     }
 
+    selectedRetouchShowcaseId.value = '';
     sourceImage.value = {
       assetId: asset.id,
       id: asset.id,
@@ -473,6 +531,24 @@ function removeSource(): void {
 
   URL.revokeObjectURL(sourceImage.value.url);
   sourceImage.value = null;
+  selectedRetouchShowcaseId.value = '';
+  sourceError.value = '';
+}
+
+function showRetouchShowcase(showcase?: RetouchShowcase): void {
+  const nextShowcase =
+    showcase ??
+    retouchShowcases[
+      (retouchShowcases.findIndex((item) => item.id === selectedRetouchShowcaseId.value) + 1) %
+        retouchShowcases.length
+    ];
+
+  if (!nextShowcase) {
+    return;
+  }
+
+  selectedRetouchShowcaseId.value = nextShowcase.id;
+  selectedOperation.value = nextShowcase.operation;
   sourceError.value = '';
 }
 
@@ -1182,22 +1258,26 @@ onBeforeUnmount(() => {
             <small>动动嘴，一部 P 图</small>
           </div>
           <div class="retouch-empty-guide__examples" aria-label="智能修图能力示例">
-            <article>
-              <strong>换个发型</strong>
-              <i class="example-portrait example-portrait--hair" />
-            </article>
-            <article>
-              <strong>换个穿搭</strong>
-              <i class="example-portrait example-portrait--outfit" />
-            </article>
-            <article>
-              <strong>换个背景</strong>
-              <i class="example-portrait example-portrait--scene" />
-            </article>
-            <article>
-              <strong>一键抠图</strong>
-              <i class="example-portrait example-portrait--cutout" />
-            </article>
+            <button
+              v-for="showcase in retouchShowcases"
+              :key="showcase.id"
+              type="button"
+              class="retouch-empty-guide__example"
+              :class="{
+                active: selectedRetouchShowcaseId === showcase.id,
+                'retouch-empty-guide__example--cutout': showcase.variant === 'cutout',
+              }"
+              @click="showRetouchShowcase(showcase)"
+            >
+              <strong>{{ showcase.label }}</strong>
+              <img
+                class="example-portrait"
+                :src="showcase.image"
+                alt=""
+                loading="lazy"
+                :style="{ '--example-position': showcase.position }"
+              />
+            </button>
           </div>
           <p>上传图片后，在右侧输入修改效果即可开始</p>
         </div>
@@ -1300,7 +1380,7 @@ onBeforeUnmount(() => {
             <CommentOutlined />
           </div>
           <strong>开始您的 AI 修图之旅吧~</strong>
-          <button type="button" @click="sourceInput?.click()">查看示例演示 ✦</button>
+          <button type="button" @click="showRetouchShowcase()">查看示例演示 ✦</button>
         </div>
       </div>
 
@@ -3209,7 +3289,7 @@ onBeforeUnmount(() => {
   gap: 4px;
 }
 
-.retouch-empty-guide__examples article {
+.retouch-empty-guide__example {
   position: relative;
   display: grid;
   min-width: 0;
@@ -3217,9 +3297,22 @@ onBeforeUnmount(() => {
   padding: 5px;
   border: 1px solid #2a3046;
   background: #0a0e1a;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
-.retouch-empty-guide__examples strong {
+.retouch-empty-guide__example:hover,
+.retouch-empty-guide__example.active {
+  border-color: #8a62d6;
+  box-shadow: 0 0 0 1px rgb(138 98 214 / 32%);
+  transform: translateY(-2px);
+}
+
+.retouch-empty-guide__example strong {
   position: absolute;
   top: -1px;
   left: 50%;
@@ -3237,63 +3330,15 @@ onBeforeUnmount(() => {
 .example-portrait {
   position: relative;
   display: block;
+  width: 100%;
   height: 172px;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, transparent 42%, rgb(15 18 28 / 32%) 43%),
-    linear-gradient(135deg, #d9d1cb, #968a83 48%, #554d4a);
+  background: #151a25;
+  object-fit: cover;
+  object-position: var(--example-position, 50% 50%);
 }
 
-.example-portrait::before {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  width: 52px;
-  height: 60px;
-  border-radius: 50% 50% 44% 44%;
-  background: #f0c2ab;
-  box-shadow: 0 -16px 0 8px #3a2928;
-  content: '';
-  transform: translateX(-50%);
-}
-
-.example-portrait::after {
-  position: absolute;
-  bottom: -26px;
-  left: 50%;
-  width: 118px;
-  height: 118px;
-  border-radius: 52% 52% 0 0;
-  background: #e8ecef;
-  content: '';
-  transform: translateX(-50%);
-}
-
-.example-portrait--hair::after {
-  background: #e8ecef;
-}
-
-.example-portrait--outfit {
-  background:
-    linear-gradient(180deg, transparent 42%, rgb(15 18 28 / 28%) 43%),
-    linear-gradient(135deg, #b7d1df, #4f8394 48%, #273f46);
-}
-
-.example-portrait--outfit::after {
-  background: #75a9bf;
-}
-
-.example-portrait--scene {
-  background:
-    linear-gradient(180deg, transparent 42%, rgb(15 18 28 / 28%) 43%),
-    linear-gradient(135deg, #ebc58e, #c26d4c 48%, #473140);
-}
-
-.example-portrait--scene::after {
-  background: #dea78d;
-}
-
-.example-portrait--cutout {
+.retouch-empty-guide__example--cutout {
   background:
     linear-gradient(45deg, #dadde2 25%, transparent 25%),
     linear-gradient(-45deg, #dadde2 25%, transparent 25%),
@@ -3307,8 +3352,24 @@ onBeforeUnmount(() => {
   background-size: 16px 16px;
 }
 
-.example-portrait--cutout::after {
-  background: #f0f1f4;
+.retouch-empty-guide__example--cutout .example-portrait {
+  clip-path: polygon(
+    34% 100%,
+    35% 84%,
+    27% 78%,
+    25% 66%,
+    31% 58%,
+    35% 57%,
+    37% 44%,
+    42% 27%,
+    54% 23%,
+    69% 27%,
+    75% 42%,
+    71% 55%,
+    78% 61%,
+    75% 75%,
+    66% 100%
+  );
 }
 
 .retouch-empty-guide > p {
