@@ -43,6 +43,32 @@ export interface ChatModel {
   displayName: string;
 }
 
+export interface FileAsset {
+  checksum: string;
+  createdAt: string;
+  id: string;
+  mimeType: string;
+  originalName: string;
+  size: number;
+}
+
+export type ImageTaskStatus = 'CANCELLED' | 'FAILED' | 'QUEUED' | 'RUNNING' | 'SUCCEEDED';
+
+export interface ImageTask {
+  completedAt: string | null;
+  createdAt: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  id: string;
+  modelAlias: string;
+  parameters: Record<string, unknown> | null;
+  prompt: string;
+  resultFile: FileAsset | null;
+  sourceFile: FileAsset | null;
+  startedAt: string | null;
+  status: ImageTaskStatus;
+}
+
 export interface ConversationSummary {
   createdAt: string;
   id: string;
@@ -286,6 +312,65 @@ export async function fetchModels(capability?: ChatModel['capabilities'][number]
   });
 
   return response.data.data.items;
+}
+
+export async function uploadImageFile(file: File): Promise<FileAsset> {
+  const formData = new FormData();
+
+  formData.append('file', file);
+
+  const response = await apiClient.post<ApiEnvelope<FileAsset>>('/api/v1/files', formData, {
+    timeout: 30_000,
+  });
+
+  return response.data.data;
+}
+
+export async function fetchFileBlob(fileId: string): Promise<Blob> {
+  const response = await apiClient.get<Blob>(
+    `/api/v1/files/${encodeURIComponent(fileId)}/content`,
+    {
+      responseType: 'blob',
+      timeout: 30_000,
+    },
+  );
+
+  return response.data;
+}
+
+export async function createImageTask(
+  input: {
+    modelAlias?: string;
+    parameters?: Record<string, unknown>;
+    prompt: string;
+    sourceFileId?: string;
+  },
+  idempotencyKey: string,
+): Promise<ImageTask> {
+  const response = await apiClient.post<ApiEnvelope<ImageTask>>('/api/v1/image-tasks', input, {
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    timeout: 30_000,
+  });
+
+  return response.data.data;
+}
+
+export async function listImageTasks(limit = 30): Promise<ImageTask[]> {
+  const response = await apiClient.get<ApiEnvelope<{ items: ImageTask[] }>>('/api/v1/image-tasks', {
+    params: { limit },
+  });
+
+  return response.data.data.items;
+}
+
+export async function getImageTask(taskId: string): Promise<ImageTask> {
+  const response = await apiClient.get<ApiEnvelope<ImageTask>>(
+    `/api/v1/image-tasks/${encodeURIComponent(taskId)}`,
+  );
+
+  return response.data.data;
 }
 
 export async function fetchConversations(): Promise<ConversationSummary[]> {

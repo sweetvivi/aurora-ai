@@ -7,7 +7,7 @@
 - 项目：极光AI，参考 `https://参考产品/` 的产品结构和交互重新实现。
 - 本地目录：`C:\Users\Administrator\Desktop\project2`
 - GitHub 远端：[https://github.com/sweetvivi/web-ai-design-clone-b](https://github.com/sweetvivi/web-ai-design-clone-b)（Private）
-- 当前阶段：M0 本地实现与参考产品 UI 重构已完成，等待用户验收后提交并推送 `feature/m0-foundation`。
+- 当前阶段：M1 首条垂直切片已在 `feature/m1-vertical-slice` 完成本地实现和验收，等待用户确认普通推送。
 - 实现边界：按 D-011 修订后的策略，界面结构、视觉和交互尽可能接近参考产品；品牌与受保护内容必须替换，原页面打包资源不得复用。
 - 主开发工具：按 D-033，Codex 作为主要开发工具；除非用户明确决定切换，否则不再按换模型流程重置方向。
 
@@ -30,10 +30,10 @@
 
 ## 当前进度
 
-- 已完成：研究和文档阶段；GitHub 远端已设置；M0 实施计划和 D-033 已落档；workspace、NestJS 后端、Vue 3 前端、五套 Shell、本地 PostgreSQL、Redis、Prisma 初始迁移、健康检查和最小 CI 均已实现并完成本地验证；首页、工具地图、智能体相关页面、绘画工作台、图片处理/AI 视频/AI 音乐独立占位入口和文档工作台已按参考产品进行原创化 UI 重构。
-- 本地验证：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm test` 全部通过；API 健康接口返回数据库和 Redis 为 `up`；代表页面已用系统 Edge 完成桌面端与真实 390px 移动端截图检查，未发现整页横向溢出；绘画生成主链路自动验证通过。
-- 下一步：用户验收当前 UI 后，先说明远端、分支和提交范围，再等待确认提交与推送；随后进入 M1 首条垂直切片。
-- Git 续接：从 `main` 的 `7a75622` 建立 `feature/m0-foundation` 分支。每次接手用 `git status --short --branch` 和 `git log --oneline -8` 核验最新状态。
+- 已完成：M0 工程基础和参考产品原创化 UI 重构；M1 认证、积分冻结/结算/退回、模型列表、对话流、会话历史、文件上传、图片任务状态机和绘画工作台真实后端接入。
+- 本地验证：M1-7 的 `pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过；API 29/29、Web 16/16；API 健康接口返回数据库和 Redis 为 `up`；桌面与 390px 移动端绘图流程通过，无横向溢出。
+- 下一步：先说明远端、分支、提交范围和提交哈希，等待用户确认后推送 M1；之后按参考产品优先顺序继续智能体和图片工作台闭环，视频功能后置。
+- Git 续接：当前分支 `feature/m1-vertical-slice`。每次接手先用 `git status --short --branch` 和 `git log --oneline -8` 核验最新状态，不依赖本文件中的旧提交哈希判断。
 
 ## 本轮新增注意事项
 
@@ -43,6 +43,7 @@
 - 原页面公开检查发现会员中心路由 `/console/vip` 和部分公开脚本字段。用户虽已在浏览器登录，但当前命令行无法读取浏览器登录 Cookie；未获得截图前，不得把价格单位、完整权益、有效期或档位写成确定事实。详细记录见 `docs/OPEN_QUESTIONS.md`。
 - 后续新增的重要注意事项、决策、待确认问题和协作规则，都要同步更新本文件，并按项目规则更新 `CHANGELOG.md`。
 - M0 执行按 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) 的三档规则进行：自动执行范围内直接做；安装依赖、项目配置、额外服务和本地数据库先说明；删除、密钥、部署、公网暴露和普通推送等红线先确认。
+- M1 测试 Key 分工：1、3 号 Key 用于生图，2 号 DeepSeek Key 用于模型对话，4 号 Seedance Key 只用于后续视频生成。M1 自动化测试仍使用 Mock provider，不消耗真实额度。
 - 本地 PostgreSQL 和 Redis 虽由 Docker Compose 管理，但当前 `compose.yaml` 使用第三方镜像代理 `dockerproxy.net`。演示阶段可用，正式部署前必须重新评估官方或公司内部镜像源。
 
 ## 待确认问题
@@ -55,7 +56,7 @@
 - 每批结束后提供实际变更、验证结果和遗留事项；验收后再进入下一批。
 - 涉及删除、推送（push）或密钥处理时，先向用户确认；不得将密钥写入仓库、日志或普通配置，也不要要求用户把密钥粘贴到对话中。
 - 用户已经明确授权的具体操作无需重复询问；若操作范围或目标发生变化，再确认新的范围。
-- 用户明确授权开始 M0 后，按实施计划分批推进；用户要求暂停或只做文档时立即停止后续工程动作。
+- 用户明确授权开始对应里程碑后，按实施计划分批推进；用户要求暂停或只做文档时立即停止后续工程动作。
 - 工作目录固定为 `C:\Users\Administrator\Desktop\project2`；不得修改 `Desktop/project` 和 `Desktop/project/ai-workbench-api`。
 - 模型切换交接完成后，下一模型必须先读取交接文件和项目核心文档、检查 Git 状态并输出摘要，等待用户下一步指令。
 

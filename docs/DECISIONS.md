@@ -171,8 +171,9 @@
 - 决策：首批统一使用极光 GPT Key 中转站和 OpenAI 兼容适配器
 - Base URL：`https://api.example.com/v1`
 - 默认对话模型：`gpt-6-astra`
-- 生图：先 Mock，M1 尾期接 Seedance
+- 生图：先 Mock；真实测试固定使用 1、3 号图像 Key，不使用 Seedance
 - 视频：先 Mock，M4 接入
+- 修订 2026-10-17：2 号 DeepSeek Key 用于模型对话；4 号 Seedance Key 只用于后续视频生成
 - Embedding：暂不做
 - 后续备用模型：GLM、Kimi、DeepSeek
 
@@ -234,6 +235,13 @@
 - 原因：Nest CLI 12 构建依赖 TypeScript programmatic compiler API，TypeScript 7.0.2 当前不提供该 API，且 TypeScript 6 尚无稳定版
 - 约束：不使用 TypeScript 6 beta 作为基础工程依赖
 - 复核：NestJS 或 TypeScript 发布兼容稳定版本后，再单独评估升级影响
+
+### D-035 测试 Key 能力分工
+
+- 状态：Accepted
+- 决策：1、3 号 Key 固定用于生图；2 号 DeepSeek Key 用于模型对话；4 号 Seedance Key 只用于后续视频生成
+- 约束：Seedance 不作为生图备用 Key，也不在 M1 生图阶段消耗额度
+- 约束：真实密钥只通过后端环境变量注入，不进入 Git、日志、普通文档和回复
 
 ## Proposed
 

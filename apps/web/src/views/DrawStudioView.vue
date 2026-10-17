@@ -15,16 +15,22 @@ import {
   LoadingOutlined,
   PictureOutlined,
   PlusOutlined,
+  ReloadOutlined,
   SearchOutlined,
   StarOutlined,
   ThunderboltFilled,
   VideoCameraOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import GalleryArtwork from '@/components/GalleryArtwork.vue';
-import { useDrawWorkspaceStore } from '@/stores/draw-workspace';
+import type { FileAsset } from '@/app/api';
+import {
+  IMAGE_TASK_POINTS_COST,
+  useDrawWorkspaceStore,
+  type DrawWorkStatus,
+} from '@/stores/draw-workspace';
+import { useSessionStore } from '@/stores/session';
 
 interface NavigationItem {
   icon: Component;
@@ -48,6 +54,7 @@ interface ToolItem {
 }
 
 interface ReferenceImage {
+  assetId: string;
   id: string;
   name: string;
   url: string;
@@ -249,13 +256,14 @@ const selectedSize = ref('1K');
 const selectedMode = ref('文生图');
 const activeResultTab = ref<'gallery' | 'mine'>('gallery');
 const referenceImages = ref<ReferenceImage[]>([]);
+const referenceError = ref('');
 const referenceInput = ref<HTMLInputElement | null>(null);
 const consumedGenerationToken = ref('');
+const uploadingReference = ref(false);
 const route = useRoute();
 const router = useRouter();
+const sessionStore = useSessionStore();
 const workspace = useDrawWorkspaceStore();
-let generationTimer: number | undefined;
-let pendingWorkIds: string[] = [];
 
 const filteredModels = computed(() => {
   const query = libraryQuery.value.trim().toLowerCase();
@@ -272,7 +280,8 @@ const selectedModelLabel = computed(
 );
 
 const isGeneratingView = computed(() => route.query.view === 'generate');
-const generating = computed(() => workspace.works.some((work) => work.status === 'generating'));
+const generationCost = computed(() => selectedAmount.value * IMAGE_TASK_POINTS_COST);
+const generating = computed(() => workspace.generating || uploadingReference.value);
 const visibleWorks = computed(() => {
   if (activeResultTab.value === 'gallery') {
     return workspace.works.filter((work) => work.status === 'done');
@@ -335,28 +344,26 @@ function openGenerator(options: { auto?: boolean; mode?: string } = {}): void {
   });
 }
 
-function startGeneration(): void {
+async function startGeneration(): Promise<void> {
   if (!prompt.value.trim() || generating.value) {
     return;
   }
 
-  const createdWorks = workspace.createGenerationWorks({
+  await workspace.initialize();
+
+  const createdWorks = await workspace.createGenerationWorks({
     amount: selectedAmount.value,
     model: currentModel.value,
     modelLabel: selectedModelLabel.value,
     prompt: prompt.value.trim(),
     ratio: selectedRatio.value,
     size: selectedSize.value,
+    sourceFileId: referenceImages.value[0]?.assetId,
   });
 
-  activeResultTab.value = 'mine';
-  window.clearTimeout(generationTimer);
-  pendingWorkIds = createdWorks.map((work) => work.id);
-  generationTimer = window.setTimeout(() => {
-    workspace.completeWorks(pendingWorkIds);
-    pendingWorkIds = [];
-    generationTimer = undefined;
-  }, 1200);
+  if (createdWorks.length > 0) {
+    activeResultTab.value = 'mine';
+  }
 }
 
 function leaveGenerator(): void {
@@ -390,19 +397,39 @@ function selectCreationMode(mode: string): void {
   openGenerator({ mode });
 }
 
-function handleReferenceUpload(event: Event): void {
+async function handleReferenceUpload(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
-  const files = Array.from(input.files ?? []).slice(0, 2 - referenceImages.value.length);
+  const file = input.files?.[0];
 
-  referenceImages.value = [
-    ...referenceImages.value,
-    ...files.map((file) => ({
-      id: `${Date.now().toString(36)}-${file.name}`,
-      name: file.name,
-      url: URL.createObjectURL(file),
-    })),
-  ];
-  input.value = '';
+  if (!file) {
+    return;
+  }
+
+  uploadingReference.value = true;
+  referenceError.value = '';
+
+  try {
+    const asset: FileAsset = await workspace.uploadReference(file);
+    const previous = referenceImages.value[0];
+
+    if (previous) {
+      URL.revokeObjectURL(previous.url);
+    }
+
+    referenceImages.value = [
+      {
+        assetId: asset.id,
+        id: asset.id,
+        name: asset.originalName,
+        url: URL.createObjectURL(file),
+      },
+    ];
+  } catch (error) {
+    referenceError.value = error instanceof Error ? error.message : '参考图上传失败，请重试';
+  } finally {
+    input.value = '';
+    uploadingReference.value = false;
+  }
 }
 
 function removeReference(referenceId: string): void {
@@ -425,35 +452,22 @@ function formatWorkTime(timestamp: number): string {
 }
 
 function downloadWork(workId: string): void {
-  const work = workspace.works.find((item) => item.id === workId);
+  void workspace.downloadWork(workId);
+}
 
-  if (!work) {
-    return;
-  }
+function retryWork(workId: string): void {
+  void workspace.retryWork(workId);
+}
 
-  const escapedPrompt = work.prompt
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
-  const svg = [
-    '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">',
-    '<defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">',
-    '<stop offset="0" stop-color="#dcecff"/><stop offset="0.55" stop-color="#9bc3f4"/>',
-    '<stop offset="1" stop-color="#315d9c"/></linearGradient></defs>',
-    '<rect width="1024" height="1024" fill="url(#bg)"/>',
-    '<circle cx="760" cy="252" r="112" fill="#fff" opacity="0.82"/>',
-    '<path d="M0 740 280 472l188 176 124-112 432 390v98H0z" fill="#244168" opacity="0.78"/>',
-    '<path d="M0 842 326 640l214 112 172-92 312 194v170H0z" fill="#152942"/>',
-    `<text x="64" y="918" fill="#fff" font-family="sans-serif" font-size="34">${escapedPrompt.slice(0, 42)}</text>`,
-    '</svg>',
-  ].join('');
-  const objectUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
-  const anchor = document.createElement('a');
+function workStatusLabel(status: DrawWorkStatus): string {
+  const labels: Record<DrawWorkStatus, string> = {
+    done: '已完成',
+    failed: '生成失败',
+    generating: '生成中',
+    queued: '排队中',
+  };
 
-  anchor.href = objectUrl;
-  anchor.download = `aurora-${work.id}.svg`;
-  anchor.click();
-  URL.revokeObjectURL(objectUrl);
+  return labels[status];
 }
 
 function generate(): void {
@@ -482,7 +496,7 @@ watch(
       prompt.value.trim()
     ) {
       consumedGenerationToken.value = token;
-      startGeneration();
+      void startGeneration();
     }
   },
   {
@@ -490,14 +504,11 @@ watch(
   },
 );
 
-onBeforeUnmount(() => {
-  if (generationTimer !== undefined) {
-    window.clearTimeout(generationTimer);
-    workspace.completeWorks(pendingWorkIds);
-    generationTimer = undefined;
-    pendingWorkIds = [];
-  }
+onMounted(() => {
+  void workspace.initialize();
+});
 
+onBeforeUnmount(() => {
   for (const image of referenceImages.value) {
     URL.revokeObjectURL(image.url);
   }
@@ -635,14 +646,14 @@ onBeforeUnmount(() => {
             <section class="draw-param-section draw-generator__references">
               <header>
                 <strong>参考图</strong>
-                <span>最多 2 张</span>
+                <span>{{ uploadingReference ? '上传中...' : '当前支持 1 张' }}</span>
               </header>
               <input
                 ref="referenceInput"
                 type="file"
                 accept="image/*"
-                multiple
                 hidden
+                :disabled="uploadingReference"
                 @change="handleReferenceUpload"
               />
               <div>
@@ -657,15 +668,18 @@ onBeforeUnmount(() => {
                   </button>
                 </span>
                 <button
-                  v-if="referenceImages.length < 2"
+                  v-if="referenceImages.length < 1"
                   type="button"
                   class="draw-generator__upload"
+                  :disabled="uploadingReference"
                   @click="referenceInput?.click()"
                 >
-                  <PlusOutlined />
-                  <small>上传参考图</small>
+                  <LoadingOutlined v-if="uploadingReference" />
+                  <PlusOutlined v-else />
+                  <small>{{ uploadingReference ? '上传中' : '上传参考图' }}</small>
                 </button>
               </div>
+              <p v-if="referenceError" class="draw-generator__field-error">{{ referenceError }}</p>
             </section>
 
             <section class="draw-param-section">
@@ -689,7 +703,7 @@ onBeforeUnmount(() => {
             <section class="draw-param-section">
               <header>
                 <strong>生成数量</strong>
-                <span>本次消耗 {{ selectedAmount * 8 }} 积分</span>
+                <span>本次消耗 {{ generationCost }} 积分</span>
               </header>
               <div class="draw-generator__options">
                 <button
@@ -707,7 +721,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="draw-generator__submit"
-              :disabled="!prompt.trim() || generating"
+              :disabled="!prompt.trim() || generating || uploadingReference"
               @click="startGeneration"
             >
               <LoadingOutlined v-if="generating" />
@@ -728,37 +742,53 @@ onBeforeUnmount(() => {
                   }}
                 </span>
               </div>
-              <em v-if="generating">正在生成图片...</em>
+              <em v-if="generating">
+                {{ workspace.submitting ? '正在提交任务...' : '正在生成图片...' }}
+              </em>
             </header>
+
+            <div v-if="workspace.error" class="draw-generator__error" role="alert">
+              <span>{{ workspace.error.message }}</span>
+              <button type="button" @click="workspace.clearError">关闭</button>
+            </div>
 
             <div v-if="visibleWorks.length > 0" class="draw-generator__work-grid">
               <article
                 v-for="work in visibleWorks"
                 :key="work.id"
                 class="draw-work-card"
-                :class="{ 'draw-work-card--generating': work.status === 'generating' }"
+                :class="`draw-work-card--${work.status}`"
               >
                 <header>
                   <span>{{ work.modelLabel }}</span>
                   <small>{{ formatWorkTime(work.createdAt) }}</small>
-                  <em :class="{ done: work.status === 'done' }">
-                    {{ work.status === 'done' ? '已完成' : '生成中' }}
+                  <em :class="work.status">
+                    {{ workStatusLabel(work.status) }}
                   </em>
                 </header>
 
                 <div class="draw-work-card__visual">
-                  <GalleryArtwork
-                    v-if="work.status === 'done'"
-                    :variant="work.variant"
-                    :title="work.prompt"
+                  <img
+                    v-if="work.status === 'done' && work.artworkUrl"
+                    :src="work.artworkUrl"
+                    :alt="work.prompt"
                   />
+                  <div v-else-if="work.status === 'failed'" class="draw-work-card__failure">
+                    <CloseOutlined />
+                    <span>生成失败</span>
+                  </div>
                   <div v-else class="draw-work-card__loading">
                     <LoadingOutlined />
-                    <span>正在渲染画面...</span>
+                    <span>
+                      {{ work.status === 'queued' ? '等待生成资源...' : '正在渲染画面...' }}
+                    </span>
                   </div>
                 </div>
 
                 <p>{{ work.prompt }}</p>
+                <small v-if="work.errorMessage" class="draw-work-card__error-message">
+                  {{ work.errorMessage }}
+                </small>
                 <div class="draw-work-card__meta">
                   <span>{{ work.size }}</span>
                   <span>{{ work.ratio }}</span>
@@ -777,6 +807,17 @@ onBeforeUnmount(() => {
                   <button type="button" @click="downloadWork(work.id)">
                     <DownloadOutlined />
                     下载
+                  </button>
+                  <button type="button" @click="workspace.removeWork(work.id)">
+                    <DeleteOutlined />
+                    删除
+                  </button>
+                </footer>
+
+                <footer v-else-if="work.status === 'failed'">
+                  <button type="button" @click="retryWork(work.id)">
+                    <ReloadOutlined />
+                    重试
                   </button>
                   <button type="button" @click="workspace.removeWork(work.id)">
                     <DeleteOutlined />
@@ -893,19 +934,24 @@ onBeforeUnmount(() => {
 
               <span class="draw-composer__credits">
                 <ThunderboltFilled />
-                {{ selectedAmount * 8 }} 积分
+                {{ generationCost }} 积分 · 余额 {{ sessionStore.points }}
               </span>
 
               <button
                 class="draw-composer__submit"
                 type="submit"
-                :disabled="!prompt.trim() || generating"
+                :disabled="!prompt.trim() || generating || uploadingReference"
               >
                 <LoadingOutlined v-if="generating" />
                 {{ generating ? '生成中' : '立即生成' }}
               </button>
             </footer>
           </form>
+
+          <div v-if="workspace.error" class="draw-composer__error" role="alert">
+            <span>{{ workspace.error.message }}</span>
+            <button type="button" @click="workspace.clearError">关闭</button>
+          </div>
 
           <div class="draw-composer__presets">
             <button
@@ -920,7 +966,7 @@ onBeforeUnmount(() => {
           </div>
 
           <p class="draw-composer__model-note">
-            当前模型：{{ selectedModelLabel }} · 支持多参考图组合、局部修改和批量生成
+            当前模型：{{ selectedModelLabel }} · 支持单张参考图重绘和批量生成
           </p>
         </section>
 
@@ -1610,12 +1656,24 @@ onBeforeUnmount(() => {
   color: #3678c8;
 }
 
+.draw-generator__upload:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
 .draw-generator__upload :deep(svg) {
   font-size: 15px;
 }
 
 .draw-generator__upload small {
   font-size: 8px;
+}
+
+.draw-generator__field-error {
+  margin: 8px 0 0;
+  color: #c6483d;
+  font-size: 8px;
+  line-height: 1.5;
 }
 
 .draw-generator__options {
@@ -1718,6 +1776,33 @@ onBeforeUnmount(() => {
   font-weight: 750;
 }
 
+.draw-generator__error,
+.draw-composer__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 13px;
+  padding: 9px 11px;
+  border: 1px solid #f0c8c3;
+  border-radius: 7px;
+  background: #fff5f4;
+  color: #a73d34;
+  font-size: 8px;
+}
+
+.draw-generator__error button,
+.draw-composer__error button {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #a73d34;
+  font-size: 8px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
 .draw-generator__work-grid {
   display: grid;
   align-items: start;
@@ -1775,11 +1860,28 @@ onBeforeUnmount(() => {
   color: #238467;
 }
 
+.draw-work-card > header em.queued {
+  background: #f2f3f5;
+  color: #737c89;
+}
+
+.draw-work-card > header em.failed {
+  background: #fff0ee;
+  color: #bd4c42;
+}
+
 .draw-work-card__visual {
   position: relative;
   aspect-ratio: 1 / 1;
   overflow: hidden;
   background: #eef1f4;
+}
+
+.draw-work-card__visual > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .draw-work-card__loading {
@@ -1814,6 +1916,26 @@ onBeforeUnmount(() => {
   text-shadow: 0 1px 8px rgb(35 58 84 / 32%);
 }
 
+.draw-work-card__failure {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  align-content: center;
+  gap: 9px;
+  background: linear-gradient(145deg, #f3f5f7, #e8ecef);
+  color: #9d5b55;
+}
+
+.draw-work-card__failure :deep(svg) {
+  font-size: 21px;
+}
+
+.draw-work-card__failure span {
+  font-size: 8px;
+  font-weight: 750;
+}
+
 @keyframes draw-loading-shine {
   0% {
     background-position: 120% 0;
@@ -1837,6 +1959,17 @@ onBeforeUnmount(() => {
   -webkit-line-clamp: 2;
 }
 
+.draw-work-card__error-message {
+  display: block;
+  overflow: hidden;
+  margin: -2px 10px 8px;
+  color: #b65147;
+  font-size: 7px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .draw-work-card__meta {
   display: flex;
   flex-wrap: wrap;
@@ -1858,6 +1991,10 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 8px;
   border-top: 1px solid #eef0f3;
+}
+
+.draw-work-card--failed > footer {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .draw-work-card > footer button {

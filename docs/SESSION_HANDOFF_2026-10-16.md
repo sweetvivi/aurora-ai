@@ -305,7 +305,7 @@ Git 身份：
 - Base URL：`https://api.example.com/v1`
 - 默认对话模型：`gpt-6-astra`
 - 只实现一个 OpenAI 兼容适配器
-- 生图先 Mock，M1 尾期接 Seedance
+- 生图先 Mock；后续接入 1、3 号图像 Key，Seedance 仅用于视频
 - 视频先 Mock，M4 接入
 - Embedding 暂不做
 

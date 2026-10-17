@@ -40,7 +40,7 @@
 
 ## 4. 当前阶段
 
-当前处于 M0 工程基础阶段，已在 `feature/m0-foundation` 分支开始实施。
+当前处于 M1 首条垂直切片阶段，已在本机分支 `feature/m1-vertical-slice` 完成实现和本地验收。
 
 已经完成：
 
@@ -54,13 +54,16 @@
 - pnpm workspace、NestJS 后端基础、Vue 3 前端基础和五套 Shell
 - PostgreSQL、Redis 本地基础设施、Prisma 初始迁移和健康检查联调
 - 最小 GitHub Actions CI 配置、类型检查、测试、构建和桌面端/移动端页面检查
+- M1 认证、积分账本、模型列表、流式对话、会话历史、文件上传和图片任务状态机
+- M1 绘画工作台真实后端接入，包括批量生成、轮询、结果加载、失败退款、重试、下载、收藏和删除
+- M1-7 全量检查通过，API 29/29、Web 16/16，桌面与 390px 移动端绘图验收通过
 
 进行中：
 
-- M0 本地验收已完成，等待用户确认后推送 `feature/m0-foundation`
+- M1 本地验收已完成，等待用户确认后推送 `feature/m1-vertical-slice`
 - GitHub Actions 的实际远端执行结果需要推送后才能确认
 
-M0 之后的业务闭环、管理后台、真实支付和公开部署按 `docs/IMPLEMENTATION_PLAN.md` 分批实施。下一步从 M1 首条垂直切片开始。
+后续优先按参考产品继续智能体、图片和视频相关功能复盘；视频后置。管理后台、真实支付和公开部署按 `docs/IMPLEMENTATION_PLAN.md` 分批实施。
 
 ## 5. 产品实现边界
 
