@@ -68,6 +68,8 @@ export class ImageTasksService implements OnModuleInit {
   async create(userId: string, input: CreateImageTaskDto, rawIdempotencyKey: string | undefined) {
     const idempotencyKey = this.normalizeIdempotencyKey(userId, rawIdempotencyKey);
     const prompt = input.prompt.trim();
+    const referenceFileIds = this.normalizeReferenceFileIds(input.referenceFileIds);
+    const taskParameters = this.buildTaskParameters(input.parameters, referenceFileIds);
 
     if (!prompt) {
       throw new ConflictException({
@@ -91,12 +93,23 @@ export class ImageTasksService implements OnModuleInit {
       await this.filesService.getOwnedAsset(userId, input.sourceFileId);
     }
 
+    if (referenceFileIds.length > 0 && !input.sourceFileId) {
+      throw new ConflictException({
+        code: 'IMAGE_SOURCE_REQUIRED',
+        message: '使用参考图时请先上传主图片',
+      });
+    }
+
+    for (const referenceFileId of referenceFileIds) {
+      await this.filesService.getOwnedAsset(userId, referenceFileId);
+    }
+
     const existing = await this.prismaService.imageTask.findUnique({
       where: { idempotencyKey },
     });
 
     if (existing) {
-      this.assertMatchingTask(existing, input, model.alias, prompt);
+      this.assertMatchingTask(existing, input, model.alias, prompt, taskParameters);
       this.schedule(existing.id);
 
       return this.getTask(userId, existing.id);
@@ -111,7 +124,7 @@ export class ImageTasksService implements OnModuleInit {
           id: taskId,
           idempotencyKey,
           modelAlias: model.alias,
-          parameters: input.parameters as Prisma.InputJsonValue | undefined,
+          parameters: taskParameters as Prisma.InputJsonValue | undefined,
           prompt,
           sourceFileId: input.sourceFileId,
           userId,
@@ -122,7 +135,7 @@ export class ImageTasksService implements OnModuleInit {
         const concurrent = await this.prismaService.imageTask.findUniqueOrThrow({
           where: { idempotencyKey },
         });
-        this.assertMatchingTask(concurrent, input, model.alias, prompt);
+        this.assertMatchingTask(concurrent, input, model.alias, prompt, taskParameters);
         this.schedule(concurrent.id);
 
         return this.getTask(userId, concurrent.id);
@@ -235,18 +248,31 @@ export class ImageTasksService implements OnModuleInit {
     let resultStorageKey: string | undefined;
 
     try {
-      const sourceImage = task.sourceFile
-        ? {
-            buffer: await this.storageAdapter.read(task.sourceFile.storageKey),
-            mimeType: task.sourceFile.mimeType,
-            originalName: task.sourceFile.originalName,
-          }
-        : undefined;
+      const sourceImages = task.sourceFile
+        ? [
+            {
+              buffer: await this.storageAdapter.read(task.sourceFile.storageKey),
+              mimeType: task.sourceFile.mimeType,
+              originalName: task.sourceFile.originalName,
+            },
+          ]
+        : [];
+
+      for (const referenceFileId of this.readReferenceFileIds(task.parameters)) {
+        const referenceFile = await this.filesService.getOwnedAsset(task.userId, referenceFileId);
+
+        sourceImages.push({
+          buffer: await this.storageAdapter.read(referenceFile.storageKey),
+          mimeType: referenceFile.mimeType,
+          originalName: referenceFile.originalName,
+        });
+      }
+
       const generated = await this.imageProvider.generateImage({
         model: model.providerModel,
         parameters: this.toRecord(task.parameters),
         prompt: task.prompt,
-        sourceImage,
+        sourceImages: sourceImages.length > 0 ? sourceImages : undefined,
       });
 
       if (!Buffer.isBuffer(generated.buffer) || generated.buffer.length === 0) {
@@ -374,9 +400,10 @@ export class ImageTasksService implements OnModuleInit {
     input: CreateImageTaskDto,
     modelAlias: string,
     prompt: string,
+    parameters: Record<string, unknown> | undefined,
   ): void {
     const parametersMatch =
-      JSON.stringify(task.parameters ?? null) === JSON.stringify(input.parameters ?? null);
+      JSON.stringify(task.parameters ?? null) === JSON.stringify(parameters ?? null);
 
     if (
       task.modelAlias !== modelAlias ||
@@ -402,6 +429,37 @@ export class ImageTasksService implements OnModuleInit {
     }
 
     return `image:${userId}:${key}`;
+  }
+
+  private normalizeReferenceFileIds(value: string[] | undefined): string[] {
+    return Array.from(new Set((value ?? []).map((fileId) => fileId.trim()).filter(Boolean)));
+  }
+
+  private buildTaskParameters(
+    parameters: Record<string, unknown> | undefined,
+    referenceFileIds: string[],
+  ): Record<string, unknown> | undefined {
+    const sanitized = { ...parameters };
+    delete sanitized.referenceFileIds;
+
+    if (referenceFileIds.length > 0) {
+      sanitized.referenceFileIds = referenceFileIds;
+    }
+
+    return parameters || referenceFileIds.length > 0 ? sanitized : undefined;
+  }
+
+  private readReferenceFileIds(parameters: Prisma.JsonValue | null): string[] {
+    const record = this.toRecord(parameters);
+    const value = record?.referenceFileIds;
+
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.filter(
+      (fileId): fileId is string => typeof fileId === 'string' && Boolean(fileId),
+    );
   }
 
   private toTaskDto(task: ImageTaskWithFiles) {

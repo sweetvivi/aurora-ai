@@ -38,7 +38,7 @@ import {
 } from '@/stores/draw-workspace';
 import { useSessionStore } from '@/stores/session';
 
-type CommerceForm = 'background' | 'pattern' | 'placeholder';
+type CommerceForm = 'background' | 'pattern' | 'placeholder' | 'retouch' | 'try-on';
 type UploadRole = 'background' | 'clothing' | 'model' | 'pattern' | 'product';
 type PreviewSide = 'after' | 'before';
 
@@ -79,7 +79,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#f07a38',
         description: '替换展示台座与商品陈列环境。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '台',
         icon: AppstoreOutlined,
         label: '展示台座替换大师',
@@ -117,7 +117,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#4e9b78',
         description: '替换场景道具并匹配真实透视关系。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '道',
         icon: AppstoreOutlined,
         label: '场景道具替换器',
@@ -129,7 +129,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#bd8a36',
         description: '根据季节氛围重建商品环境。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '季',
         icon: AppstoreOutlined,
         label: '季节氛围替换大师',
@@ -141,7 +141,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#2b96ab',
         description: '迁移商品到新的商业场景。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '迁',
         icon: AppstoreOutlined,
         label: '商品场景迁移大师',
@@ -153,7 +153,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#d95d81',
         description: '生成自然的手持商品展示效果。',
-        form: 'placeholder',
+        form: 'try-on',
         glyph: '手',
         icon: UserOutlined,
         label: '手持模特替换专家',
@@ -201,7 +201,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#7287d8',
         description: '生成模特试穿和佩戴效果。',
-        form: 'placeholder',
+        form: 'try-on',
         glyph: '模',
         icon: UserOutlined,
         label: '虚拟模特试穿',
@@ -213,7 +213,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#2e9ed1',
         description: '一键抠图并替换新的商品背景。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '换',
         icon: BgColorsOutlined,
         label: '一键商品换背景',
@@ -230,7 +230,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#518fd1',
         description: '校正背景光影与透视关系。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '光',
         icon: BgColorsOutlined,
         label: '光影透视校正大师',
@@ -242,7 +242,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#7664d9',
         description: '生成具有艺术感的背景画面。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '艺',
         icon: AppstoreOutlined,
         label: '艺术创意背景画板',
@@ -254,7 +254,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#43a073',
         description: '统一处理多张商品背景。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '批',
         icon: AppstoreOutlined,
         label: '批量背景统一处理',
@@ -266,7 +266,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#b78345',
         description: '生成家居生活场景背景。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '家',
         icon: AppstoreOutlined,
         label: '家居环境智能融合',
@@ -278,7 +278,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#3d97bc',
         description: '生成数码科技质感背景。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '科',
         icon: AppstoreOutlined,
         label: '数码科技背景设计',
@@ -290,7 +290,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#d57e4f',
         description: '生成美食氛围和陈列背景。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '食',
         icon: AppstoreOutlined,
         label: '美食场景背景搭配',
@@ -302,7 +302,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#d75f8d',
         description: '生成美妆产品的高级质感背景。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '美',
         icon: AppstoreOutlined,
         label: '美妆质感背景大师',
@@ -314,7 +314,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#8755b8',
         description: '生成服饰风格化的背景环境。',
-        form: 'placeholder',
+        form: 'background',
         glyph: '衣',
         icon: AppstoreOutlined,
         label: '服饰风格背景定制',
@@ -331,7 +331,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#397be5',
         description: '一键去除背景，保留商品主体。',
-        form: 'placeholder',
+        form: 'retouch',
         glyph: '抠',
         icon: PictureOutlined,
         label: '商品抠图',
@@ -343,7 +343,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#9a57d7',
         description: '将商品图转换为不同艺术风格。',
-        form: 'placeholder',
+        form: 'retouch',
         glyph: '风',
         icon: AppstoreOutlined,
         label: '风格转换',
@@ -355,7 +355,7 @@ const catalogGroups: CatalogGroup[] = [
       {
         accent: '#23a56e',
         description: 'AI 无损放大，提升图片清晰度。',
-        form: 'placeholder',
+        form: 'retouch',
         glyph: '放',
         icon: PictureOutlined,
         label: '图片放大',
@@ -402,6 +402,11 @@ const clothingCategories = [
 ];
 const patternStrengths = ['自然贴合', '保持纹理', '强化图案'];
 const patternResolutions = ['1K', '2K', '4K'];
+const retouchModes = ['一键抠图', '商品精修', '高清放大', '背景净化和补光'];
+const retouchResolutions = ['1K', '2K', '4K'];
+const tryOnPoses = ['正面站姿', '自然走姿', '半身展示', '坐姿展示'];
+const tryOnScenes = ['纯色棚拍', '生活方式', '都市街景', '家居空间'];
+const tryOnResolutions = ['1K', '2K', '4K'];
 const ratios = ['1:1', '4:5', '3:4', '16:9', '9:16'];
 const amounts = [1, 2, 3, 4];
 const promptPresets = ['保持光线方向一致', '边缘融合自然', '突出商品材质', '留出文案空间'];
@@ -454,6 +459,11 @@ const patternApplication = ref(patternApplications[0] ?? '胸前图案');
 const clothingCategory = ref(clothingCategories[0] ?? 'T 恤');
 const patternStrength = ref(patternStrengths[0] ?? '自然贴合');
 const patternResolution = ref('2K');
+const retouchMode = ref(retouchModes[0] ?? '一键抠图');
+const retouchResolution = ref('2K');
+const tryOnPose = ref(tryOnPoses[0] ?? '正面站姿');
+const tryOnScene = ref(tryOnScenes[0] ?? '纯色棚拍');
+const tryOnResolution = ref('2K');
 const selectedRatio = ref('1:1');
 const selectedAmount = ref(1);
 const imageUploads = ref<Record<UploadRole, UploadState | null>>({
@@ -491,6 +501,8 @@ const filteredToolCount = computed(() =>
 const isAvailableTool = computed(() => activeTool.value.form !== 'placeholder');
 const isBackgroundTool = computed(() => activeTool.value.form === 'background');
 const isPatternTool = computed(() => activeTool.value.form === 'pattern');
+const isRetouchTool = computed(() => activeTool.value.form === 'retouch');
+const isTryOnTool = computed(() => activeTool.value.form === 'try-on');
 const requiredUploads = computed<UploadRole[]>(() => {
   if (isBackgroundTool.value) {
     return ['product', 'background'];
@@ -498,6 +510,14 @@ const requiredUploads = computed<UploadRole[]>(() => {
 
   if (isPatternTool.value) {
     return ['clothing', 'pattern'];
+  }
+
+  if (isRetouchTool.value) {
+    return ['product'];
+  }
+
+  if (isTryOnTool.value) {
+    return ['clothing', 'model'];
   }
 
   return [];
@@ -518,6 +538,16 @@ const previewImage = computed(() => {
     return previewSide.value === 'before'
       ? imageUploads.value.clothing?.url
       : imageUploads.value.pattern?.url;
+  }
+
+  if (isRetouchTool.value) {
+    return imageUploads.value.product?.url;
+  }
+
+  if (isTryOnTool.value) {
+    return previewSide.value === 'before'
+      ? imageUploads.value.clothing?.url
+      : imageUploads.value.model?.url;
   }
 
   return undefined;
@@ -542,6 +572,18 @@ const previewDescription = computed(() => {
     return previewSide.value === 'before'
       ? '上传需要替换图案的基础服饰'
       : '图案自然贴合面料，同时保留服饰版型和褶皱';
+  }
+
+  if (isRetouchTool.value) {
+    return previewSide.value === 'before'
+      ? '上传需要处理的商品原图'
+      : `${retouchMode.value}会保留商品主体并优化细节`;
+  }
+
+  if (isTryOnTool.value) {
+    return previewSide.value === 'before'
+      ? '上传需要上身的服饰或商品素材'
+      : '虚拟模特试穿会匹配版型、姿态和场景光线';
   }
 
   return activeTool.value.description;
@@ -571,6 +613,24 @@ const toolSteps = computed(() => {
     ];
   }
 
+  if (isRetouchTool.value) {
+    return [
+      '上传需要处理的商品图片',
+      '选择抠图、精修、放大或补光方式',
+      '选择输出分辨率并补充额外要求',
+      '点击开始处理，等待 AI 返回结果',
+    ];
+  }
+
+  if (isTryOnTool.value) {
+    return [
+      '上传需要试穿的服饰或商品素材',
+      '上传模特姿态参考图',
+      '选择展示姿态、场景和输出分辨率',
+      '点击开始处理，生成自然试穿效果',
+    ];
+  }
+
   return ['先选择左侧可用工具', '按面板提示上传素材', '调整参数后开始处理'];
 });
 const toolTips = computed(() => {
@@ -587,6 +647,22 @@ const toolTips = computed(() => {
       '图案分辨率越高，面料纹理越清晰',
       '服饰主体不要被大面积遮挡',
       '复杂褶皱会由 AI 自动匹配图案透视',
+    ];
+  }
+
+  if (isRetouchTool.value) {
+    return [
+      '商品主体越完整，边缘处理越准确',
+      '高分辨率原图能保留更多材质细节',
+      '复杂透明材质建议补充额外要求',
+    ];
+  }
+
+  if (isTryOnTool.value) {
+    return [
+      '服饰图尽量使用正面平铺或无遮挡商品图',
+      '模特参考图与目标姿态越接近，结果越自然',
+      '场景选择会影响光影和整体商品氛围',
     ];
   }
 
@@ -698,6 +774,23 @@ function buildPrompt(): string {
     );
   }
 
+  if (isRetouchTool.value) {
+    parts.push(
+      `处理方式：${retouchMode.value}。`,
+      `输出分辨率：${retouchResolution.value}。`,
+      '保持商品主体、品牌文字、材质和原始颜色准确。',
+    );
+  }
+
+  if (isTryOnTool.value) {
+    parts.push(
+      `展示姿态：${tryOnPose.value}。`,
+      `目标场景：${tryOnScene.value}。`,
+      `输出分辨率：${tryOnResolution.value}。`,
+      '保持服饰版型、图案、材质和商品细节准确，手部和身体结构自然。',
+    );
+  }
+
   if (prompt.value.trim()) {
     parts.push(`额外需求：${prompt.value.trim()}。`);
   }
@@ -711,6 +804,14 @@ function sourceRole(): UploadRole | null {
   }
 
   if (isPatternTool.value) {
+    return 'clothing';
+  }
+
+  if (isRetouchTool.value) {
+    return 'product';
+  }
+
+  if (isTryOnTool.value) {
     return 'clothing';
   }
 
@@ -729,6 +830,11 @@ async function submitTask(): Promise<void> {
 
   const primaryRole = sourceRole();
   const primaryImage = primaryRole ? imageUploads.value[primaryRole] : null;
+  const referenceFileId = isBackgroundTool.value
+    ? imageUploads.value.background?.assetId
+    : isPatternTool.value
+      ? imageUploads.value.pattern?.assetId
+      : imageUploads.value.model?.assetId;
 
   if (!primaryRole || !primaryImage) {
     uploadError.value = '缺少主素材，请重新上传';
@@ -751,13 +857,25 @@ async function submitTask(): Promise<void> {
       patternApplication: isPatternTool.value ? patternApplication.value : undefined,
       patternFileId: imageUploads.value.pattern?.assetId,
       patternStrength: isPatternTool.value ? patternStrength.value : undefined,
+      retouchMode: isRetouchTool.value ? retouchMode.value : undefined,
+      retouchResolution: isRetouchTool.value ? retouchResolution.value : undefined,
       sourceRole: primaryRole,
+      tryOnPose: isTryOnTool.value ? tryOnPose.value : undefined,
+      tryOnScene: isTryOnTool.value ? tryOnScene.value : undefined,
+      tryOnResolution: isTryOnTool.value ? tryOnResolution.value : undefined,
     },
     model: 'commerce-visual-3',
     modelLabel: activeTool.value.label,
     prompt: buildPrompt(),
     ratio: selectedRatio.value,
-    size: isBackgroundTool.value ? backgroundResolution.value : patternResolution.value,
+    referenceFileIds: referenceFileId ? [referenceFileId] : undefined,
+    size: isBackgroundTool.value
+      ? backgroundResolution.value
+      : isPatternTool.value
+        ? patternResolution.value
+        : isRetouchTool.value
+          ? retouchResolution.value
+          : tryOnResolution.value,
     sourceFileId: primaryImage.assetId,
     toolKey: 'commerce',
   });
@@ -794,6 +912,11 @@ function resetForm(): void {
   clothingCategory.value = clothingCategories[0] ?? 'T 恤';
   patternStrength.value = patternStrengths[0] ?? '自然贴合';
   patternResolution.value = '2K';
+  retouchMode.value = retouchModes[0] ?? '一键抠图';
+  retouchResolution.value = '2K';
+  tryOnPose.value = tryOnPoses[0] ?? '正面站姿';
+  tryOnScene.value = tryOnScenes[0] ?? '纯色棚拍';
+  tryOnResolution.value = '2K';
   selectedRatio.value = '1:1';
   selectedAmount.value = 1;
 }
@@ -1175,6 +1298,169 @@ onBeforeUnmount(() => {
               placeholder="例如：图案颜色降低一点，保留面料褶皱"
             />
           </label>
+        </div>
+
+        <div v-else-if="isRetouchTool" class="commerce-editor__content">
+          <label class="commerce-field">
+            <span>处理方式 <em>*</em></span>
+            <select v-model="retouchMode">
+              <option v-for="mode in retouchModes" :key="mode" :value="mode">{{ mode }}</option>
+            </select>
+          </label>
+
+          <label class="commerce-field">
+            <span>输出分辨率</span>
+            <select v-model="retouchResolution">
+              <option
+                v-for="resolution in retouchResolutions"
+                :key="resolution"
+                :value="resolution"
+              >
+                {{ resolution }}
+              </option>
+            </select>
+          </label>
+
+          <div
+            class="commerce-upload"
+            :class="{ filled: imageUploads.product }"
+            @dragover.prevent
+            @drop.prevent="handleDrop('product', $event)"
+          >
+            <div v-if="imageUploads.product" class="commerce-upload__preview">
+              <img :src="imageUploads.product.url" :alt="imageUploads.product.name" />
+              <button type="button" aria-label="移除商品图片" @click="removeUpload('product')">
+                <CloseOutlined />
+              </button>
+              <span>商品原图</span>
+            </div>
+            <button v-else type="button" @click="openUpload('product')">
+              <LoadingOutlined v-if="isUploading('product')" />
+              <UploadOutlined v-else />
+              <strong>{{ isUploading('product') ? '正在上传' : uploadMeta.product.label }}</strong>
+              <small>{{ uploadMeta.product.description }}</small>
+              <em>0 / 1</em>
+            </button>
+          </div>
+
+          <label class="commerce-field">
+            <span>额外需求</span>
+            <textarea
+              v-model="prompt"
+              maxlength="600"
+              placeholder="例如：保留商品边缘细节，背景改为纯白"
+            />
+          </label>
+
+          <div class="commerce-presets">
+            <span>快捷要求</span>
+            <div>
+              <button
+                v-for="preset in promptPresets"
+                :key="preset"
+                type="button"
+                @click="setPromptPreset(preset)"
+              >
+                <PlusOutlined />
+                {{ preset }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="isTryOnTool" class="commerce-editor__content">
+          <label class="commerce-field">
+            <span>展示姿态 <em>*</em></span>
+            <select v-model="tryOnPose">
+              <option v-for="pose in tryOnPoses" :key="pose" :value="pose">{{ pose }}</option>
+            </select>
+          </label>
+
+          <label class="commerce-field">
+            <span>目标场景 <em>*</em></span>
+            <select v-model="tryOnScene">
+              <option v-for="scene in tryOnScenes" :key="scene" :value="scene">{{ scene }}</option>
+            </select>
+          </label>
+
+          <label class="commerce-field">
+            <span>输出分辨率</span>
+            <select v-model="tryOnResolution">
+              <option v-for="resolution in tryOnResolutions" :key="resolution" :value="resolution">
+                {{ resolution }}
+              </option>
+            </select>
+          </label>
+
+          <div
+            class="commerce-upload"
+            :class="{ filled: imageUploads.clothing }"
+            @dragover.prevent
+            @drop.prevent="handleDrop('clothing', $event)"
+          >
+            <div v-if="imageUploads.clothing" class="commerce-upload__preview">
+              <img :src="imageUploads.clothing.url" :alt="imageUploads.clothing.name" />
+              <button type="button" aria-label="移除服饰图片" @click="removeUpload('clothing')">
+                <CloseOutlined />
+              </button>
+              <span>服饰素材</span>
+            </div>
+            <button v-else type="button" @click="openUpload('clothing')">
+              <LoadingOutlined v-if="isUploading('clothing')" />
+              <UploadOutlined v-else />
+              <strong>{{
+                isUploading('clothing') ? '正在上传' : uploadMeta.clothing.label
+              }}</strong>
+              <small>{{ uploadMeta.clothing.description }}</small>
+              <em>0 / 1</em>
+            </button>
+          </div>
+
+          <div
+            class="commerce-upload"
+            :class="{ filled: imageUploads.model }"
+            @dragover.prevent
+            @drop.prevent="handleDrop('model', $event)"
+          >
+            <div v-if="imageUploads.model" class="commerce-upload__preview">
+              <img :src="imageUploads.model.url" :alt="imageUploads.model.name" />
+              <button type="button" aria-label="移除模特参考图" @click="removeUpload('model')">
+                <CloseOutlined />
+              </button>
+              <span>模特参考</span>
+            </div>
+            <button v-else type="button" @click="openUpload('model')">
+              <LoadingOutlined v-if="isUploading('model')" />
+              <UploadOutlined v-else />
+              <strong>{{ isUploading('model') ? '正在上传' : uploadMeta.model.label }}</strong>
+              <small>{{ uploadMeta.model.description }}</small>
+              <em>0 / 1</em>
+            </button>
+          </div>
+
+          <label class="commerce-field">
+            <span>额外需求</span>
+            <textarea
+              v-model="prompt"
+              maxlength="600"
+              placeholder="例如：保持服饰图案和版型，姿势自然放松"
+            />
+          </label>
+
+          <div class="commerce-presets">
+            <span>快捷要求</span>
+            <div>
+              <button
+                v-for="preset in promptPresets"
+                :key="preset"
+                type="button"
+                @click="setPromptPreset(preset)"
+              >
+                <PlusOutlined />
+                {{ preset }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div v-else class="commerce-editor__placeholder">

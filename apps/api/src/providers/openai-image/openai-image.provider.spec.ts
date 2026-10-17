@@ -48,15 +48,53 @@ describe('OpenAiImageProvider', () => {
       model: 'gpt-image-2.5',
       parameters: { ratio: '16:9', size: '2K' },
       prompt: '替换背景',
-      sourceImage: {
-        buffer: Buffer.from(ONE_PIXEL_PNG_BASE64, 'base64'),
-        mimeType: 'image/png',
-        originalName: 'source.png',
-      },
+      sourceImages: [
+        {
+          buffer: Buffer.from(ONE_PIXEL_PNG_BASE64, 'base64'),
+          mimeType: 'image/png',
+          originalName: 'source.png',
+        },
+      ],
     });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://example.test/v1/images/edits');
-    expect(fetchMock.mock.calls[0]?.[1]?.body).toBeInstanceOf(FormData);
+    const form = fetchMock.mock.calls[0]?.[1]?.body;
+
+    expect(form).toBeInstanceOf(FormData);
+    expect((form as FormData).getAll('image')).toHaveLength(1);
+  });
+
+  it('sends multiple reference images with the official image[] field', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ b64_json: ONE_PIXEL_PNG_BASE64 }] }), {
+        headers: { 'content-type': 'application/json' },
+        status: 200,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = createProvider();
+    await provider.generateImage({
+      model: 'gpt-image-2.5',
+      prompt: '将商品融合到背景',
+      sourceImages: [
+        {
+          buffer: Buffer.from(ONE_PIXEL_PNG_BASE64, 'base64'),
+          mimeType: 'image/png',
+          originalName: 'product.png',
+        },
+        {
+          buffer: Buffer.from(ONE_PIXEL_PNG_BASE64, 'base64'),
+          mimeType: 'image/png',
+          originalName: 'background.png',
+        },
+      ],
+    });
+
+    const form = fetchMock.mock.calls[0]?.[1]?.body as FormData;
+
+    expect(form).toBeInstanceOf(FormData);
+    expect(form.getAll('image[]')).toHaveLength(2);
   });
 
   it('downloads a URL result when the provider does not return base64', async () => {

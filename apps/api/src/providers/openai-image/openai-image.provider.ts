@@ -54,7 +54,7 @@ export class OpenAiImageProvider implements ImageProvider {
       const payload = this.createPayload(input);
       const actor = this.configService.get<string>('IMAGE_ACTOR_AUTHORIZATION');
       const response = await fetch(
-        `${baseUrl}${input.sourceImage ? '/images/edits' : '/images/generations'}`,
+        `${baseUrl}${input.sourceImages?.length ? '/images/edits' : '/images/generations'}`,
         {
           body: payload.body,
           headers: {
@@ -93,7 +93,7 @@ export class OpenAiImageProvider implements ImageProvider {
     const size = resolveImageSize(input.parameters);
     const quality = resolveImageQuality(input.parameters);
 
-    if (input.sourceImage) {
+    if (input.sourceImages?.length) {
       const form = new FormData();
 
       form.append('model', model);
@@ -102,13 +102,17 @@ export class OpenAiImageProvider implements ImageProvider {
       form.append('size', size);
       form.append('quality', quality);
       form.append('output_format', 'png');
-      form.append(
-        'image',
-        new Blob([new Uint8Array(input.sourceImage.buffer)], {
-          type: input.sourceImage.mimeType,
-        }),
-        input.sourceImage.originalName,
-      );
+      const imageField = input.sourceImages.length === 1 ? 'image' : 'image[]';
+
+      for (const sourceImage of input.sourceImages) {
+        form.append(
+          imageField,
+          new Blob([new Uint8Array(sourceImage.buffer)], {
+            type: sourceImage.mimeType,
+          }),
+          sourceImage.originalName,
+        );
+      }
 
       return {
         body: form,

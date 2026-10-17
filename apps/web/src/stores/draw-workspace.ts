@@ -54,6 +54,7 @@ interface CreateGenerationInput {
   modelLabel: string;
   prompt: string;
   ratio: string;
+  referenceFileIds?: string[];
   size: string;
   sourceFileId?: string;
   toolKey?: string;
@@ -202,6 +203,7 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
                 tool: toolKey,
               },
               prompt,
+              referenceFileIds: input.referenceFileIds,
               sourceFileId: input.sourceFileId,
             },
             `${generationId}:${index + 1}`,

@@ -362,6 +362,7 @@ export async function createImageTask(
     modelAlias?: string;
     parameters?: Record<string, unknown>;
     prompt: string;
+    referenceFileIds?: string[];
     sourceFileId?: string;
   },
   idempotencyKey: string,

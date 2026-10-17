@@ -25,11 +25,14 @@ const PNG_BUFFER = Buffer.from(
 describe('file uploads and image tasks', () => {
   let app: INestApplication;
   let imageMode: 'failure' | 'success';
+  let lastImageInput: GenerateImageInput | undefined;
   let prisma: PrismaService;
   const storage = new MemoryStorageAdapter();
 
   const imageProvider: ImageProvider = {
     async generateImage(input: GenerateImageInput) {
+      lastImageInput = input;
+
       if (imageMode === 'failure') {
         throw new ServiceUnavailableException({
           code: 'IMAGE_PROVIDER_UNAVAILABLE',
@@ -141,8 +144,11 @@ describe('file uploads and image tasks', () => {
 
   it('creates an image task, settles points, and returns the result file', async () => {
     imageMode = 'success';
+    lastImageInput = undefined;
     const { accessToken, email } = await registerUser();
     const idempotencyKey = randomUUID();
+    const sourceFileId = await uploadImage(accessToken, 'source.png');
+    const backgroundFileId = await uploadImage(accessToken, 'background.png');
 
     const createResponse = await request(app.getHttpServer())
       .post('/api/v1/image-tasks')
@@ -152,7 +158,9 @@ describe('file uploads and image tasks', () => {
         parameters: {
           aspectRatio: '1:1',
         },
-        prompt: '一张用于测试的抽象图案',
+        prompt: '将商品自然融合到目标背景',
+        referenceFileIds: [backgroundFileId],
+        sourceFileId,
       })
       .expect(202);
 
@@ -166,6 +174,9 @@ describe('file uploads and image tasks', () => {
     });
     expect(task.resultFile).toMatchObject({
       mimeType: 'image/png',
+    });
+    expect(lastImageInput).toMatchObject({
+      sourceImages: [{ originalName: 'source.png' }, { originalName: 'background.png' }],
     });
     expect(task).not.toHaveProperty('idempotencyKey');
 
@@ -200,7 +211,9 @@ describe('file uploads and image tasks', () => {
         parameters: {
           aspectRatio: '1:1',
         },
-        prompt: '一张用于测试的抽象图案',
+        prompt: '将商品自然融合到目标背景',
+        referenceFileIds: [backgroundFileId],
+        sourceFileId,
       })
       .expect(202);
 
@@ -254,6 +267,58 @@ describe('file uploads and image tasks', () => {
     expect(ledger.map((entry) => entry.type)).toEqual(['GRANT', 'HOLD', 'REFUND']);
   });
 
+  it('rejects reference images that belong to another user', async () => {
+    const owner = await registerUser();
+    const otherUser = await registerUser();
+    const sourceFileId = await uploadImage(owner.accessToken, 'source.png');
+    const otherUserFileId = await uploadImage(otherUser.accessToken, 'private.png');
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/image-tasks')
+      .set('authorization', `Bearer ${owner.accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        prompt: '不应读取其他用户文件',
+        referenceFileIds: [otherUserFileId],
+        sourceFileId,
+      })
+      .expect(404);
+
+    expect(response.body.error.code).toBe('FILE_NOT_FOUND');
+  });
+
+  it('ignores reference file ids injected through freeform parameters', async () => {
+    imageMode = 'success';
+    lastImageInput = undefined;
+    const owner = await registerUser();
+    const otherUser = await registerUser();
+    const sourceFileId = await uploadImage(owner.accessToken, 'source.png');
+    const otherUserFileId = await uploadImage(otherUser.accessToken, 'private.png');
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/image-tasks')
+      .set('authorization', `Bearer ${owner.accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        parameters: {
+          aspectRatio: '1:1',
+          referenceFileIds: [otherUserFileId],
+        },
+        prompt: '只处理主图片',
+        sourceFileId,
+      })
+      .expect(202);
+
+    const task = await waitForTerminalTask(owner.accessToken, response.body.data.id);
+
+    expect(task.status).toBe('SUCCEEDED');
+    const observedInput = lastImageInput as GenerateImageInput | undefined;
+
+    expect(observedInput?.sourceImages).toEqual([
+      expect.objectContaining({ originalName: 'source.png' }),
+    ]);
+  });
+
   async function waitForTerminalTask(
     accessToken: string,
     taskId: string,
@@ -296,6 +361,19 @@ describe('file uploads and image tasks', () => {
       accessToken: response.body.data.accessToken as string,
       email,
     };
+  }
+
+  async function uploadImage(accessToken: string, filename: string): Promise<string> {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/files')
+      .set('authorization', `Bearer ${accessToken}`)
+      .attach('file', PNG_BUFFER, {
+        contentType: 'image/png',
+        filename,
+      })
+      .expect(201);
+
+    return response.body.data.id as string;
   }
 });
 

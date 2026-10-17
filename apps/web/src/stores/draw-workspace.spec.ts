@@ -135,6 +135,7 @@ describe('draw workspace store', () => {
       modelLabel: '极光光影 2.1',
       prompt: '  湖畔玻璃茶室  ',
       ratio: '16:9',
+      referenceFileIds: ['file-reference'],
       size: '2K',
       sourceFileId: 'file-source',
     });
@@ -161,6 +162,7 @@ describe('draw workspace store', () => {
         uiModelLabel: '极光光影 2.1',
       },
       prompt: '湖畔玻璃茶室',
+      referenceFileIds: ['file-reference'],
       sourceFileId: 'file-source',
     });
     expect(firstCall[1]).toMatch(/^generation-.+:1$/);
