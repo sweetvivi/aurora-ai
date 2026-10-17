@@ -69,6 +69,25 @@ export interface ImageTask {
   status: ImageTaskStatus;
 }
 
+export type VideoTaskStatus = 'CANCELLED' | 'FAILED' | 'QUEUED' | 'RUNNING' | 'SUCCEEDED';
+
+export interface VideoTask {
+  completedAt: string | null;
+  createdAt: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  id: string;
+  lastFrameFile: FileAsset | null;
+  modelAlias: string;
+  parameters: Record<string, unknown> | null;
+  progress: number;
+  prompt: string;
+  resultFile: FileAsset | null;
+  sourceFile: FileAsset | null;
+  startedAt: string | null;
+  status: VideoTaskStatus;
+}
+
 export interface ConversationSummary {
   createdAt: string;
   id: string;
@@ -368,6 +387,50 @@ export async function listImageTasks(limit = 30): Promise<ImageTask[]> {
 export async function getImageTask(taskId: string): Promise<ImageTask> {
   const response = await apiClient.get<ApiEnvelope<ImageTask>>(
     `/api/v1/image-tasks/${encodeURIComponent(taskId)}`,
+  );
+
+  return response.data.data;
+}
+
+export async function createVideoTask(
+  input: {
+    lastFrameFileId?: string;
+    modelAlias?: string;
+    parameters?: Record<string, unknown>;
+    prompt: string;
+    sourceFileId?: string;
+  },
+  idempotencyKey: string,
+): Promise<VideoTask> {
+  const response = await apiClient.post<ApiEnvelope<VideoTask>>('/api/v1/video-tasks', input, {
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    timeout: 30_000,
+  });
+
+  return response.data.data;
+}
+
+export async function listVideoTasks(limit = 30): Promise<VideoTask[]> {
+  const response = await apiClient.get<ApiEnvelope<{ items: VideoTask[] }>>('/api/v1/video-tasks', {
+    params: { limit },
+  });
+
+  return response.data.data.items;
+}
+
+export async function getVideoTask(taskId: string): Promise<VideoTask> {
+  const response = await apiClient.get<ApiEnvelope<VideoTask>>(
+    `/api/v1/video-tasks/${encodeURIComponent(taskId)}`,
+  );
+
+  return response.data.data;
+}
+
+export async function cancelVideoTask(taskId: string): Promise<VideoTask> {
+  const response = await apiClient.post<ApiEnvelope<VideoTask>>(
+    `/api/v1/video-tasks/${encodeURIComponent(taskId)}/cancel`,
   );
 
   return response.data.data;

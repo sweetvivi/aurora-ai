@@ -69,6 +69,21 @@ export const envSchema = z.object({
   IMAGE_DEFAULT_MODEL: z.string().min(1).default('gpt-image-2.5'),
   IMAGE_DEFAULT_MODEL_ALIAS: z.string().min(1).default('jiguang-gpt-image-2.5'),
   IMAGE_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(600_000).default(180_000),
+  VIDEO_TASK_POINTS_COST: z.coerce.number().int().min(0).default(10),
+  VIDEO_PROVIDER: z.enum(['auto', 'mock', 'xai']).default('auto'),
+  VIDEO_BASE_URL: z.string().url().default('https://api.example.com/v1'),
+  VIDEO_API_KEY: optionalNonEmptyString,
+  VIDEO_DEFAULT_MODEL: z.string().min(1).default('grok-imagine-video'),
+  VIDEO_DEFAULT_MODEL_ALIAS: z.string().min(1).default('xai-grok-imagine-video'),
+  VIDEO_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(600_000).default(180_000),
+  VIDEO_POLL_INTERVAL_MS: z.coerce.number().int().min(100).max(30_000).default(2_000),
+  VIDEO_MAX_POLL_DURATION_MS: z.coerce.number().int().min(10_000).max(3_600_000).default(900_000),
+  VIDEO_MOCK_DURATION_MS: z.coerce.number().int().min(0).max(60_000).default(4_000),
+  VIDEO_RESULT_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1_024)
+    .default(300 * 1024 * 1024),
 });
 
 export type AppEnvironment = z.infer<typeof envSchema>;

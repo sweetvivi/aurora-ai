@@ -11,6 +11,9 @@ describe('environment schema', () => {
     expect(environment.IMAGE_DEFAULT_MODEL).toBe('gpt-image-2.5');
     expect(environment.IMAGE_DEFAULT_MODEL_ALIAS).toBe('jiguang-gpt-image-2.5');
     expect(environment.LLM_DEFAULT_MODEL).toBe('openai-gpt-6-astra');
+    expect(environment.VIDEO_PROVIDER).toBe('auto');
+    expect(environment.VIDEO_DEFAULT_MODEL).toBe('grok-imagine-video');
+    expect(environment.VIDEO_DEFAULT_MODEL_ALIAS).toBe('xai-grok-imagine-video');
   });
 
   it('coerces boolean environment values', () => {

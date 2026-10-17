@@ -26,6 +26,20 @@ const DEFAULT_MODELS: RegisteredModel[] = [
     providerCode: 'jiguang',
     providerModel: 'gpt-image-2.5',
   },
+  {
+    alias: 'xai-grok-imagine-video',
+    capabilities: ['video'],
+    displayName: 'Grok Imagine Video',
+    providerCode: 'xai',
+    providerModel: 'grok-imagine-video',
+  },
+  {
+    alias: 'xai-grok-imagine-video-1.5',
+    capabilities: ['video'],
+    displayName: 'Grok Imagine Video 1.5',
+    providerCode: 'xai',
+    providerModel: 'grok-imagine-video-1.5',
+  },
 ];
 
 @Injectable()
@@ -58,6 +72,12 @@ export class ModelRegistryService {
   getDefaultImageModel(): RegisteredModel {
     return this.getByAlias(
       this.configService.get<string>('IMAGE_DEFAULT_MODEL_ALIAS', 'jiguang-gpt-image-2.5'),
+    );
+  }
+
+  getDefaultVideoModel(): RegisteredModel {
+    return this.getByAlias(
+      this.configService.get<string>('VIDEO_DEFAULT_MODEL_ALIAS', 'xai-grok-imagine-video'),
     );
   }
 }

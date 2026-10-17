@@ -14,6 +14,7 @@ import { ModelsModule } from './models/models.module';
 import { PointsModule } from './points/points.module';
 import { ProvidersModule } from './providers/providers.module';
 import { StorageModule } from './storage/storage.module';
+import { VideoTasksModule } from './video-tasks/video-tasks.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { StorageModule } from './storage/storage.module';
     ChatModule,
     FilesModule,
     ImageTasksModule,
+    VideoTasksModule,
     ProvidersModule,
     AuthModule,
     HealthModule,

@@ -21,9 +21,14 @@ import { RouterLink, useRoute } from 'vue-router';
 import { fetchFileBlob } from '@/app/api';
 import GalleryArtwork from '@/components/GalleryArtwork.vue';
 import { useDrawWorkspaceStore } from '@/stores/draw-workspace';
+import {
+  VIDEO_TASK_POINTS_COST,
+  type VideoWork,
+  type VideoWorkStatus,
+  useVideoWorkspaceStore,
+} from '@/stores/video-workspace';
 
 type VideoMode = 'first-last-frame' | 'image-to-video' | 'text-to-video';
-type VideoTaskStatus = 'cancelled' | 'done' | 'failed' | 'generating' | 'queued';
 type GalleryTab = 'discover' | 'mine';
 
 interface VideoModel {
@@ -35,23 +40,8 @@ interface VideoModel {
   value: string;
 }
 
-interface VideoTask {
-  createdAt: number;
-  duration: number;
-  favorite: boolean;
-  id: string;
-  mode: VideoMode;
-  model: string;
-  modelLabel: string;
-  progress: number;
-  prompt: string;
-  ratio: string;
-  resolution: string;
-  status: VideoTaskStatus;
-  variant: number;
-}
-
 interface SourceFrame {
+  id: string;
   name: string;
   url: string;
 }
@@ -64,8 +54,6 @@ interface ShowcaseItem {
   title: string;
   variant: number;
 }
-
-const STORAGE_KEY = 'aurora-video-tasks-v1';
 
 const modes: { description: string; label: string; value: VideoMode }[] = [
   { description: '用文字描述镜头', label: '文生视频', value: 'text-to-video' },
@@ -179,6 +167,7 @@ const promptPresets = [
 const activeGalleryTab = ref<GalleryTab>('discover');
 const route = useRoute();
 const drawWorkspace = useDrawWorkspaceStore();
+const videoWorkspace = useVideoWorkspaceStore();
 const mode = ref<VideoMode>('text-to-video');
 const selectedModel = ref(models[0]?.value ?? 'aurora-video-3');
 const selectedRatio = ref('16:9');
@@ -187,105 +176,34 @@ const selectedResolution = ref('1080P');
 const prompt = ref('');
 const sourceFrames = ref<SourceFrame[]>([]);
 const sourceInput = ref<HTMLInputElement | null>(null);
-const tasks = ref<VideoTask[]>([]);
 const formError = ref('');
 const consumedRouteContext = ref('');
-let progressTimer: number | undefined;
+const uploadingSource = ref(false);
 
 const activeModel = computed(
   () => models.find((model) => model.value === selectedModel.value) ?? models[0],
 );
 const sortedTasks = computed(() =>
-  [...tasks.value].sort((left, right) => right.createdAt - left.createdAt),
+  [...videoWorkspace.works].sort((left, right) => right.createdAt - left.createdAt),
 );
-const activeTasks = computed(() =>
-  tasks.value.filter((task) => task.status === 'queued' || task.status === 'generating'),
-);
+const activeTasks = computed(() => videoWorkspace.activeWorks);
 const needsSource = computed(() => mode.value !== 'text-to-video');
 const requiredFrameCount = computed(() => (mode.value === 'first-last-frame' ? 2 : 1));
 const canSubmit = computed(() => {
-  if (activeTasks.value.length > 0 || !prompt.value.trim()) {
+  if (videoWorkspace.submitting || activeTasks.value.length > 0 || !prompt.value.trim()) {
     return false;
   }
 
-  return !needsSource.value || sourceFrames.value.length === requiredFrameCount.value;
+  return (
+    !uploadingSource.value &&
+    (!needsSource.value || sourceFrames.value.length === requiredFrameCount.value)
+  );
 });
-const imageHistory = computed(() => tasks.value.filter((task) => task.status === 'done').length);
+const imageHistory = computed(
+  () => videoWorkspace.works.filter((task) => task.status === 'done').length,
+);
 
-function loadStoredTasks(): void {
-  try {
-    const rawTasks = window.localStorage.getItem(STORAGE_KEY);
-
-    if (!rawTasks) {
-      return;
-    }
-
-    const parsedTasks = JSON.parse(rawTasks) as VideoTask[];
-
-    tasks.value = Array.isArray(parsedTasks)
-      ? parsedTasks.map((task) => ({
-          ...task,
-          progress: task.status === 'done' ? 100 : Math.min(task.progress ?? 0, 96),
-          status:
-            task.status === 'queued' || task.status === 'generating' ? 'generating' : task.status,
-        }))
-      : [];
-  } catch {
-    tasks.value = [];
-  }
-}
-
-function persistTasks(): void {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks.value));
-}
-
-function beginProgress(taskId: string): void {
-  if (progressTimer === undefined) {
-    progressTimer = window.setInterval(advanceTasks, 650);
-  }
-
-  const task = tasks.value.find((item) => item.id === taskId);
-
-  if (task) {
-    task.status = 'generating';
-    task.progress = Math.max(task.progress, 4);
-    persistTasks();
-  }
-}
-
-function advanceTasks(): void {
-  let hasActiveTask = false;
-
-  for (const task of tasks.value) {
-    if (task.status !== 'queued' && task.status !== 'generating') {
-      continue;
-    }
-
-    hasActiveTask = true;
-    task.status = 'generating';
-    task.progress = Math.min(100, task.progress + 4 + Math.floor(Math.random() * 9));
-
-    if (task.progress >= 100) {
-      task.progress = 100;
-      task.status = 'done';
-    }
-  }
-
-  persistTasks();
-
-  if (!hasActiveTask || activeTasks.value.length === 0) {
-    clearProgressTimer();
-  }
-}
-
-function clearProgressTimer(): void {
-  if (progressTimer !== undefined) {
-    window.clearInterval(progressTimer);
-    progressTimer = undefined;
-  }
-}
-
-function handleSourceUpload(event: Event): void {
+async function handleSourceUpload(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const files = Array.from(input.files ?? []);
 
@@ -294,14 +212,29 @@ function handleSourceUpload(event: Event): void {
   }
 
   const availableSlots = Math.max(0, requiredFrameCount.value - sourceFrames.value.length);
-  const nextFrames = files.slice(0, availableSlots).map((file) => ({
-    name: file.name,
-    url: URL.createObjectURL(file),
-  }));
 
-  sourceFrames.value = [...sourceFrames.value, ...nextFrames];
   formError.value = '';
-  input.value = '';
+  uploadingSource.value = true;
+
+  try {
+    for (const file of files.slice(0, availableSlots)) {
+      const asset = await videoWorkspace.uploadFrame(file);
+
+      sourceFrames.value = [
+        ...sourceFrames.value,
+        {
+          id: asset.id,
+          name: file.name,
+          url: URL.createObjectURL(file),
+        },
+      ];
+    }
+  } catch (error) {
+    formError.value = error instanceof Error ? error.message : '素材上传失败，请重试';
+  } finally {
+    uploadingSource.value = false;
+    input.value = '';
+  }
 }
 
 function removeSourceFrame(index: number): void {
@@ -366,13 +299,19 @@ async function consumeRouteContext(): Promise<void> {
     }
 
     const blob = await fetchFileBlob(work.resultFileId);
+    const frameName = work.resultFileName || `draw-${work.id}.png`;
+    const frameFile = new File([blob], frameName, {
+      type: blob.type || 'image/png',
+    });
+    const asset = await videoWorkspace.uploadFrame(frameFile);
 
     removeAllSourceFrames();
     changeMode('image-to-video');
     sourceFrames.value = [
       {
-        name: work.resultFileName || `draw-${work.id}.png`,
-        url: URL.createObjectURL(blob),
+        id: asset.id,
+        name: frameName,
+        url: URL.createObjectURL(frameFile),
       },
     ];
   } catch (error) {
@@ -391,7 +330,7 @@ function changeMode(nextMode: VideoMode): void {
   }
 }
 
-function submitTask(): void {
+async function submitTask(): Promise<void> {
   formError.value = '';
 
   if (!prompt.value.trim()) {
@@ -405,76 +344,60 @@ function submitTask(): void {
     return;
   }
 
-  const task: VideoTask = {
-    createdAt: Date.now(),
+  const sourceIds = sourceFrames.value.map((frame) => frame.id);
+  const task = await videoWorkspace.createGeneration({
     duration: selectedDuration.value,
-    favorite: false,
-    id: createTaskId(),
+    lastFrameFileId: mode.value === 'first-last-frame' ? sourceIds[1] : undefined,
     mode: mode.value,
     model: selectedModel.value,
     modelLabel: activeModel.value?.label ?? '视频模型',
-    progress: 2,
     prompt: prompt.value.trim(),
     ratio: selectedRatio.value,
     resolution: selectedResolution.value,
-    status: 'queued',
-    variant: variantFromId(createTaskId()),
-  };
-
-  tasks.value = [task, ...tasks.value];
-  activeGalleryTab.value = 'mine';
-  persistTasks();
-  prompt.value = '';
-  beginProgress(task.id);
-}
-
-function retryTask(taskId: string): void {
-  const task = tasks.value.find((item) => item.id === taskId);
-
-  if (!task || activeTasks.value.length > 0) {
-    return;
-  }
-
-  task.createdAt = Date.now();
-  task.progress = 2;
-  task.status = 'queued';
-  activeGalleryTab.value = 'mine';
-  persistTasks();
-  beginProgress(task.id);
-}
-
-function cancelTask(taskId: string): void {
-  const task = tasks.value.find((item) => item.id === taskId);
+    sourceFileId: needsSource.value ? sourceIds[0] : undefined,
+  });
 
   if (!task) {
+    formError.value = videoWorkspace.error?.message ?? '视频任务提交失败，请稍后重试';
     return;
   }
 
-  task.status = 'cancelled';
-  task.progress = Math.min(task.progress, 96);
-  persistTasks();
+  activeGalleryTab.value = 'mine';
+  prompt.value = '';
+}
 
-  if (activeTasks.value.length === 0) {
-    clearProgressTimer();
+async function retryTask(taskId: string): Promise<void> {
+  if (activeTasks.value.length > 0) {
+    return;
   }
+
+  const task = await videoWorkspace.retryWork(taskId);
+
+  if (!task) {
+    formError.value = videoWorkspace.error?.message ?? '视频任务重试失败，请稍后再试';
+    return;
+  }
+
+  activeGalleryTab.value = 'mine';
+}
+
+async function cancelTask(taskId: string): Promise<void> {
+  await videoWorkspace.cancelWork(taskId);
 }
 
 function removeTask(taskId: string): void {
-  tasks.value = tasks.value.filter((task) => task.id !== taskId);
-  persistTasks();
+  videoWorkspace.removeWork(taskId);
 }
 
 function toggleFavorite(taskId: string): void {
-  const task = tasks.value.find((item) => item.id === taskId);
-
-  if (task) {
-    task.favorite = !task.favorite;
-    persistTasks();
-  }
+  videoWorkspace.toggleFavorite(taskId);
 }
 
-function reuseTask(task: VideoTask): void {
-  changeMode(task.mode);
+function reuseTask(task: VideoWork): void {
+  if (isVideoMode(task.mode)) {
+    changeMode(task.mode);
+  }
+
   prompt.value = task.prompt;
   selectedModel.value = task.model;
   selectedRatio.value = task.ratio;
@@ -499,26 +422,12 @@ function reuseShowcase(item: ShowcaseItem): void {
   window.scrollTo({ behavior: 'smooth', top: 0 });
 }
 
-function downloadStoryboard(task: VideoTask): void {
-  const payload = [
-    `镜头描述：${task.prompt}`,
-    `模型：${task.modelLabel}`,
-    `时长：${task.duration} 秒`,
-    `比例：${task.ratio}`,
-    `清晰度：${task.resolution}`,
-  ].join('\n');
-  const blob = new Blob([payload], { type: 'text/plain;charset=utf-8' });
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-
-  anchor.href = objectUrl;
-  anchor.download = `aurora-video-${task.id}.txt`;
-  anchor.click();
-  URL.revokeObjectURL(objectUrl);
+async function downloadTask(taskId: string): Promise<void> {
+  await videoWorkspace.downloadWork(taskId);
 }
 
-function statusLabel(status: VideoTaskStatus): string {
-  const labels: Record<VideoTaskStatus, string> = {
+function statusLabel(status: VideoWorkStatus): string {
+  const labels: Record<VideoWorkStatus, string> = {
     cancelled: '已取消',
     done: '已完成',
     failed: '生成失败',
@@ -533,27 +442,17 @@ function modeLabel(modeValue: VideoMode): string {
   return modes.find((item) => item.value === modeValue)?.label ?? '视频';
 }
 
-function createTaskId(): string {
-  return `video-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+function isVideoResult(task: VideoWork): boolean {
+  return task.resultMimeType.startsWith('video/');
 }
 
-function variantFromId(value: string): number {
-  let hash = 0;
-
-  for (const character of value) {
-    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  }
-
-  return hash % 8;
+function taskDuration(task: VideoWork): string {
+  return `00:${String(task.duration).padStart(2, '0')}`;
 }
 
 onMounted(() => {
-  loadStoredTasks();
+  void videoWorkspace.initialize();
   void consumeRouteContext();
-
-  if (activeTasks.value.length > 0) {
-    progressTimer = window.setInterval(advanceTasks, 650);
-  }
 });
 
 watch(
@@ -564,7 +463,6 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  clearProgressTimer();
   removeAllSourceFrames();
 });
 </script>
@@ -587,7 +485,7 @@ onBeforeUnmount(() => {
       <div class="video-toolbar__status">
         <span>
           <ClockCircleOutlined />
-          本地演示模式
+          {{ videoWorkspace.generating ? '任务处理中' : '视频工作台已连接' }}
         </span>
         <RouterLink to="/map">工作台</RouterLink>
       </div>
@@ -760,15 +658,15 @@ onBeforeUnmount(() => {
         <div class="video-submit">
           <span>
             <ThunderboltFilled />
-            预计 {{ selectedDuration * 2 }} 积分
+            预计 {{ VIDEO_TASK_POINTS_COST }} 积分
           </span>
           <button type="button" :disabled="!canSubmit" @click="submitTask">
-            <LoadingOutlined v-if="activeTasks.length > 0" />
+            <LoadingOutlined v-if="activeTasks.length > 0 || videoWorkspace.submitting" />
             <VideoCameraOutlined v-else />
             {{ activeTasks.length > 0 ? '镜头生成中' : '立即生成' }}
           </button>
           <small v-if="formError" role="alert">{{ formError }}</small>
-          <small v-else>演示任务不调用上游视频模型</small>
+          <small v-else>生成任务会在后台持续同步，刷新页面后可继续查看</small>
         </div>
       </aside>
 
@@ -830,9 +728,29 @@ onBeforeUnmount(() => {
             <div
               class="video-showcase-card__visual"
               :class="`ratio-${task.ratio.replace(':', '-')}`"
+              :data-result-kind="isVideoResult(task) ? 'video' : 'image'"
             >
+              <template v-if="task.status === 'done' && task.resultUrl">
+                <video
+                  v-if="isVideoResult(task)"
+                  :src="task.resultUrl"
+                  controls
+                  playsinline
+                  preload="metadata"
+                />
+                <img v-else :src="task.resultUrl" :alt="task.prompt" />
+              </template>
+              <div
+                v-else-if="task.status === 'done' && task.resultLoading"
+                class="video-task-loading"
+              >
+                <span>
+                  <LoadingOutlined />
+                </span>
+                <strong>载入作品</strong>
+              </div>
               <GalleryArtwork
-                v-if="task.status === 'done'"
+                v-else-if="task.status === 'done'"
                 :title="task.prompt"
                 :variant="task.variant"
               />
@@ -850,7 +768,7 @@ onBeforeUnmount(() => {
                 </i>
               </div>
               <span class="video-showcase-card__model">{{ task.modelLabel }}</span>
-              <span class="video-showcase-card__duration"> 00:0{{ task.duration }} </span>
+              <span class="video-showcase-card__duration">{{ taskDuration(task) }}</span>
               <div v-if="task.status === 'done'" class="video-showcase-card__play">
                 <PlayCircleOutlined />
               </div>
@@ -870,7 +788,7 @@ onBeforeUnmount(() => {
                   v-if="task.status === 'done'"
                   type="button"
                   title="下载"
-                  @click="downloadStoryboard(task)"
+                  @click="downloadTask(task.id)"
                 >
                   <DownloadOutlined />
                 </button>
@@ -1578,9 +1496,11 @@ onBeforeUnmount(() => {
 }
 
 .video-showcase-card__visual > :deep(svg),
-.video-showcase-card__visual > img {
+.video-showcase-card__visual > img,
+.video-showcase-card__visual > video {
   width: 100%;
   height: 100%;
+  background: #0b0b0e;
   object-fit: cover;
 }
 
@@ -1604,6 +1524,13 @@ onBeforeUnmount(() => {
 .video-showcase-card__duration {
   bottom: 7px;
   left: 7px;
+}
+
+.video-showcase-card__visual[data-result-kind='video'] .video-showcase-card__duration {
+  top: 7px;
+  right: 7px;
+  bottom: auto;
+  left: auto;
 }
 
 .video-showcase-card__visual > button {
@@ -1638,12 +1565,17 @@ onBeforeUnmount(() => {
   font-size: 18px;
   transform: translate(-50%, -50%);
   opacity: 0;
+  pointer-events: none;
   transition: opacity 140ms ease;
   backdrop-filter: blur(8px);
 }
 
 .video-showcase-card:hover .video-showcase-card__play {
   opacity: 1;
+}
+
+.video-showcase-card__visual[data-result-kind='video'] .video-showcase-card__play {
+  display: none;
 }
 
 .video-task-loading {
