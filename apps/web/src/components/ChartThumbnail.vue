@@ -4,6 +4,7 @@ defineProps<{
 }>();
 
 const bars = [26, 47, 34, 57, 39, 63, 45];
+const pictorialBars = [5, 7, 4, 6, 3, 5];
 const lineDots: Array<[number, number]> = [
   [10, 58],
   [38, 41],
@@ -84,6 +85,20 @@ const stackBars: Array<[number, number, number, number]> = [
           :height="height"
           rx="2"
         />
+      </template>
+
+      <template v-else-if="type === 'pictorial-bar'">
+        <g v-for="(units, index) in pictorialBars" :key="index">
+          <circle
+            v-for="unit in units"
+            :key="unit"
+            class="chart-thumbnail__pictorial"
+            :class="`chart-thumbnail__pictorial--${index % 4}`"
+            :cx="18 + index * 17"
+            :cy="66 - unit * 8"
+            r="3.4"
+          />
+        </g>
       </template>
 
       <template v-else-if="type === 'pie'">
@@ -667,6 +682,27 @@ const stackBars: Array<[number, number, number, number]> = [
 
 .chart-thumbnail__bar {
   fill: #25ae7d;
+}
+
+.chart-thumbnail__pictorial {
+  stroke: #fff;
+  stroke-width: 0.8;
+}
+
+.chart-thumbnail__pictorial--0 {
+  fill: #4c84ff;
+}
+
+.chart-thumbnail__pictorial--1 {
+  fill: #3dc39a;
+}
+
+.chart-thumbnail__pictorial--2 {
+  fill: #f0b247;
+}
+
+.chart-thumbnail__pictorial--3 {
+  fill: #ef744b;
 }
 
 .chart-thumbnail__pie-base,

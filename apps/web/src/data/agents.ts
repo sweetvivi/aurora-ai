@@ -192,7 +192,7 @@ const curatedAgentCatalog: AgentCatalogItem[] = [
     usage: 1283,
   },
   {
-    category: 'AI 视觉创作',
+    category: 'AI视觉创作',
     color: '#8e62ed',
     description: '将一句想法扩写成适合图像模型的专业提示词。',
     glyph: '绘',
@@ -205,7 +205,7 @@ const curatedAgentCatalog: AgentCatalogItem[] = [
     usage: 1188,
   },
   {
-    category: 'AI 视觉创作',
+    category: 'AI视觉创作',
     color: '#d85aa5',
     description: '生成从品牌气质到画面细节都完整的创意方案。',
     glyph: '设',
@@ -283,7 +283,7 @@ const curatedAgentCatalog: AgentCatalogItem[] = [
     usage: 352,
   },
   {
-    category: 'AI 电商',
+    category: 'AI电商',
     color: '#e4a12f',
     description: '根据商品卖点生成真实、克制的评价内容模板。',
     glyph: '评',
@@ -348,7 +348,7 @@ const curatedAgentCatalog: AgentCatalogItem[] = [
     usage: 1383,
   },
   {
-    category: '产品与 UI 设计',
+    category: '产品与UI设计',
     color: '#3d86d9',
     description: '从用户任务出发检查页面结构、交互路径和视觉层级。',
     glyph: '界',
@@ -387,7 +387,7 @@ const curatedAgentCatalog: AgentCatalogItem[] = [
     usage: 2106,
   },
   {
-    category: 'AI 图片',
+    category: 'AI图片',
     color: '#0c8d75',
     description: '分析图片构图、光线和风格，并给出可执行的修改建议。',
     glyph: '图',

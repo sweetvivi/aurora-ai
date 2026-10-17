@@ -52,8 +52,9 @@ const pageSize = 24;
 const hotSearches = ['AI写作助手', '代码生成器', '数据分析', '图像处理', '翻译助手'];
 
 const categoryDefinitions: { icon: Component; label: string }[] = [
+  { icon: ReadOutlined, label: 'AI教育' },
   { icon: ReadOutlined, label: '教育与培训' },
-  { icon: PictureOutlined, label: 'AI 视觉创作' },
+  { icon: PictureOutlined, label: 'AI视觉创作' },
   { icon: HighlightOutlined, label: '图形与图像处理' },
   { icon: FileTextOutlined, label: '办公文档生成' },
   { icon: BarChartOutlined, label: '数据计算与分析' },
@@ -64,11 +65,11 @@ const categoryDefinitions: { icon: Component; label: string }[] = [
   { icon: TranslationOutlined, label: '语言与文字处理' },
   { icon: TeamOutlined, label: '商务与运营支持' },
   { icon: CoffeeOutlined, label: '生活与娱乐' },
-  { icon: LayoutOutlined, label: '产品与 UI 设计' },
+  { icon: LayoutOutlined, label: '产品与UI设计' },
   { icon: SoundOutlined, label: '媒体与传播' },
   { icon: AppstoreOutlined, label: '综合工具（多模态）' },
-  { icon: ShoppingCartOutlined, label: 'AI 电商' },
-  { icon: PictureOutlined, label: 'AI 图片' },
+  { icon: ShoppingCartOutlined, label: 'AI电商' },
+  { icon: PictureOutlined, label: 'AI图片' },
   { icon: UserOutlined, label: '我的智能体' },
 ];
 

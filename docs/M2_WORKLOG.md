@@ -492,8 +492,8 @@ pnpm --filter @aurora/web test -- agent-directory.spec.ts
 node outputs/ui-reference/verify-catalog-charts.mjs
 ```
 
-- 官方智能体目录扩展到 6358 条、17 个分类，第一页固定显示 24 条，分类、搜索、收藏和分页空态均已覆盖
-- 模型对话图表空态扩展到 28 类 SVG 缩略图，桌面端和移动端均无横向溢出、无页面脚本错误、无错误状态
+- 官方智能体目录扩展到 6358 条、18 个分类，第一页固定显示 24 条，分类、搜索、收藏和分页空态均已覆盖
+- 模型对话图表空态扩展到 29 类 SVG 缩略图，桌面端和移动端均无横向溢出、无页面脚本错误、无错误状态
 - 智能体验收使用 Mock 会话、模型和模块接口，不读取或输出 Key，不调用真实 Provider
 - 新增 `apps/web/src/data/agent-directory.spec.ts`，验证 6358 条唯一 ID、分类计数、确定性和小目标裁剪
 

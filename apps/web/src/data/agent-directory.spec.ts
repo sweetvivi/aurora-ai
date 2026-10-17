@@ -13,11 +13,35 @@ describe('buildGeneratedAgentCatalog', () => {
   it('keeps category totals aligned with the reference navigation counts', () => {
     const catalog = buildGeneratedAgentCatalog([]);
 
-    expect(catalog.filter((agent) => agent.category === '教育与培训')).toHaveLength(603);
-    expect(catalog.filter((agent) => agent.category === 'AI 视觉创作')).toHaveLength(370);
-    expect(catalog.filter((agent) => agent.category === '编程与软件开发')).toHaveLength(240);
-    expect(catalog.filter((agent) => agent.category === 'AI 电商')).toHaveLength(250);
-    expect(catalog.filter((agent) => agent.category === 'AI 图片')).toHaveLength(275);
+    const expectedCounts = {
+      AI教育: 546,
+      AI视觉创作: 317,
+      图形与图像处理: 323,
+      办公文档生成: 482,
+      数据计算与分析: 526,
+      知识检索与信息获取: 408,
+      编程与软件开发: 206,
+      创意营销与内容策划: 315,
+      学术与研究辅助: 218,
+      教育与培训: 461,
+      语言与文字处理: 389,
+      商务与运营支持: 284,
+      生活与娱乐: 405,
+      产品与UI设计: 261,
+      媒体与传播: 607,
+      '综合工具（多模态）': 279,
+      AI电商: 190,
+      AI图片: 119,
+    };
+
+    for (const [category, count] of Object.entries(expectedCounts)) {
+      expect(catalog.filter((agent) => agent.category === category)).toHaveLength(count);
+    }
+
+    expect(
+      Object.values(expectedCounts).reduce((total, count) => total + count, 0),
+    ).toBe(6336);
+    expect(catalog.filter((agent) => !(agent.category in expectedCounts))).toHaveLength(22);
   });
 
   it('is deterministic and trims a smaller target consistently', () => {

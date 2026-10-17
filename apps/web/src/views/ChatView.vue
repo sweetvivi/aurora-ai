@@ -118,6 +118,11 @@ const chartTemplates = [
     preview: 'bar',
   },
   {
+    label: '象形柱图',
+    prompt: '请把下面的数据整理成象形柱图，用直观图形对比各类别的数量和规模。',
+    preview: 'pictorial-bar',
+  },
+  {
     label: '饼图',
     prompt: '请把下面的数据整理成占比分析，说明主要构成和变化原因。',
     preview: 'pie',
@@ -183,7 +188,7 @@ const chartTemplates = [
     preview: 'treemap',
   },
   {
-    label: 'K 线图',
+    label: 'K线图',
     prompt: '请把下面的数据整理成 K 线图分析，说明开盘、收盘、最高和最低价的走势。',
     preview: 'candlestick',
   },
@@ -198,7 +203,7 @@ const chartTemplates = [
     preview: 'gantt',
   },
   {
-    label: '地图',
+    label: '地理坐标/地图',
     prompt: '请把下面的数据整理成地图分析，展示地域分布、差异和热点区域。',
     preview: 'map',
   },
@@ -223,7 +228,7 @@ const chartTemplates = [
     preview: 'tree',
   },
   {
-    label: '平行坐标图',
+    label: '平行坐标系',
     prompt: '请把下面的多指标数据整理成平行坐标图，比较不同样本在各维度上的表现。',
     preview: 'parallel',
   },
@@ -233,12 +238,12 @@ const chartTemplates = [
     preview: 'gauge',
   },
   {
-    label: '日历图',
+    label: '日历坐标系',
     prompt: '请把下面的数据整理成日历热力分析，展示周期规律、峰值日期和异常波动。',
     preview: 'calendar',
   },
   {
-    label: '矩阵图',
+    label: '矩阵坐标系',
     prompt: '请把下面的数据整理成矩阵图分析，比较两个维度组合下的分布和强弱关系。',
     preview: 'matrix',
   },

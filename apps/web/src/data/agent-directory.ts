@@ -15,21 +15,31 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
   {
     actions: ['制定学习计划', '拆解知识难点', '设计练习路径', '生成测验题', '复盘薄弱环节', '讲解核心概念'],
     capabilities: ['document-report', 'web-research'],
+    category: 'AI教育',
+    colors: ['#20b77a', '#3d9f7b', '#4e91d8', '#d7669a', '#f08a45'],
+    glyphs: ['学', '教', '习', '知', '课', '练'],
+    shortTag: 'AI教育',
+    targetCount: 546,
+    topics: ['K12 学习', '大学课程', '英语备考', '编程入门', '职业技能', '考研复习', '课堂设计', '成人自学'],
+  },
+  {
+    actions: ['制定学习计划', '拆解知识难点', '设计练习路径', '生成测验题', '复盘薄弱环节', '讲解核心概念'],
+    capabilities: ['document-report', 'web-research'],
     category: '教育与培训',
     colors: ['#f08a45', '#ee6a62', '#d7669a', '#4e91d8', '#3d9f7b'],
     glyphs: ['学', '教', '习', '知', '课', '练'],
     shortTag: '教育',
-    targetCount: 603,
+    targetCount: 461,
     topics: ['K12 学习', '大学课程', '英语备考', '编程入门', '职业技能', '考研复习', '课堂设计', '成人自学'],
   },
   {
     actions: ['生成视觉方向', '优化画面提示词', '设计角色设定', '拆解摄影镜头', '匹配品牌气质', '扩展创意草图'],
     capabilities: ['ai-drawing', 'image-analysis', 'smart-chart'],
-    category: 'AI 视觉创作',
+    category: 'AI视觉创作',
     colors: ['#8a64ed', '#d65aa9', '#f06f72', '#3f8ed7', '#e0a23e'],
     glyphs: ['绘', '影', '色', '艺', '景', '创'],
     shortTag: '视觉',
-    targetCount: 370,
+    targetCount: 317,
     topics: ['文生图', '品牌海报', '电商视觉', '角色插画', '产品摄影', '概念场景', '漫画分镜', '三维渲染'],
   },
   {
@@ -39,7 +49,7 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#3b9b86', '#4c83d8', '#a968d6', '#e37957', '#78a63f'],
     glyphs: ['修', '图', '像', '形', '色', '质'],
     shortTag: '图像',
-    targetCount: 375,
+    targetCount: 323,
     topics: ['人像精修', '商品抠图', '老照片修复', '海报排版', '图片扩图', '背景替换', '批量水印', '清晰度增强'],
   },
   {
@@ -49,7 +59,7 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#4f84d8', '#2fa87a', '#7468d7', '#e18b42', '#d35d7f'],
     glyphs: ['文', '办', '报', '稿', '汇', '档'],
     shortTag: '办公',
-    targetCount: 560,
+    targetCount: 482,
     topics: ['会议纪要', '周报月报', '产品需求', '招投标文件', '项目复盘', '公文写作', '汇报材料', '合同摘要'],
   },
   {
@@ -59,7 +69,7 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#258866', '#477ed9', '#8966d1', '#d69b32', '#d96568'],
     glyphs: ['数', '析', '算', '图', '表', '统'],
     shortTag: '数据',
-    targetCount: 610,
+    targetCount: 526,
     topics: ['经营分析', '用户增长', '销售漏斗', '留存分析', '库存预测', '财务报表', '实验评估', '指标体系'],
   },
   {
@@ -69,7 +79,7 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#2c8ea9', '#536fd1', '#368f75', '#ad6ab8', '#dc824c'],
     glyphs: ['检', '索', '知', '讯', '源', '查'],
     shortTag: '检索',
-    targetCount: 475,
+    targetCount: 408,
     topics: ['行业调研', '竞品资料', '政策查询', '论文检索', '新闻核查', '知识地图', '来源比对', '专题资料'],
   },
   {
@@ -79,7 +89,7 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#5278e8', '#268fd0', '#2d9f75', '#705bd4', '#d26075'],
     glyphs: ['码', '编', '栈', '测', '构', '云'],
     shortTag: '代码',
-    targetCount: 240,
+    targetCount: 206,
     topics: ['前端开发', '后端服务', '数据库', 'API 设计', '自动化测试', '性能优化', 'DevOps', '代码审查'],
   },
   {
@@ -89,7 +99,7 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#ed5c76', '#e77f42', '#835ed7', '#358fc9', '#36a473'],
     glyphs: ['营', '创', '策', '文', '播', '秀'],
     shortTag: '营销',
-    targetCount: 365,
+    targetCount: 315,
     topics: ['新品发布', '社媒运营', '短视频脚本', '品牌故事', '活动策划', '直播话术', '用户增长', '内容日历'],
   },
   {
@@ -99,7 +109,7 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#6d72c7', '#4c86ca', '#3d9b83', '#a864b1', '#d17c49'],
     glyphs: ['研', '论', '学', '证', '引', '思'],
     shortTag: '学术',
-    targetCount: 255,
+    targetCount: 218,
     topics: ['论文选题', '文献综述', '研究方法', '实验设计', '学术表达', '开题报告', '数据分析', '投稿检查'],
   },
   {
@@ -109,7 +119,7 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#dd6b52', '#d4557d', '#7a63d4', '#368fc4', '#3d9d77'],
     glyphs: ['译', '语', '文', '词', '校', '写'],
     shortTag: '语言',
-    targetCount: 450,
+    targetCount: 389,
     topics: ['商务翻译', '学术润色', '英语学习', '日语学习', '多语客服', '公文校对', '内容改写', '术语统一'],
   },
   {
@@ -119,7 +129,7 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#a96b31', '#4d79bd', '#368d72', '#9b63af', '#cb5f70'],
     glyphs: ['商', '运', '法', '客', '项', '管'],
     shortTag: '商务',
-    targetCount: 330,
+    targetCount: 284,
     topics: ['客户沟通', '合同摘要', '项目管理', '团队协作', '供应链', '招聘面试', '运营复盘', '商务提案'],
   },
   {
@@ -129,17 +139,17 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#2fa9a0', '#e48b4d', '#4d82d1', '#d85f8a', '#6e9d45'],
     glyphs: ['旅', '练', '食', '玩', '家', '趣'],
     shortTag: '生活',
-    targetCount: 280,
+    targetCount: 405,
     topics: ['旅行规划', '健身训练', '健康饮食', '家居整理', '影视推荐', '亲子活动', '宠物照护', '兴趣学习'],
   },
   {
     actions: ['检查用户体验', '梳理信息架构', '生成交互流程', '评审界面层级', '整理设计规范', '输出验收清单'],
     capabilities: ['web-generation', 'image-analysis', 'small-game'],
-    category: '产品与 UI 设计',
+    category: '产品与UI设计',
     colors: ['#3e83d4', '#765fcf', '#2f9a82', '#d26a86', '#d89043'],
     glyphs: ['品', '设', '界', '交', '验', '构'],
     shortTag: '产品',
-    targetCount: 265,
+    targetCount: 261,
     topics: ['移动应用', '后台系统', '落地页', '交互原型', '设计系统', '用户研究', '可用性测试', '数据看板'],
   },
   {
@@ -149,7 +159,7 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#d65c86', '#ce6b4e', '#596fc5', '#348ba6', '#409774'],
     glyphs: ['媒', '播', '闻', '稿', '镜', '声'],
     shortTag: '媒体',
-    targetCount: 245,
+    targetCount: 607,
     topics: ['新媒体编辑', '短视频策划', '新闻摘要', '播客提纲', '栏目规划', '社交传播', '视频号运营', '舆情整理'],
   },
   {
@@ -166,27 +176,27 @@ const categoryBlueprints: AgentCategoryBlueprint[] = [
     colors: ['#536fcd', '#3f8db5', '#2e9a7e', '#8b62c3', '#d2764d'],
     glyphs: ['通', '全', '合', '智', '多', '集'],
     shortTag: '综合',
-    targetCount: 410,
+    targetCount: 279,
     topics: ['综合分析', '项目助手', '学习工作流', '内容工作流', '数据工作流', '个人知识库', '跨工具协作', '复杂任务'],
   },
   {
     actions: ['生成商品卖点', '优化详情页文案', '分析用户评价', '设计活动机制', '比较竞品信息', '整理客服话术'],
     capabilities: ['ai-drawing', 'document-report', 'web-search'],
-    category: 'AI 电商',
+    category: 'AI电商',
     colors: ['#dfa12f', '#df6b53', '#4b84c8', '#3c997a', '#a65da7'],
     glyphs: ['商', '评', '货', '店', '客', '营'],
     shortTag: '电商',
-    targetCount: 250,
+    targetCount: 190,
     topics: ['商品标题', '详情页', '用户评价', '客服话术', '活动运营', '竞品分析', '选品建议', '直播带货'],
   },
   {
     actions: ['分析图片内容', '生成修图建议', '提取画面文字', '设计生图提示词', '匹配视觉风格', '检查图片用途'],
     capabilities: ['ai-drawing', 'ai-retouch', 'image-analysis', 'image-ocr', 'image-search'],
-    category: 'AI 图片',
+    category: 'AI图片',
     colors: ['#168b75', '#3e7fc7', '#8e61c9', '#d3678a', '#de9141'],
     glyphs: ['图', '像', '绘', '色', '视', '审'],
     shortTag: '图片',
-    targetCount: 275,
+    targetCount: 119,
     topics: ['图片分析', '图片搜索', 'OCR 识别', '视觉提示词', '商品图优化', '人像美化', '图片分类', '风格迁移'],
   },
 ];
@@ -230,11 +240,11 @@ export function buildGeneratedAgentCatalog(
     for (let index = 0; index < quota; index += 1) {
       const prefix = namePrefixes[index % namePrefixes.length] ?? '智能';
       const topic =
-        blueprint.topics[Math.floor(index / namePrefixes.length) % blueprint.topics.length] ?? '综合';
+        blueprint.topics[
+          Math.floor(index / (namePrefixes.length * nameSuffixes.length)) % blueprint.topics.length
+        ] ?? '综合';
       const suffix =
-        nameSuffixes[
-          Math.floor(index / (namePrefixes.length * blueprint.topics.length)) % nameSuffixes.length
-        ] ?? '助手';
+        nameSuffixes[Math.floor(index / namePrefixes.length) % nameSuffixes.length] ?? '助手';
       const action = blueprint.actions[(index * 5 + categoryKey) % blueprint.actions.length] ?? '完成分析';
       const glyph = blueprint.glyphs[(index * 3 + categoryKey) % blueprint.glyphs.length] ?? '智';
       const color = blueprint.colors[(index * 7 + categoryKey) % blueprint.colors.length] ?? '#5b7cfa';
@@ -246,7 +256,7 @@ export function buildGeneratedAgentCatalog(
         description: `面向${topic}场景，帮助你${action}，并输出清晰、可执行的结果。`,
         glyph,
         id: `official-${String(categoryKey).padStart(2, '0')}-${String(index + 1).padStart(4, '0')}`,
-        name: `${prefix}${topic}${suffix}`,
+        name: `${prefix}${topic}${suffix}·${blueprint.shortTag}`,
         opening: `告诉我你的${topic}目标和已有材料，我会围绕“${action}”逐步梳理并给出可执行结果。`,
         rating: Number((4.1 + ((index * 7 + categoryKey) % 9) / 10).toFixed(1)),
         starterPrompts: [
@@ -270,6 +280,7 @@ export function buildGeneratedAgentCatalog(
       const index = catalog.length;
       catalog.push({
         ...fallback,
+        category: '精选推荐',
         id: `official-extra-${String(index + 1).padStart(4, '0')}`,
         name: `${namePrefixes[index % namePrefixes.length] ?? '智能'}综合${
           nameSuffixes[index % nameSuffixes.length] ?? '助手'
