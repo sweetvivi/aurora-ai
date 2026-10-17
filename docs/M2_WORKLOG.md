@@ -763,6 +763,24 @@ node outputs/ui-reference/verify-agent-edit.mjs
 - `verify-agent-edit.mjs` 使用 Playwright 和 API 路由 Mock，覆盖桌面端 `1440x1000` 与移动端 `390x844` 的编辑入口、参数回填、保存请求、原 `agentId` 和横向溢出
 - 格式检查、lint、前后端类型检查、全量测试、生产构建和创建/编辑验收全部通过；API 为 19 个文件 76 项，Web 为 15 个文件 60 项
 
+云端画布工作流库：
+
+```text
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+node outputs/ui-reference/verify-canvas-workflow-library.mjs
+node outputs/ui-reference/verify-canvas-studio.mjs
+```
+
+- 在单画布云端持久化基础上新增工作流列表，支持新建、打开、重命名和删除非当前工作流；删除接口同时按工作流 ID 和用户 ID 匹配，避免越权删除
+- 新建、导入和示例模板会生成新的画布 ID，不再覆盖已保存工作流；本地备份存在时优先恢复对应云端记录，旧格式本地数据不再错误覆盖云端画布
+- 当前画布不能直接删除，需要先新建或切换到其他工作流；云端失败时继续保留本地副本和降级提示
+- `verify-canvas-workflow-library.mjs` 使用 Playwright 路由 Mock 覆盖两个云端工作流、重命名请求、新建请求、删除非当前工作流和重新打开，桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出或页面脚本错误
+- 定向 API 测试 20 个文件 79 项、Web 测试 16 个文件 63 项、格式检查、lint、类型检查和生产构建通过；本批不调用真实 Provider、不读取或输出 Key
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥

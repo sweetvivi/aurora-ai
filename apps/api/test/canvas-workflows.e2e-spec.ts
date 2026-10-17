@@ -133,6 +133,11 @@ describe('canvas workflow endpoints', () => {
 
     expect(otherListResponse.body.data.items).toEqual([]);
 
+    await request(app.getHttpServer())
+      .delete(`/api/v1/canvas-workflows/${workflowId}`)
+      .set('authorization', `Bearer ${otherUser.accessToken}`)
+      .expect(404);
+
     const otherSaveResponse = await request(app.getHttpServer())
       .post('/api/v1/canvas-workflows')
       .set('authorization', `Bearer ${otherUser.accessToken}`)
@@ -145,6 +150,20 @@ describe('canvas workflow endpoints', () => {
       .expect(404);
 
     expect(otherSaveResponse.body.error.code).toBe('CANVAS_WORKFLOW_NOT_FOUND');
+
+    const deleteResponse = await request(app.getHttpServer())
+      .delete(`/api/v1/canvas-workflows/${workflowId}`)
+      .set('authorization', `Bearer ${owner.accessToken}`)
+      .expect(200);
+
+    expect(deleteResponse.body.data).toEqual({ id: workflowId });
+
+    const deletedListResponse = await request(app.getHttpServer())
+      .get('/api/v1/canvas-workflows')
+      .set('authorization', `Bearer ${owner.accessToken}`)
+      .expect(200);
+
+    expect(deletedListResponse.body.data.items).toEqual([]);
   });
 
   it('rejects malformed canvas documents', async () => {

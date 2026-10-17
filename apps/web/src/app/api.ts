@@ -733,6 +733,14 @@ export async function saveCanvasWorkflow(
   return response.data.data;
 }
 
+export async function deleteCanvasWorkflow(workflowId: string): Promise<{ id: string }> {
+  const response = await apiClient.delete<ApiEnvelope<{ id: string }>>(
+    `/api/v1/canvas-workflows/${encodeURIComponent(workflowId)}`,
+  );
+
+  return response.data.data;
+}
+
 export async function fetchModuleDisplayConfigs(): Promise<{
   items: ModuleDisplayConfig[];
   source: 'database' | 'defaults';

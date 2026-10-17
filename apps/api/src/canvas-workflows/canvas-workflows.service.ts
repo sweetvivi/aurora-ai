@@ -76,6 +76,27 @@ export class CanvasWorkflowsService {
     return this.toView(workflow);
   }
 
+  async remove(userId: string, workflowId: string): Promise<{ id: string }> {
+    const normalizedId = workflowId.trim();
+    const result = normalizedId
+      ? await this.prismaService.canvasWorkflow.deleteMany({
+          where: {
+            id: normalizedId,
+            userId,
+          },
+        })
+      : { count: 0 };
+
+    if (result.count === 0) {
+      throw new NotFoundException({
+        code: 'CANVAS_WORKFLOW_NOT_FOUND',
+        message: '画布不存在或无权访问',
+      });
+    }
+
+    return { id: normalizedId };
+  }
+
   private normalizeDocument(input: Record<string, unknown>): Prisma.InputJsonObject {
     if (
       Array.isArray(input) ||

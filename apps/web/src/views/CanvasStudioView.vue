@@ -37,7 +37,13 @@ import {
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { fetchCanvasWorkflows, fetchFileBlob, saveCanvasWorkflow } from '@/app/api';
+import {
+  deleteCanvasWorkflow,
+  fetchCanvasWorkflows,
+  fetchFileBlob,
+  saveCanvasWorkflow,
+  type CanvasWorkflowRecord,
+} from '@/app/api';
 import GalleryArtwork from '@/components/GalleryArtwork.vue';
 import {
   IMAGE_TASK_POINTS_COST,
@@ -220,6 +226,11 @@ const activeAssetCategory = ref<CanvasAssetCategory>('all');
 const activeHistoryTab = ref<HistoryTab>('image');
 const activeWorkflowTab = ref<'mine' | 'samples'>('mine');
 const activeBatchFilter = ref<BatchFilter>('pending');
+const canvasWorkflows = ref<CanvasWorkflowRecord[]>([]);
+const workflowListError = ref('');
+const workflowBusyId = ref('');
+const renamingWorkflowId = ref('');
+const workflowTitleDraft = ref('');
 const canvasTitle = ref('新建画布');
 const selectedNodeId = ref('');
 const selectedNodeIds = ref<string[]>([]);
@@ -570,6 +581,62 @@ function formatSavedAt(value: number): string {
   }).format(value);
 }
 
+function sortCanvasWorkflows(workflows: CanvasWorkflowRecord[]): CanvasWorkflowRecord[] {
+  return [...workflows].sort((left, right) => {
+    const leftTime = Date.parse(left.updatedAt) || 0;
+    const rightTime = Date.parse(right.updatedAt) || 0;
+
+    return rightTime - leftTime;
+  });
+}
+
+function upsertCanvasWorkflow(workflow: CanvasWorkflowRecord): void {
+  const existingIndex = canvasWorkflows.value.findIndex((item) => item.id === workflow.id);
+  const nextWorkflows = [...canvasWorkflows.value];
+
+  if (existingIndex >= 0) {
+    nextWorkflows[existingIndex] = workflow;
+  } else {
+    nextWorkflows.unshift(workflow);
+  }
+
+  canvasWorkflows.value = sortCanvasWorkflows(nextWorkflows);
+}
+
+function formatWorkflowUpdatedAt(value: string): string {
+  const timestamp = Date.parse(value);
+
+  if (!timestamp) {
+    return '刚刚';
+  }
+
+  const elapsed = Math.max(0, Date.now() - timestamp);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (elapsed < minute) {
+    return '刚刚';
+  }
+
+  if (elapsed < hour) {
+    return `${Math.floor(elapsed / minute)} 分钟前`;
+  }
+
+  if (elapsed < day) {
+    return `${Math.floor(elapsed / hour)} 小时前`;
+  }
+
+  return new Intl.DateTimeFormat('zh-CN', {
+    day: '2-digit',
+    month: '2-digit',
+  }).format(timestamp);
+}
+
+function workflowNodeCount(workflow: CanvasWorkflowRecord): number {
+  return Array.isArray(workflow.document.nodes) ? workflow.document.nodes.length : 0;
+}
+
 function writeLocalCanvas(savedAt = Date.now()): void {
   try {
     window.localStorage.setItem(
@@ -616,6 +683,7 @@ async function persistCanvasNow(options: { notifyOnError?: boolean } = {}): Prom
         canvasId = saved.id;
         saveState.value = 'saved';
         lastSavedAt.value = formatSavedAt(savedAt);
+        upsertCanvasWorkflow(saved);
         writeLocalCanvas(savedAt);
       } catch (error) {
         saveState.value = 'error';
@@ -669,8 +737,14 @@ async function loadCanvas(): Promise<void> {
     [];
 
   try {
+    workflowListError.value = '';
     const workflows = await fetchCanvasWorkflows();
-    const remote = workflows[0];
+    canvasWorkflows.value = sortCanvasWorkflows(workflows);
+    const remote = local
+      ? local.id
+        ? workflows.find((workflow) => workflow.id === local.id)
+        : undefined
+      : workflows[0];
     const remoteUpdatedAt = remote ? Date.parse(remote.updatedAt) : 0;
 
     if (remote && (!local || remoteUpdatedAt >= local.savedAt)) {
@@ -693,6 +767,7 @@ async function loadCanvas(): Promise<void> {
       await persistCanvasNow({ notifyOnError: false });
     }
   } catch (error) {
+    workflowListError.value = error instanceof Error ? error.message : '云端工作流列表暂时无法读取';
     saveState.value = 'error';
     writeLocalCanvas();
     showCanvasNotice(
@@ -745,6 +820,7 @@ function createCanvas(): void {
   commitHistory();
   const seed = createSeedCanvas();
 
+  canvasId = createId('canvas');
   canvasTitle.value = '新建画布';
   nodes.value = seed.nodes;
   edges.value = seed.edges;
@@ -764,6 +840,7 @@ function loadWorkflow(workflow: CanvasWorkflowTemplate): void {
   commitHistory();
   const seed = createSeedCanvas();
 
+  canvasId = createId('canvas');
   canvasTitle.value = workflow.name;
   nodes.value = seed.nodes.slice(0, Math.min(workflow.nodes, seed.nodes.length));
   edges.value = seed.edges.filter(
@@ -1646,8 +1723,118 @@ function sendInspiration(): void {
   inspirationMessage.value = '';
 }
 
-function workflowForAsset(): CanvasWorkflowTemplate[] {
-  return workflowTemplates;
+async function openCloudWorkflow(workflow: CanvasWorkflowRecord): Promise<void> {
+  if (workflow.id === canvasId) {
+    closeRailMenu();
+    return;
+  }
+
+  const document = normalizeCanvasDocument(workflow.document);
+
+  if (!document) {
+    showCanvasNotice('该工作流数据格式无效，暂时无法打开');
+    return;
+  }
+
+  workflowBusyId.value = workflow.id;
+  await persistCanvasNow({ notifyOnError: false });
+  commitHistory();
+  applyCanvasDocument(document);
+  canvasId = workflow.id;
+  saveState.value = 'saved';
+  const savedAt = Date.parse(workflow.updatedAt) || Date.now();
+
+  lastSavedAt.value = formatSavedAt(savedAt);
+  workflowBusyId.value = '';
+  closeRailMenu();
+  writeLocalCanvas(savedAt);
+  showCanvasNotice(`已切换到“${workflow.title}”`);
+}
+
+function startWorkflowRename(workflow: CanvasWorkflowRecord): void {
+  renamingWorkflowId.value = workflow.id;
+  workflowTitleDraft.value = workflow.title;
+  void nextTick(() => {
+    const input = document.querySelector<HTMLInputElement>('[data-workflow-rename-input]');
+
+    input?.focus();
+    input?.select();
+  });
+}
+
+function cancelWorkflowRename(): void {
+  renamingWorkflowId.value = '';
+  workflowTitleDraft.value = '';
+}
+
+async function saveWorkflowRename(workflow: CanvasWorkflowRecord): Promise<void> {
+  const title = workflowTitleDraft.value.trim().slice(0, 80);
+
+  if (!title) {
+    showCanvasNotice('工作流名称不能为空');
+    return;
+  }
+
+  if (title === workflow.title) {
+    cancelWorkflowRename();
+    return;
+  }
+
+  const document = normalizeCanvasDocument(workflow.document);
+
+  if (!document) {
+    showCanvasNotice('该工作流数据格式无效，暂时无法重命名');
+    return;
+  }
+
+  workflowBusyId.value = workflow.id;
+
+  try {
+    const saved = await saveCanvasWorkflow({
+      document: {
+        ...document,
+        title,
+      },
+      id: workflow.id,
+      title,
+      version: workflow.version,
+    });
+
+    upsertCanvasWorkflow(saved);
+    if (saved.id === canvasId) {
+      canvasTitle.value = saved.title;
+      writeLocalCanvas(Date.parse(saved.updatedAt) || Date.now());
+    }
+    cancelWorkflowRename();
+    showCanvasNotice('工作流已重命名');
+  } catch (error) {
+    showCanvasNotice(error instanceof Error ? error.message : '重命名失败');
+  } finally {
+    workflowBusyId.value = '';
+  }
+}
+
+async function removeCloudWorkflow(workflow: CanvasWorkflowRecord): Promise<void> {
+  if (workflow.id === canvasId) {
+    showCanvasNotice('请先新建或切换到其他工作流，再删除当前画布');
+    return;
+  }
+
+  if (!window.confirm(`删除工作流“${workflow.title}”？此操作不可撤销。`)) {
+    return;
+  }
+
+  workflowBusyId.value = workflow.id;
+
+  try {
+    await deleteCanvasWorkflow(workflow.id);
+    canvasWorkflows.value = canvasWorkflows.value.filter((item) => item.id !== workflow.id);
+    showCanvasNotice('工作流已删除');
+  } catch (error) {
+    showCanvasNotice(error instanceof Error ? error.message : '删除失败');
+  } finally {
+    workflowBusyId.value = '';
+  }
 }
 
 function chooseAsset(asset: CanvasAsset): void {
@@ -2041,6 +2228,7 @@ async function importWorkflow(event: Event): Promise<void> {
       .filter((group) => group.nodeIds.length >= 2);
 
     commitHistory();
+    canvasId = createId('canvas');
     nodes.value = importedNodes;
     edges.value = importedEdges;
     groups.value = importedGroups;
@@ -2390,12 +2578,97 @@ onBeforeUnmount(() => {
             </button>
           </header>
           <p>
-            <BulbOutlined />
-            工作流保存在本机，清理浏览器缓存会丢失，请注意备份。
+            <CloudSyncOutlined />
+            登录后工作流会同步到云端，本机同时保留一份可恢复副本。
           </p>
-          <div class="canvas-workflow-grid">
+          <template v-if="activeWorkflowTab === 'mine'">
+            <div class="canvas-workflow-library-bar">
+              <button type="button" class="primary" @click="createCanvas">
+                <PlusOutlined />
+                新建画布
+              </button>
+              <span>{{ canvasWorkflows.length }} 个工作流</span>
+            </div>
+            <p v-if="workflowListError" class="canvas-panel-error">
+              {{ workflowListError }}
+            </p>
+            <div v-else-if="canvasWorkflows.length === 0" class="canvas-workflow-empty">
+              <NodeIndexOutlined />
+              <strong>还没有云端工作流</strong>
+              <span>编辑画布后会自动保存，也可以先新建一份空白画布。</span>
+            </div>
+            <div v-else class="canvas-workflow-grid canvas-workflow-grid--library">
+              <article
+                v-for="workflow in canvasWorkflows"
+                :key="workflow.id"
+                :class="{ active: workflow.id === canvasId }"
+              >
+                <button
+                  type="button"
+                  class="canvas-workflow-card__open"
+                  :disabled="workflowBusyId === workflow.id"
+                  @click="openCloudWorkflow(workflow)"
+                >
+                  <span>
+                    <LoadingOutlined v-if="workflowBusyId === workflow.id" />
+                    <NodeIndexOutlined v-else />
+                  </span>
+                  <strong>{{ workflow.title }}</strong>
+                  <small>
+                    {{ workflowNodeCount(workflow) }} 个节点 ·
+                    {{ formatWorkflowUpdatedAt(workflow.updatedAt) }}
+                  </small>
+                  <em v-if="workflow.id === canvasId">当前画布</em>
+                  <em v-else>点击打开</em>
+                </button>
+                <footer>
+                  <template v-if="renamingWorkflowId === workflow.id">
+                    <input
+                      v-model="workflowTitleDraft"
+                      maxlength="80"
+                      aria-label="工作流名称"
+                      data-workflow-rename-input
+                      @keydown.enter.prevent="saveWorkflowRename(workflow)"
+                      @keydown.escape.prevent="cancelWorkflowRename"
+                    />
+                    <button
+                      type="button"
+                      aria-label="保存名称"
+                      :disabled="workflowBusyId === workflow.id"
+                      @click="saveWorkflowRename(workflow)"
+                    >
+                      <CheckOutlined />
+                    </button>
+                    <button type="button" aria-label="取消重命名" @click="cancelWorkflowRename">
+                      <CloseOutlined />
+                    </button>
+                  </template>
+                  <template v-else>
+                    <button
+                      type="button"
+                      aria-label="重命名工作流"
+                      @click="startWorkflowRename(workflow)"
+                    >
+                      <EditOutlined />
+                    </button>
+                    <button
+                      v-if="workflow.id !== canvasId"
+                      type="button"
+                      class="danger"
+                      aria-label="删除工作流"
+                      :disabled="workflowBusyId === workflow.id"
+                      @click="removeCloudWorkflow(workflow)"
+                    >
+                      <DeleteOutlined />
+                    </button>
+                  </template>
+                </footer>
+              </article>
+            </div>
+          </template>
+          <div v-else class="canvas-workflow-grid">
             <button
-              v-for="workflow in workflowForAsset()"
+              v-for="workflow in workflowTemplates"
               :key="workflow.id"
               type="button"
               @click="loadWorkflow(workflow)"
@@ -3576,7 +3849,10 @@ onBeforeUnmount(() => {
   top: 190px;
   left: 68px;
   width: min(680px, calc(100% - 96px));
+  max-height: min(620px, calc(100% - 220px));
+  overflow: auto;
   padding: 15px;
+  scrollbar-width: thin;
 }
 
 .canvas-workflow-panel > header > div {
@@ -3636,6 +3912,74 @@ onBeforeUnmount(() => {
   font-size: 8px;
 }
 
+.canvas-workflow-library-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 11px;
+}
+
+.canvas-workflow-library-bar > button {
+  display: inline-flex;
+  height: 29px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid rgb(124 100 255 / 55%);
+  border-radius: 7px;
+  background: #3b315f;
+  color: #ded8ff;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.canvas-workflow-library-bar > button:hover {
+  background: #493c72;
+}
+
+.canvas-workflow-library-bar > span {
+  color: #858b96;
+  font-size: 8px;
+}
+
+.canvas-workflow-empty {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  min-height: 146px;
+  place-content: center;
+  padding: 20px;
+  border: 1px dashed rgb(255 255 255 / 12%);
+  border-radius: 9px;
+  background: #26272d;
+  color: #8c929e;
+  text-align: center;
+}
+
+.canvas-workflow-empty > svg {
+  color: #8a73f4;
+  font-size: 24px;
+}
+
+.canvas-workflow-empty strong {
+  color: #e3e5e9;
+  font-size: 10px;
+}
+
+.canvas-workflow-empty span {
+  max-width: 280px;
+  font-size: 8px;
+  line-height: 1.6;
+}
+
+.canvas-panel-error {
+  margin: 8px 0 12px;
+  color: #f0b56a;
+  font-size: 8px;
+  line-height: 1.6;
+}
+
 .canvas-workflow-grid {
   display: grid;
   gap: 9px;
@@ -3659,6 +4003,111 @@ onBeforeUnmount(() => {
 .canvas-workflow-grid > button:hover {
   border-color: rgb(124 100 255 / 62%);
   background: #303138;
+}
+
+.canvas-workflow-grid--library > article {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 8px;
+  background: #292a30;
+}
+
+.canvas-workflow-grid--library > article:hover {
+  border-color: rgb(124 100 255 / 62%);
+  background: #303138;
+}
+
+.canvas-workflow-grid--library > article.active {
+  border-color: rgb(124 100 255 / 72%);
+  box-shadow: inset 0 0 0 1px rgb(124 100 255 / 18%);
+}
+
+.canvas-workflow-card__open {
+  display: grid;
+  min-width: 0;
+  min-height: 138px;
+  justify-items: start;
+  padding: 13px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.canvas-workflow-card__open:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.canvas-workflow-card__open > span {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  margin-bottom: 18px;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #7357ef, #4e39ba);
+  color: #fff;
+}
+
+.canvas-workflow-card__open em {
+  margin-top: 9px;
+  color: #a394f7;
+  font-size: 7px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+.canvas-workflow-grid--library > article > footer {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 0 10px 9px;
+}
+
+.canvas-workflow-grid--library > article > footer button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 6px;
+  background: #23242a;
+  color: #aeb2bc;
+  cursor: pointer;
+}
+
+.canvas-workflow-grid--library > article > footer button:hover:not(:disabled) {
+  border-color: rgb(124 100 255 / 50%);
+  color: #fff;
+}
+
+.canvas-workflow-grid--library > article > footer button.danger:hover:not(:disabled) {
+  border-color: rgb(240 112 112 / 55%);
+  color: #ffb2b2;
+}
+
+.canvas-workflow-grid--library > article > footer button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.canvas-workflow-grid--library > article > footer input {
+  min-width: 0;
+  width: 100%;
+  height: 26px;
+  padding: 0 7px;
+  border: 1px solid rgb(124 100 255 / 48%);
+  border-radius: 6px;
+  outline: none;
+  background: #1f2025;
+  color: #fff;
+  font-size: 8px;
 }
 
 .canvas-workflow-grid > button > span {
@@ -5798,6 +6247,10 @@ onBeforeUnmount(() => {
   .canvas-asset-grid,
   .canvas-history-groups > section > div {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .canvas-workflow-grid--library {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .canvas-batch-panel {

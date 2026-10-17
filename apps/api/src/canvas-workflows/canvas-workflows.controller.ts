@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CanvasWorkflowsService } from './canvas-workflows.service';
 import { SaveCanvasWorkflowDto } from './dto/save-canvas-workflow.dto';
@@ -17,5 +17,10 @@ export class CanvasWorkflowsController {
   @Post()
   save(@CurrentUser('id') userId: string, @Body() input: SaveCanvasWorkflowDto) {
     return this.canvasWorkflowsService.save(userId, input);
+  }
+
+  @Delete(':workflowId')
+  remove(@CurrentUser('id') userId: string, @Param('workflowId') workflowId: string) {
+    return this.canvasWorkflowsService.remove(userId, workflowId);
   }
 }
