@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons-vue';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import MarkdownMessage from '@/components/MarkdownMessage.vue';
 import { getAgentById } from '@/data/agents';
 import { useAgentWorkspaceStore, type AgentSession } from '@/stores/agent-workspace';
 
@@ -319,9 +320,19 @@ watch(
             </span>
             <div>
               <strong>{{ message.role === 'assistant' ? agent.name : '你' }}</strong>
-              <p>
+              <MarkdownMessage
+                v-if="message.role === 'assistant' && message.status === 'COMPLETED'"
+                class="agent-detail__markdown"
+                :content="message.content"
+              />
+              <MarkdownMessage
+                v-else-if="message.role === 'assistant' && message.status === 'STREAMING'"
+                class="agent-detail__markdown"
+                :content="message.content"
+                streaming
+              />
+              <p v-else>
                 {{ message.content }}
-                <i v-if="message.status === 'STREAMING'" class="agent-detail__cursor" />
               </p>
             </div>
           </article>
@@ -810,6 +821,17 @@ watch(
   line-height: 1.75;
   text-align: left;
   white-space: pre-wrap;
+}
+
+.agent-detail__markdown {
+  margin-top: 5px;
+  padding: 12px 14px;
+  border-radius: 4px 12px 12px;
+  background: #f5f7fa;
+  color: #363d48;
+  font-size: 12px;
+  line-height: 1.75;
+  text-align: left;
 }
 
 .agent-detail__message--user p {

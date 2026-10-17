@@ -27,6 +27,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import ChartThumbnail from '@/components/ChartThumbnail.vue';
 import ChatComposer from '@/components/ChatComposer.vue';
+import MarkdownMessage from '@/components/MarkdownMessage.vue';
 import { useChatWorkspaceStore } from '@/stores/chat-workspace';
 import { useSessionStore } from '@/stores/session';
 
@@ -516,9 +517,19 @@ function formatConversationTime(value: string | null): string {
             ]"
           >
             <span>{{ message.role === 'assistant' ? '极' : '我' }}</span>
-            <p>
+            <MarkdownMessage
+              v-if="message.role === 'assistant' && message.status === 'COMPLETED'"
+              class="chat-message__markdown"
+              :content="message.content"
+            />
+            <MarkdownMessage
+              v-else-if="message.role === 'assistant' && message.status === 'STREAMING'"
+              class="chat-message__markdown"
+              :content="message.content"
+              streaming
+            />
+            <p v-else>
               {{ message.content }}
-              <i v-if="message.status === 'STREAMING'" class="chat-message__cursor" />
               <em v-if="message.status === 'PENDING'">正在恢复生成状态...</em>
             </p>
             <div
@@ -1150,6 +1161,16 @@ function formatConversationTime(value: string | null): string {
   white-space: pre-wrap;
 }
 
+.chat-message__markdown {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 11px;
+  background: #f6f7f9;
+  color: #363d48;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
 .chat-message--failed p {
   border: 1px solid #f1d3cf;
   background: #fff8f7;
@@ -1201,22 +1222,6 @@ function formatConversationTime(value: string | null): string {
 .chat-message__actions button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.chat-message__cursor {
-  display: inline-block;
-  width: 6px;
-  height: 14px;
-  margin-left: 3px;
-  vertical-align: -2px;
-  background: #4c84ff;
-  animation: cursor-blink 900ms steps(2, jump-none) infinite;
-}
-
-@keyframes cursor-blink {
-  50% {
-    opacity: 0;
-  }
 }
 
 @media (max-width: 900px) {
