@@ -1,5 +1,13 @@
 import { defineStore } from 'pinia';
-import { fetchModels, streamChat } from '@/app/api';
+import {
+  fetchAgents,
+  fetchModels,
+  publishAgent,
+  saveAgent,
+  streamChat,
+  type PersistedAgent,
+  type SaveAgentInput,
+} from '@/app/api';
 import {
   agentCapabilityOptions,
   type AgentCapabilityId,
@@ -202,6 +210,123 @@ function buildAgentSystemPrompt(agent: AgentCatalogItem): string {
     .join('\n');
 }
 
+function cleanList(items: string[]): string[] {
+  return items.map((item) => item.trim()).filter(Boolean);
+}
+
+function colorForAgent(agentId: string): string {
+  const hash = [...agentId].reduce((value, character) => value + character.charCodeAt(0), 0);
+
+  return customAgentColors[hash % customAgentColors.length] ?? '#3979ed';
+}
+
+function draftToSaveInput(draft: AgentDraft): SaveAgentInput {
+  const name = draft.name.trim() || '未命名智能体';
+
+  return {
+    capabilities: [...draft.capabilities],
+    color: colorForAgent(draft.id),
+    description: draft.description.trim(),
+    glyph: name.slice(0, 1) || '智',
+    id: draft.id,
+    instructions: draft.instructions.trim(),
+    name,
+    opening: draft.opening.trim(),
+    starterPrompts: cleanList(draft.starterPrompts),
+    tags: cleanList(draft.tags),
+  };
+}
+
+function catalogItemToSaveInput(agent: AgentCatalogItem): SaveAgentInput {
+  const name = agent.name.trim() || '未命名智能体';
+
+  return {
+    capabilities: [...(agent.capabilities ?? [])],
+    color: agent.color || colorForAgent(agent.id),
+    description: agent.description.trim(),
+    glyph: agent.glyph.trim().slice(0, 1) || name.slice(0, 1) || '智',
+    id: agent.id,
+    instructions: agent.instructions?.trim() ?? '',
+    name,
+    opening: agent.opening.trim(),
+    starterPrompts: cleanList(agent.starterPrompts),
+    tags: cleanList(agent.tags),
+  };
+}
+
+function persistedAgentToCatalogItem(agent: PersistedAgent): AgentCatalogItem {
+  return {
+    capabilities: [...agent.capabilities],
+    category: agent.category,
+    color: agent.color,
+    description: agent.description,
+    glyph: agent.glyph,
+    id: agent.id,
+    instructions: agent.instructions,
+    name: agent.name,
+    opening: agent.opening,
+    rating: agent.rating,
+    starterPrompts: [...agent.starterPrompts],
+    tags: [...agent.tags],
+    usage: agent.usage,
+  };
+}
+
+function persistedAgentToDraft(agent: PersistedAgent): AgentDraft {
+  return {
+    capabilities: [...agent.capabilities],
+    description: agent.description,
+    id: agent.id,
+    instructions: agent.instructions,
+    name: agent.name,
+    opening: agent.opening,
+    published: agent.status === 'PUBLISHED',
+    starterPrompts: [...agent.starterPrompts],
+    tags: [...agent.tags],
+  };
+}
+
+async function migrateLegacyAgents(
+  localAgents: AgentCatalogItem[],
+  drafts: AgentDraft[],
+  persistedAgents: PersistedAgent[],
+): Promise<{ agents: PersistedAgent[]; error: string }> {
+  const agentsById = new Map(persistedAgents.map((agent) => [agent.id, agent]));
+  const candidates = new Map<string, SaveAgentInput>();
+
+  for (const draft of drafts) {
+    if (draft.published) {
+      candidates.set(draft.id, draftToSaveInput(draft));
+    }
+  }
+
+  for (const agent of localAgents) {
+    candidates.set(agent.id, catalogItemToSaveInput(agent));
+  }
+
+  let migrationError = '';
+
+  for (const [agentId, input] of candidates) {
+    if (agentsById.has(agentId)) {
+      continue;
+    }
+
+    try {
+      const savedAgent = await saveAgent(input);
+      agentsById.set(savedAgent.id, savedAgent);
+    } catch (error) {
+      migrationError =
+        migrationError ||
+        (error instanceof Error ? error.message : '本地智能体同步失败，请稍后重试');
+    }
+  }
+
+  return {
+    agents: [...agentsById.values()],
+    error: migrationError,
+  };
+}
+
 export const useAgentWorkspaceStore = defineStore('agent-workspace', {
   state: (): AgentWorkspaceState => loadWorkspaceState(),
   actions: {
@@ -226,6 +351,10 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
         return;
       }
 
+      if (this.status === 'loading') {
+        return;
+      }
+
       const sessionStore = useSessionStore();
       this.status = 'loading';
       this.error = '';
@@ -241,12 +370,46 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
       }
 
       try {
-        const models = await fetchModels('chat');
+        const [modelsResult, agentsResult] = await Promise.allSettled([
+          fetchModels('chat'),
+          fetchAgents(),
+        ]);
+
+        if (modelsResult.status === 'rejected') {
+          throw modelsResult.reason;
+        }
+
+        const models = modelsResult.value;
 
         if (!models.some((model) => model.alias === this.modelAlias)) {
           this.modelAlias = models[0]?.alias ?? '';
         }
 
+        let persistedAgents: PersistedAgent[] = [];
+        let workspaceError = '';
+
+        if (agentsResult.status === 'fulfilled') {
+          persistedAgents = agentsResult.value;
+
+          const migration = await migrateLegacyAgents(
+            this.customAgents,
+            this.drafts,
+            persistedAgents,
+          );
+          persistedAgents = migration.agents;
+          workspaceError = migration.error;
+        } else {
+          workspaceError =
+            agentsResult.reason instanceof Error
+              ? agentsResult.reason.message
+              : '智能体列表加载失败，当前显示本地缓存';
+        }
+
+        const serverAgentIds = new Set(persistedAgents.map((agent) => agent.id));
+        const localAgents = this.customAgents.filter((agent) => !serverAgentIds.has(agent.id));
+
+        this.customAgents = [...persistedAgents.map(persistedAgentToCatalogItem), ...localAgents];
+        this.error = workspaceError;
         this.status = 'ready';
       } catch (error) {
         this.error = error instanceof Error ? error.message : '模型列表加载失败';
@@ -458,53 +621,69 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
 
       this.persist();
     },
-    saveDraft(draft: AgentDraft): AgentDraft {
-      const index = this.drafts.findIndex((item) => item.id === draft.id);
+    async saveDraft(draft: AgentDraft): Promise<AgentDraft> {
+      try {
+        const persistedAgent = await saveAgent(draftToSaveInput(draft));
+        const savedDraft = persistedAgentToDraft(persistedAgent);
+        const customAgent = persistedAgentToCatalogItem(persistedAgent);
+        const draftIndex = this.drafts.findIndex((item) => item.id === savedDraft.id);
+        const agentIndex = this.customAgents.findIndex((item) => item.id === customAgent.id);
 
-      if (index >= 0) {
-        this.drafts.splice(index, 1, draft);
-      } else {
-        this.drafts.unshift(draft);
+        if (draftIndex >= 0) {
+          this.drafts.splice(draftIndex, 1, savedDraft);
+        } else {
+          this.drafts.unshift(savedDraft);
+        }
+
+        if (agentIndex >= 0) {
+          this.customAgents.splice(agentIndex, 1, customAgent);
+        } else {
+          this.customAgents.unshift(customAgent);
+        }
+
+        this.error = '';
+        this.status = 'ready';
+        this.persist();
+        return savedDraft;
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : '智能体保存失败，请稍后重试';
+        this.status = 'error';
+        throw error;
       }
-
-      this.persist();
-      return draft;
     },
-    publishDraft(draft: AgentDraft): AgentCatalogItem {
-      const savedDraft = this.saveDraft({
-        ...draft,
-        published: true,
-      });
-      const existingIndex = this.customAgents.findIndex((agent) => agent.id === savedDraft.id);
-      const customAgent: AgentCatalogItem = {
-        capabilities: [...savedDraft.capabilities],
-        category: '我的智能体',
-        color: customAgentColors[this.customAgents.length % customAgentColors.length] ?? '#3979ed',
-        description: savedDraft.description.trim() || '由极光AI创建的专属智能体。',
-        glyph: savedDraft.name.trim().slice(0, 1) || '智',
-        id: savedDraft.id,
-        instructions: savedDraft.instructions,
-        name: savedDraft.name.trim() || '未命名智能体',
-        opening:
-          savedDraft.opening.trim() ||
-          `你好，我是${savedDraft.name.trim() || '你的专属智能体'}。告诉我你的目标，我会开始处理。`,
-        rating: 5,
-        starterPrompts:
-          savedDraft.starterPrompts.filter(Boolean).length > 0
-            ? savedDraft.starterPrompts.filter(Boolean)
-            : ['介绍你能完成的任务', '帮我拆解一个目标', '开始处理我的需求'],
-        tags: savedDraft.tags.length > 0 ? savedDraft.tags : ['专属智能体', '本地草稿'],
-        usage: 0,
-      };
+    async publishDraft(draft: AgentDraft): Promise<AgentCatalogItem> {
+      try {
+        const savedDraft = await this.saveDraft({
+          ...draft,
+          published: false,
+        });
+        const publishedAgent = await publishAgent(savedDraft.id);
+        const customAgent = persistedAgentToCatalogItem(publishedAgent);
+        const publishedDraft = persistedAgentToDraft(publishedAgent);
+        const draftIndex = this.drafts.findIndex((item) => item.id === customAgent.id);
+        const agentIndex = this.customAgents.findIndex((item) => item.id === customAgent.id);
 
-      if (existingIndex >= 0) {
-        this.customAgents.splice(existingIndex, 1, customAgent);
-      } else {
-        this.customAgents.unshift(customAgent);
+        if (draftIndex >= 0) {
+          this.drafts.splice(draftIndex, 1, publishedDraft);
+        } else {
+          this.drafts.unshift(publishedDraft);
+        }
+
+        if (agentIndex >= 0) {
+          this.customAgents.splice(agentIndex, 1, customAgent);
+        } else {
+          this.customAgents.unshift(customAgent);
+        }
+
+        this.error = '';
+        this.status = 'ready';
+        this.persist();
+        return customAgent;
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : '智能体发布失败，请稍后重试';
+        this.status = 'error';
+        throw error;
       }
-
-      this.persist();
-      return customAgent;
     },
   },
 });

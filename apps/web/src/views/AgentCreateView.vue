@@ -10,7 +10,7 @@ import {
   SendOutlined,
   UploadOutlined,
 } from '@ant-design/icons-vue';
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { agentCapabilityOptions, type AgentCapabilityId } from '@/data/agents';
 import { type AgentDraft, useAgentWorkspaceStore } from '@/stores/agent-workspace';
@@ -22,6 +22,8 @@ const dialogPanelOpen = ref(true);
 const tagMenuOpen = ref(false);
 const published = ref(false);
 const saved = ref(false);
+const saving = ref(false);
+const publishing = ref(false);
 const dialogMode = ref('normal');
 const previewPrompt = ref('');
 const previewReply = ref('');
@@ -46,6 +48,7 @@ const canPublish = computed(
     draft.description.trim().length > 0 &&
     draft.instructions.trim().length > 0,
 );
+const actionError = computed(() => workspace.error);
 
 const previewLines = computed(() => {
   if (!draft.name.trim()) {
@@ -67,23 +70,50 @@ function snapshotDraft(): AgentDraft {
   };
 }
 
-function saveDraft(): void {
-  workspace.saveDraft(snapshotDraft());
-  saved.value = true;
-  published.value = false;
-}
-
-function publish(): void {
-  if (!canPublish.value) {
+async function saveDraft(): Promise<void> {
+  if (saving.value || publishing.value) {
     return;
   }
 
-  const customAgent = workspace.publishDraft(snapshotDraft());
-  saved.value = true;
-  published.value = true;
-  window.setTimeout(() => {
-    void router.push(`/agents/${customAgent.id}`);
-  }, 500);
+  saving.value = true;
+  workspace.error = '';
+
+  try {
+    const savedDraft = await workspace.saveDraft(snapshotDraft());
+    Object.assign(draft, savedDraft);
+    saved.value = true;
+    published.value = savedDraft.published;
+  } catch {
+    saved.value = false;
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function publish(): Promise<void> {
+  if (!canPublish.value || saving.value || publishing.value) {
+    return;
+  }
+
+  publishing.value = true;
+  workspace.error = '';
+
+  try {
+    const customAgent = await workspace.publishDraft(snapshotDraft());
+    draft.name = customAgent.name;
+    draft.description = customAgent.description;
+    draft.instructions = customAgent.instructions ?? draft.instructions;
+    draft.opening = customAgent.opening;
+    draft.tags = [...customAgent.tags];
+    draft.published = true;
+    saved.value = true;
+    published.value = true;
+    await router.push(`/agents/${customAgent.id}`);
+  } catch {
+    published.value = false;
+  } finally {
+    publishing.value = false;
+  }
 }
 
 function toggleTag(tag: string): void {
@@ -121,6 +151,10 @@ function sendPreview(): void {
   ].join('\n');
   previewPrompt.value = '';
 }
+
+onMounted(() => {
+  void workspace.initialize();
+});
 </script>
 
 <template>
@@ -137,25 +171,28 @@ function sendPreview(): void {
         </span>
       </span>
       <div class="agent-create__actions">
-        <button type="button" @click="saveDraft">
+        <button type="button" :disabled="saving || publishing" @click="saveDraft">
           <SaveOutlined />
-          {{ saved ? '已保存' : '保存草稿' }}
+          {{ saving ? '保存中' : saved ? '已保存' : '保存草稿' }}
         </button>
         <button
           class="agent-create__publish"
           type="button"
-          :disabled="!canPublish"
+          :disabled="!canPublish || saving || publishing"
           @click="publish"
         >
           <CheckOutlined v-if="published" />
           <RocketOutlined v-else />
-          {{ published ? '已发布' : '发布' }}
+          {{ publishing ? '发布中' : published ? '已发布' : '发布' }}
         </button>
       </div>
     </header>
 
     <div class="agent-create__layout">
       <section class="agent-create__form">
+        <div v-if="actionError" class="agent-create__error" role="alert">
+          {{ actionError }}
+        </div>
         <h1>配置智能体</h1>
 
         <div class="agent-section-title">• 基本配置信息 <span>（必填）</span></div>
@@ -434,14 +471,14 @@ function sendPreview(): void {
   color: #3979ed;
 }
 
+.agent-create__actions > button:disabled {
+  color: #c3c8d0;
+  cursor: not-allowed;
+}
+
 .agent-create__publish:not(:disabled):hover {
   border-color: #9ddab8;
   color: #168952;
-}
-
-.agent-create__publish:disabled {
-  color: #c3c8d0;
-  cursor: not-allowed;
 }
 
 .agent-create__layout {
@@ -460,6 +497,17 @@ function sendPreview(): void {
 .agent-create__form h1 {
   margin: 0 0 18px;
   font-size: 20px;
+}
+
+.agent-create__error {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid #f1c7c7;
+  border-radius: 7px;
+  background: #fff5f5;
+  color: #b34040;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .agent-section-title {

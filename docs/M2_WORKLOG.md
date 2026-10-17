@@ -719,6 +719,26 @@ node outputs/ui-reference/verify-global-search.mjs
 - Web 测试扩展为 15 个文件 58 项；定向测试、类型检查和浏览器验收通过
 - 自动验收使用 Playwright 路由拦截，不调用真实 Provider，不读取或输出 Key
 
+自定义智能体服务端持久化：
+
+```text
+pnpm format:check
+pnpm lint
+pnpm --filter @aurora/api typecheck
+pnpm --filter @aurora/web typecheck
+pnpm test
+pnpm build
+node outputs/ui-reference/verify-agent-create.mjs
+```
+
+- 新增 Prisma `CustomAgentStatus` 枚举和 `CustomAgent` 表，迁移 `20261018120000_add_custom_agents` 已在本机执行成功，只新增表和索引，不删除或改动现有业务数据
+- 新增 `/api/v1/agents` 列表与保存、`/api/v1/agents/:agentId` 更新、`/api/v1/agents/:agentId/publish` 发布接口；全部受全局认证保护，并按当前用户隔离数据
+- 前端智能体工作区初始化时并行加载模型和服务端智能体；旧 `localStorage.customAgents` 会按 ID 幂等迁移，服务端失败时保留本地缓存并显示错误
+- 保存和发布改为真实异步请求；创建页会显示保存中、发布中和服务端错误，发布成功后才进入详情页
+- 新增 API E2E 与 Store 测试，覆盖草稿、列表、更新、发布、用户隔离、旧数据迁移、API 失败回退；API 为 19 个文件 76 项，Web 为 15 个文件 60 项
+- 格式检查、lint、API/Web 类型检查、全量测试、构建和 `verify-agent-create.mjs` 桌面端与移动端验收全部通过
+- 本地 Web `http://127.0.0.1:5173/`、API 健康检查、PostgreSQL 和 Redis 均保持运行；自动验收使用 Playwright 路由 Mock，不调用真实对话或图片 Provider，不读取或输出 Key
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥

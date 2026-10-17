@@ -88,6 +88,11 @@ enum VideoTaskStatus {
   CANCELLED
 }
 
+enum CustomAgentStatus {
+  DRAFT
+  PUBLISHED
+}
+
 model ProviderConfig {
   id          String        @id @default(cuid())
   code        String        @unique
@@ -158,6 +163,7 @@ model User {
   fileAssets      FileAsset[]
   imageTasks      ImageTask[]
   videoTasks      VideoTask[]
+  customAgents    CustomAgent[]
 
   @@index([createdAt])
   @@map("users")
@@ -363,4 +369,29 @@ model VideoTask {
   @@index([userId, createdAt])
   @@index([status, createdAt])
   @@map("video_tasks")
+}
+
+model CustomAgent {
+  id             String            @id
+  userId         String
+  status         CustomAgentStatus @default(DRAFT)
+  name           String
+  description    String            @default("")
+  instructions   String            @default("") @db.Text
+  opening        String            @default("")
+  category       String            @default("我的智能体")
+  capabilities   String[]
+  tags           String[]
+  starterPrompts String[]
+  color          String            @default("#3979ed")
+  glyph          String
+  rating         Float             @default(5)
+  usage          Int               @default(0)
+  publishedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, updatedAt])
+  @@map("custom_agents")
 }

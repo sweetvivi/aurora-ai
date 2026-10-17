@@ -6,13 +6,17 @@ const apiMocks = vi.hoisted(() => ({
   devLogin: vi.fn(),
   emailLogin: vi.fn(),
   emailRegister: vi.fn(),
+  fetchAgents: vi.fn(),
   fetchCurrentUser: vi.fn(),
   fetchModels: vi.fn(),
   getRefreshToken: vi.fn(),
   hasStoredTokens: vi.fn(),
   logout: vi.fn(),
+  publishAgent: vi.fn(),
+  saveAgent: vi.fn(),
   setAuthSession: vi.fn(),
   streamChat: vi.fn(),
+  updateAgent: vi.fn(),
 }));
 
 vi.mock('@/app/api', async () => {
@@ -38,10 +42,53 @@ const authenticatedUser = {
 };
 
 describe('agent workspace store', () => {
+  let persistedAgents: Map<string, Record<string, unknown>>;
+
   beforeEach(() => {
     setActivePinia(createPinia());
     window.localStorage.clear();
     vi.clearAllMocks();
+    persistedAgents = new Map();
+
+    apiMocks.fetchAgents.mockImplementation(async () => [...persistedAgents.values()]);
+    apiMocks.saveAgent.mockImplementation(async (input: Record<string, unknown>) => {
+      const id =
+        typeof input.id === 'string' && input.id
+          ? input.id
+          : `persisted-agent-${persistedAgents.size + 1}`;
+      const existing = persistedAgents.get(id);
+      const agent = {
+        ...input,
+        category: '我的智能体',
+        createdAt: existing?.createdAt ?? '2026-10-18T00:00:00.000Z',
+        id,
+        publishedAt: existing?.publishedAt ?? null,
+        rating: 5,
+        status: existing?.status ?? 'DRAFT',
+        updatedAt: '2026-10-18T00:00:00.000Z',
+        usage: 0,
+      };
+
+      persistedAgents.set(id, agent);
+      return agent;
+    });
+    apiMocks.publishAgent.mockImplementation(async (agentId: string) => {
+      const agent = persistedAgents.get(agentId);
+
+      if (!agent) {
+        throw new Error('智能体不存在');
+      }
+
+      const publishedAgent = {
+        ...agent,
+        publishedAt: '2026-10-18T00:00:00.000Z',
+        status: 'PUBLISHED',
+        updatedAt: '2026-10-18T00:00:00.000Z',
+      };
+
+      persistedAgents.set(agentId, publishedAgent);
+      return publishedAgent;
+    });
 
     apiMocks.fetchModels.mockResolvedValue([
       {
@@ -53,11 +100,11 @@ describe('agent workspace store', () => {
     apiMocks.hasStoredTokens.mockReturnValue(true);
   });
 
-  it('restores favorites and published agents in a new store instance', () => {
+  it('restores favorites and published agents in a new store instance', async () => {
     const store = useAgentWorkspaceStore();
 
     store.toggleFavorite('visual-prompt');
-    store.publishDraft({
+    await store.publishDraft({
       capabilities: ['web-search', 'smart-chart'],
       description: '整理产品需求并输出验收清单。',
       id: 'custom-product-helper',
@@ -73,6 +120,8 @@ describe('agent workspace store', () => {
 
     const restoredStore = useAgentWorkspaceStore();
 
+    await restoredStore.initialize();
+
     expect(restoredStore.favoriteAgentIds).toEqual(['visual-prompt']);
     expect(restoredStore.customAgents).toEqual([
       expect.objectContaining({
@@ -82,6 +131,101 @@ describe('agent workspace store', () => {
         name: '产品验收助手',
       }),
     ]);
+  });
+
+  it('migrates legacy local agents to the server without duplicating existing ids', async () => {
+    window.localStorage.setItem(
+      'aurora:agent-workspace:v1',
+      JSON.stringify({
+        customAgents: [
+          {
+            capabilities: ['web-search'],
+            category: '我的智能体',
+            color: '#3979ed',
+            description: '旧版本地智能体',
+            glyph: '旧',
+            id: 'legacy-agent',
+            instructions: '先确认目标，再整理结果。',
+            name: '旧版助手',
+            opening: '你好，我可以整理信息。',
+            rating: 5,
+            starterPrompts: ['整理今天的资料'],
+            tags: ['迁移'],
+            usage: 0,
+          },
+        ],
+        drafts: [],
+        favoriteAgentIds: [],
+        modelAlias: '',
+        sessions: [],
+      }),
+    );
+    persistedAgents.set('existing-agent', {
+      capabilities: [],
+      category: '我的智能体',
+      color: '#3979ed',
+      createdAt: '2026-10-18T00:00:00.000Z',
+      description: '服务端已有智能体',
+      glyph: '服',
+      id: 'existing-agent',
+      instructions: '',
+      name: '服务端助手',
+      opening: '',
+      publishedAt: null,
+      rating: 5,
+      starterPrompts: [],
+      status: 'DRAFT',
+      tags: [],
+      updatedAt: '2026-10-18T00:00:00.000Z',
+      usage: 0,
+    });
+
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+    const store = useAgentWorkspaceStore();
+
+    await store.initialize();
+
+    expect(apiMocks.saveAgent).toHaveBeenCalledTimes(1);
+    expect(apiMocks.saveAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'legacy-agent',
+        name: '旧版助手',
+      }),
+    );
+    expect(store.customAgents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'existing-agent' }),
+        expect.objectContaining({ id: 'legacy-agent' }),
+      ]),
+    );
+  });
+
+  it('surfaces server save errors instead of pretending the draft was saved', async () => {
+    apiMocks.saveAgent.mockRejectedValueOnce(new Error('智能体保存接口不可用'));
+    const store = useAgentWorkspaceStore();
+    const draft = {
+      capabilities: ['web-search'] as const,
+      description: '测试错误状态',
+      id: 'failing-agent',
+      instructions: '输出结构化结果。',
+      name: '失败助手',
+      opening: '你好',
+      published: false,
+      starterPrompts: ['开始'],
+      tags: ['测试'],
+    };
+
+    await expect(
+      store.saveDraft({ ...draft, capabilities: [...draft.capabilities] }),
+    ).rejects.toThrow('智能体保存接口不可用');
+
+    expect(store.error).toBe('智能体保存接口不可用');
+    expect(store.status).toBe('error');
+    expect(store.customAgents).toEqual([]);
   });
 
   it('streams a real agent response with ephemeral agent instructions', async () => {

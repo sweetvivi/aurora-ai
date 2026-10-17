@@ -27,7 +27,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { agentCatalog, type AgentCatalogItem } from '@/data/agents';
 import { useAgentWorkspaceStore } from '@/stores/agent-workspace';
@@ -200,6 +200,10 @@ watch(totalPages, (pages) => {
   if (currentPage.value > pages) {
     currentPage.value = pages;
   }
+});
+
+onMounted(() => {
+  void workspace.initialize();
 });
 
 function openAgent(agentId: string): void {

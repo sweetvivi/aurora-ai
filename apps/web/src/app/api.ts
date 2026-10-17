@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import type { AgentCapabilityId, AgentCatalogItem } from '@/data/agents';
 import { createSseParser } from './sse';
 
 const ACCESS_TOKEN_KEY = 'aurora.auth.accessToken';
@@ -152,6 +153,28 @@ export interface ChatModel {
   alias: string;
   capabilities: Array<'chat' | 'embedding' | 'image' | 'video' | 'vision'>;
   displayName: string;
+}
+
+export interface PersistedAgent extends AgentCatalogItem {
+  capabilities: AgentCapabilityId[];
+  createdAt: string;
+  instructions: string;
+  publishedAt: string | null;
+  status: 'DRAFT' | 'PUBLISHED';
+  updatedAt: string;
+}
+
+export interface SaveAgentInput {
+  capabilities: AgentCapabilityId[];
+  color?: string;
+  description: string;
+  glyph?: string;
+  id?: string;
+  instructions: string;
+  name: string;
+  opening: string;
+  starterPrompts: string[];
+  tags: string[];
 }
 
 export interface FileAsset {
@@ -641,6 +664,38 @@ export async function fetchModels(capability?: ChatModel['capabilities'][number]
   });
 
   return response.data.data.items;
+}
+
+export async function fetchAgents(): Promise<PersistedAgent[]> {
+  const response = await apiClient.get<ApiEnvelope<{ items: PersistedAgent[] }>>('/api/v1/agents');
+
+  return response.data.data.items;
+}
+
+export async function saveAgent(input: SaveAgentInput): Promise<PersistedAgent> {
+  const response = await apiClient.post<ApiEnvelope<PersistedAgent>>('/api/v1/agents', input);
+
+  return response.data.data;
+}
+
+export async function updateAgent(
+  agentId: string,
+  input: Partial<SaveAgentInput>,
+): Promise<PersistedAgent> {
+  const response = await apiClient.patch<ApiEnvelope<PersistedAgent>>(
+    `/api/v1/agents/${encodeURIComponent(agentId)}`,
+    input,
+  );
+
+  return response.data.data;
+}
+
+export async function publishAgent(agentId: string): Promise<PersistedAgent> {
+  const response = await apiClient.post<ApiEnvelope<PersistedAgent>>(
+    `/api/v1/agents/${encodeURIComponent(agentId)}/publish`,
+  );
+
+  return response.data.data;
 }
 
 export async function fetchModuleDisplayConfigs(): Promise<{
