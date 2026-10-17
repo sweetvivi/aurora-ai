@@ -497,6 +497,25 @@ node outputs/ui-reference/verify-catalog-charts.mjs
 - 智能体验收使用 Mock 会话、模型和模块接口，不读取或输出 Key，不调用真实 Provider
 - 新增 `apps/web/src/data/agent-directory.spec.ts`，验证 6358 条唯一 ID、分类计数、确定性和小目标裁剪
 
+图片生成空态与创作栏对齐补充验证：
+
+```text
+pnpm lint
+pnpm format:check
+pnpm --filter @aurora/web test
+pnpm --filter @aurora/web typecheck
+pnpm build
+node outputs/ui-reference/verify-image-generation.mjs
+node outputs/ui-reference/verify-image-workbench-detail.mjs
+node outputs/ui-reference/verify-m2-routes.mjs
+```
+
+- 图片生成空态隐藏“全部时间 / 批量操作”，存在作品时恢复日期和批量操作栏
+- 七个分类按钮补齐图标，底部创作栏新增独立上传图块，上传后切换为原参考图预览
+- 桌面端 `1440x1000` 和移动端 `390x844` 均无横向溢出、按钮文字截断或页面脚本错误
+- Web 测试 11 个文件、40 项通过，lint、格式检查、类型检查和前后端构建通过
+- 图片生成、工作台细节和 8 个优先模块路由验收通过；全部使用 Mock 或 Playwright 路由拦截，不调用真实 Provider，不读取或输出 Key
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥

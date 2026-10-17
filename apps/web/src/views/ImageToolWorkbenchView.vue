@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  AppstoreOutlined,
   BgColorsOutlined,
   BulbOutlined,
   CheckOutlined,
@@ -22,6 +23,7 @@ import {
   ScissorOutlined,
   SendOutlined,
   SettingOutlined,
+  SmileOutlined,
   StarOutlined,
   ThunderboltFilled,
   UndoOutlined,
@@ -80,6 +82,7 @@ interface RetouchShowcase {
 }
 
 interface GenerationCategory {
+  icon?: Component;
   label: string;
   value: string;
 }
@@ -98,13 +101,13 @@ interface GenerationShowcase {
 const modelAccents = ['#7157e8', '#2f8ddb', '#22a172', '#d36c9b', '#d99a36', '#3979d5'];
 
 const generationCategories: GenerationCategory[] = [
-  { label: '全部', value: 'all' },
-  { label: '人像美化', value: 'portrait' },
-  { label: '场景优化', value: 'scene' },
-  { label: '创意设计', value: 'creative' },
-  { label: '风格迁移', value: 'style' },
-  { label: '图片修复', value: 'repair' },
-  { label: 'AI 绘画', value: 'paint' },
+  { icon: AppstoreOutlined, label: '全部', value: 'all' },
+  { icon: SmileOutlined, label: '人像美化', value: 'portrait' },
+  { icon: PictureOutlined, label: '场景优化', value: 'scene' },
+  { icon: BulbOutlined, label: '创意设计', value: 'creative' },
+  { icon: BgColorsOutlined, label: '风格迁移', value: 'style' },
+  { icon: ScanOutlined, label: '图片修复', value: 'repair' },
+  { icon: HighlightOutlined, label: 'AI 绘画', value: 'paint' },
 ];
 
 const generationShowcases: GenerationShowcase[] = [
@@ -997,14 +1000,13 @@ onBeforeUnmount(() => {
         <h1>智能生图</h1>
       </div>
       <nav aria-label="图片生成入口">
-        <RouterLink to="/draw">AI 绘画</RouterLink>
         <button type="button" @click="legacyGenerationMode = true">旧文生图</button>
         <RouterLink to="/retouch">新版修图</RouterLink>
       </nav>
     </header>
 
     <div class="generation-studio__content">
-      <div class="generation-filter-bar">
+      <div v-if="generationGroups.length > 0" class="generation-filter-bar">
         <button type="button">
           <ExperimentOutlined />
           全部时间
@@ -1141,6 +1143,7 @@ onBeforeUnmount(() => {
             :class="{ active: activeGenerationCategory === category.value }"
             @click="activeGenerationCategory = category.value"
           >
+            <component :is="category.icon" v-if="category.icon" />
             {{ category.label }}
           </button>
         </div>
@@ -1220,7 +1223,20 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="sourceImage" class="generation-composer__source">
+      <button
+        v-if="!sourceImage"
+        type="button"
+        class="generation-composer__upload-tile"
+        :disabled="uploading"
+        @click="sourceInput?.click()"
+      >
+        <LoadingOutlined v-if="uploading" />
+        <PlusOutlined v-else />
+        <strong>{{ uploading ? '上传中' : '上传图片' }}</strong>
+        <small>最多10张</small>
+      </button>
+
+      <div v-else class="generation-composer__source">
         <img :src="sourceImage.url" :alt="sourceImage.name" />
         <span>
           <strong>{{ sourceImage.name }}</strong>
@@ -1265,16 +1281,6 @@ onBeforeUnmount(() => {
 
       <div class="generation-composer__actions">
         <div class="generation-composer__settings">
-          <button
-            type="button"
-            class="generation-composer__upload"
-            :disabled="uploading"
-            @click="sourceInput?.click()"
-          >
-            <LoadingOutlined v-if="uploading" />
-            <PlusOutlined v-else />
-            {{ uploading ? '上传中' : '上传图片' }}
-          </button>
           <label>
             <ExperimentOutlined />
             <select v-model="selectedModel" aria-label="生成模型">
@@ -2864,6 +2870,12 @@ onBeforeUnmount(() => {
     color 150ms ease;
 }
 
+.generation-category-filter button :deep(svg) {
+  width: 14px;
+  height: 14px;
+  color: #4f5d68;
+}
+
 .generation-category-filter button:hover {
   border-color: #9bd1c0;
   color: #217c62;
@@ -2874,6 +2886,10 @@ onBeforeUnmount(() => {
   background: #8752e6;
   color: #fff;
   box-shadow: 0 8px 20px rgb(120 74 215 / 16%);
+}
+
+.generation-category-filter button.active :deep(svg) {
+  color: #fff;
 }
 
 .generation-showcase-grid {
@@ -3046,6 +3062,7 @@ onBeforeUnmount(() => {
   display: grid;
   width: min(calc(100% - 60px), 1320px);
   gap: 10px;
+  grid-template-columns: 104px minmax(0, 1fr);
   justify-self: center;
   margin: 0 auto 16px;
   padding: 12px;
@@ -3063,11 +3080,52 @@ onBeforeUnmount(() => {
   bottom: 12px;
 }
 
+.generation-composer__upload-tile {
+  display: grid;
+  min-width: 0;
+  min-height: 116px;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  padding: 8px;
+  border: 1px dashed #c8d8d2;
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgb(255 255 255 / 92%), rgb(245 251 249 / 88%)), #fff;
+  color: #7b8790;
+  cursor: pointer;
+}
+
+.generation-composer__upload-tile :deep(svg) {
+  color: #20a57d;
+  font-size: 20px;
+}
+
+.generation-composer__upload-tile strong {
+  color: #50615a;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.generation-composer__upload-tile small {
+  color: #9ea9a5;
+  font-size: 8px;
+}
+
+.generation-composer__upload-tile:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .generation-composer__source {
   display: grid;
   min-width: 0;
+  min-height: 116px;
   align-items: center;
   gap: 9px;
+  grid-column: 1;
+  grid-row: 1 / span 2;
   grid-template-columns: 40px minmax(0, 1fr) 28px;
   padding: 7px;
   border: 1px solid #e0e9e6;
@@ -3116,6 +3174,8 @@ onBeforeUnmount(() => {
 .generation-composer__prompt {
   position: relative;
   display: block;
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .generation-composer__prompt textarea {
@@ -3154,6 +3214,7 @@ onBeforeUnmount(() => {
   border: 1px solid #e1ebe7;
   border-radius: 9px;
   background: #f7fbf9;
+  grid-column: 1 / -1;
 }
 
 .generation-composer__advanced > label {
@@ -3217,6 +3278,8 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .generation-composer__settings {
@@ -3275,6 +3338,7 @@ onBeforeUnmount(() => {
 .generation-composer__examples-panel {
   display: grid;
   gap: 9px;
+  grid-column: 1 / -1;
   padding: 10px;
   border: 1px solid #d9e9e4;
   border-radius: 10px;
@@ -4313,6 +4377,7 @@ onBeforeUnmount(() => {
   .generation-composer {
     bottom: 70px;
     width: calc(100% - 24px);
+    grid-template-columns: 92px minmax(0, 1fr);
     margin-bottom: 12px;
   }
 
@@ -4457,7 +4522,21 @@ onBeforeUnmount(() => {
 
   .generation-composer {
     width: calc(100% - 16px);
+    grid-template-columns: 1fr;
     padding: 10px;
+  }
+
+  .generation-composer__upload-tile,
+  .generation-composer__source,
+  .generation-composer__prompt,
+  .generation-composer__actions {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .generation-composer__upload-tile,
+  .generation-composer__source {
+    min-height: 78px;
   }
 
   .generation-composer__settings {
