@@ -739,6 +739,26 @@ node outputs/ui-reference/verify-agent-create.mjs
 - 格式检查、lint、API/Web 类型检查、全量测试、构建和 `verify-agent-create.mjs` 桌面端与移动端验收全部通过
 - 本地 Web `http://127.0.0.1:5173/`、API 健康检查、PostgreSQL 和 Redis 均保持运行；自动验收使用 Playwright 路由 Mock，不调用真实对话或图片 Provider，不读取或输出 Key
 
+自定义智能体编辑流程：
+
+```text
+pnpm format:check
+pnpm lint
+pnpm --filter @aurora/api typecheck
+pnpm --filter @aurora/web typecheck
+pnpm test
+pnpm build
+node outputs/ui-reference/verify-agent-create.mjs
+node outputs/ui-reference/verify-agent-edit.mjs
+```
+
+- 详情页对服务端自建智能体显示“编辑”入口，“我创建的”卡片也提供独立编辑按钮
+- 编辑页通过 `/agents/create?edit=<agentId>` 加载服务端数据，并完整回填名称、简介、配置、标签、能力、开场白和预置问题
+- 修改过程中复用原有草稿保存接口；按钮会区分“保存草稿 / 保存更改”，保存后正确显示“已保存”，重新修改后恢复未保存状态
+- 返回按钮会根据编辑状态回到对应智能体详情或智能体广场；创建新智能体时仍生成唯一草稿 ID，避免重复覆盖
+- `verify-agent-edit.mjs` 使用 Playwright 和 API 路由 Mock，覆盖桌面端 `1440x1000` 与移动端 `390x844` 的编辑入口、参数回填、保存请求、原 `agentId` 和横向溢出
+- 格式检查、lint、前后端类型检查、全量测试、生产构建和创建/编辑验收全部通过；API 为 19 个文件 76 项，Web 为 15 个文件 60 项
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥

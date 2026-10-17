@@ -6,6 +6,7 @@ import {
   BulbOutlined,
   CodeOutlined,
   CoffeeOutlined,
+  EditOutlined,
   FileTextOutlined,
   HighlightOutlined,
   LayoutOutlined,
@@ -210,6 +211,15 @@ function openAgent(agentId: string): void {
   void router.push(`/agents/${agentId}`);
 }
 
+function editAgent(agentId: string): void {
+  void router.push({
+    path: '/agents/create',
+    query: {
+      edit: agentId,
+    },
+  });
+}
+
 function toggleFavorite(agentId: string): void {
   workspace.toggleFavorite(agentId);
 }
@@ -395,18 +405,29 @@ function goToPage(page: number): void {
                     <span v-if="activeTab === 'created'">我创建的</span>
                     <span v-else>AI 助手</span>
                   </div>
-                  <button
-                    type="button"
-                    class="agent-card__favorite"
-                    :class="{ active: workspace.favoriteAgentIds.includes(agent.id) }"
-                    :aria-label="
-                      workspace.favoriteAgentIds.includes(agent.id) ? '取消收藏' : '收藏智能体'
-                    "
-                    @click.stop="toggleFavorite(agent.id)"
-                  >
-                    <StarFilled v-if="workspace.favoriteAgentIds.includes(agent.id)" />
-                    <StarOutlined v-else />
-                  </button>
+                  <span class="agent-card__actions">
+                    <button
+                      v-if="activeTab === 'created'"
+                      type="button"
+                      class="agent-card__edit"
+                      aria-label="编辑智能体"
+                      @click.stop="editAgent(agent.id)"
+                    >
+                      <EditOutlined />
+                    </button>
+                    <button
+                      type="button"
+                      class="agent-card__favorite"
+                      :class="{ active: workspace.favoriteAgentIds.includes(agent.id) }"
+                      :aria-label="
+                        workspace.favoriteAgentIds.includes(agent.id) ? '取消收藏' : '收藏智能体'
+                      "
+                      @click.stop="toggleFavorite(agent.id)"
+                    >
+                      <StarFilled v-if="workspace.favoriteAgentIds.includes(agent.id)" />
+                      <StarOutlined v-else />
+                    </button>
+                  </span>
                 </header>
 
                 <div class="agent-card__metrics">
@@ -1121,7 +1142,7 @@ function goToPage(page: number): void {
   white-space: nowrap;
 }
 
-.agent-card__header span {
+.agent-card__header > div > span {
   width: max-content;
   padding: 2px 5px;
   border-radius: 4px;
@@ -1131,6 +1152,13 @@ function goToPage(page: number): void {
   font-weight: 800;
 }
 
+.agent-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.agent-card__edit,
 .agent-card__favorite {
   display: grid;
   width: 27px;
@@ -1142,6 +1170,11 @@ function goToPage(page: number): void {
   color: #a3aaa6;
   font-size: 11px;
   cursor: pointer;
+}
+
+.agent-card__edit:hover {
+  background: #eef4ff;
+  color: #3979ed;
 }
 
 .agent-card__favorite.active {

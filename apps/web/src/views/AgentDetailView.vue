@@ -43,6 +43,9 @@ const agent = computed(
     workspace.customAgents.find((item) => item.id === String(route.params.id)) ??
     getAgentById('code-mentor'),
 );
+const editableAgent = computed(() =>
+  workspace.customAgents.some((item) => item.id === agent.value?.id),
+);
 
 const sessions = computed(() => {
   if (!agent.value) {
@@ -139,6 +142,19 @@ function startNewSession(): void {
 
 function openHistory(): void {
   historyOpen.value = true;
+}
+
+function editAgent(): void {
+  if (!editableAgent.value || !agent.value) {
+    return;
+  }
+
+  void router.push({
+    path: '/agents/create',
+    query: {
+      edit: agent.value.id,
+    },
+  });
 }
 
 function selectHistorySession(sessionId: string): void {
@@ -324,6 +340,10 @@ watch(
         </span>
         <strong>{{ agent.name }}</strong>
         <em>{{ agent.tags[0] }}</em>
+        <button v-if="editableAgent" type="button" @click="editAgent">
+          <EditOutlined />
+          编辑
+        </button>
         <span class="agent-detail__cost">
           <ThunderboltFilled />
           1 积分/次

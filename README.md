@@ -28,7 +28,7 @@
 - 超级对话：`/chat/groups` 支持同时选择最多 10 个模型并发提问，每个模型独立流式展示、状态反馈、停止生成和整轮重试；工作区按用户保存最近 20 轮，刷新后恢复模型选择和每个模型自己的会话并继续追问，当前仍不共享跨模型上下文，并按模型数量分别计费
 - 模型对话图表空态现包含 29 类真实 SVG 缩略图，并在桌面端和移动端保持两行/多列响应式网格，不自动发送或创建任务
 - AI 绘画：新版智能生图独立页、7 个分类和 17 个效果模板、旧生成页、批量作品、详情层、跨模块编辑入口、下载、收藏、删除和重试；`/draw` 内层侧栏已按参考产品拆分模型、核心功能、编辑与优化、创意实验室三级目录，支持搜索和桌面折叠；`/newdraw` 的“旧文生图”回到旧生成页，“新版修图”进入智能修图
-- 超级智能体：预置与自建智能体、6358 条官方目录、18 类筛选、搜索、收藏、分页、创建器、能力选择、真实 SSE 对话和历史记录抽屉
+- 超级智能体：预置与自建智能体、6358 条官方目录、18 类筛选、搜索、收藏、分页、创建器、能力选择、服务端持久化、编辑已创建智能体、真实 SSE 对话和历史记录抽屉
 - 智能修图：画布式工作台、处理方式快捷切换、原图/结果对比、最多 30 步撤销/恢复、任务记录和真实图片任务链路
 - 图片生成：参考产品式作品历史、高级设置、存储天数、效果示例和底部固定创作栏
 - 视频生成：按参考产品行为从主平台独立打开 `/video`，使用自带深色工具栏和工作区；支持文生视频、单图参考、4000 字提示词、任务轮询、取消、重试、下载和播放；未接入的首尾帧、AI 音效和极速模式保持明确禁用或标记
@@ -44,7 +44,7 @@
 当前批次验证结果：
 
 - `pnpm format:check`、`pnpm lint`、`pnpm typecheck` 通过
-- `pnpm test`：API 18 个文件 74 项，Web 13 个文件 53 项
+- `pnpm test`：API 19 个文件 76 项，Web 15 个文件 60 项
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-canvas-studio.mjs`、`verify-video-tasks.mjs`、`verify-m2-interactions.mjs`、`verify-m2-routes.mjs` 和 `verify-admin-modules.mjs` 全部通过
 - `node outputs/ui-reference/verify-admin-modules.mjs` 通过，模块改名、角标、排序和显隐会同步刷新共享目录；桌面端和移动端无横向溢出、无页面脚本错误
@@ -55,6 +55,7 @@
 - `node outputs/ui-reference/verify-chat-attachments.mjs` 通过，图片上传、预览、发送、消息展示和历史恢复在桌面端与移动端均正常；验收使用 Mock，不调用真实 Provider
 - `node outputs/ui-reference/verify-group-chat.mjs` 通过，超级对话的 3 模型并发、10 模型上限、停止生成、桌面端与移动端响应式布局均正常；验收使用 Playwright 路由拦截，不调用真实 Provider
 - `node outputs/ui-reference/verify-catalog-charts.mjs` 通过，6358 条智能体目录、分页/空态、29 类图表、无错误状态和无横向溢出在桌面端与移动端均正常
+- `node outputs/ui-reference/verify-agent-create.mjs` 和 `verify-agent-edit.mjs` 通过，智能体创建、服务端持久化数据回填、编辑保存和桌面/移动端布局均正常
 - `node outputs/ui-reference/verify-newdraw-templates.mjs` 通过，`/newdraw` 的 7 分类、17 模板、筛选、回填、示例弹窗、高级设置和顶部跳转在桌面端与移动端均正常；390px 移动端固定创作栏与底部导航保持至少 8px 间距
 - `node outputs/ui-reference/verify-showcase-assets.mjs` 通过，`/newdraw` 的 34 张预览图和图片生成页的 12 张示例图全部加载，无横向溢出
 - `node outputs/ui-reference/verify-commerce-studio.mjs` 通过，电商工具的空状态、必填参数、素材上传、替换/试穿任务和桌面/移动端布局均正常

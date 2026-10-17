@@ -10,11 +10,12 @@ import {
   SendOutlined,
   UploadOutlined,
 } from '@ant-design/icons-vue';
-import { computed, onMounted, reactive, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { agentCapabilityOptions, type AgentCapabilityId } from '@/data/agents';
 import { type AgentDraft, useAgentWorkspaceStore } from '@/stores/agent-workspace';
 
+const route = useRoute();
 const router = useRouter();
 const workspace = useAgentWorkspaceStore();
 const uiPanelOpen = ref(true);
@@ -22,16 +23,21 @@ const dialogPanelOpen = ref(true);
 const tagMenuOpen = ref(false);
 const published = ref(false);
 const saved = ref(false);
+const savedSignature = ref('');
 const saving = ref(false);
 const publishing = ref(false);
+const loadingDraft = ref(false);
 const dialogMode = ref('normal');
 const previewPrompt = ref('');
 const previewReply = ref('');
-const draftId = `custom-agent-${Date.now().toString(36)}`;
+const editingId = computed(() =>
+  typeof route.query.edit === 'string' ? route.query.edit.trim() : '',
+);
+const isEditing = computed(() => Boolean(editingId.value));
 const draft = reactive<AgentDraft>({
   capabilities: [],
   description: '',
-  id: draftId,
+  id: makeDraftId(),
   instructions: '',
   name: '',
   opening: '',
@@ -40,13 +46,28 @@ const draft = reactive<AgentDraft>({
   tags: [] as string[],
 });
 
-const tagOptions = ['办公效率', '内容创作', '编程开发', '学习研究', '营销增长', '生活助手'];
+const baseTagOptions = ['办公效率', '内容创作', '编程开发', '学习研究', '营销增长', '生活助手'];
+const tagOptions = computed(() => [...new Set([...baseTagOptions, ...draft.tags])].filter(Boolean));
 
 const canPublish = computed(
   () =>
     draft.name.trim().length > 0 &&
     draft.description.trim().length > 0 &&
     draft.instructions.trim().length > 0,
+);
+const draftSignature = computed(() =>
+  JSON.stringify({
+    capabilities: draft.capabilities,
+    description: draft.description,
+    instructions: draft.instructions,
+    name: draft.name,
+    opening: draft.opening,
+    starterPrompts: draft.starterPrompts,
+    tags: draft.tags,
+  }),
+);
+const hasUnsavedChanges = computed(
+  () => saved.value && savedSignature.value !== draftSignature.value,
 );
 const actionError = computed(() => workspace.error);
 
@@ -60,6 +81,83 @@ const previewLines = computed(() => {
     draft.description.trim() || '一个由极光AI创建的专属智能体',
   ];
 });
+
+function makeDraftId(): string {
+  const randomPart =
+    globalThis.crypto?.randomUUID?.().slice(0, 8) ?? Math.random().toString(36).slice(2, 10);
+
+  return `custom-agent-${Date.now().toString(36)}-${randomPart}`;
+}
+
+function resetDraft(): void {
+  draft.capabilities = [];
+  draft.description = '';
+  draft.id = makeDraftId();
+  draft.instructions = '';
+  draft.name = '';
+  draft.opening = '';
+  draft.published = false;
+  draft.starterPrompts = ['', '', ''];
+  draft.tags = [];
+  uiPanelOpen.value = true;
+  dialogPanelOpen.value = true;
+  tagMenuOpen.value = false;
+  published.value = false;
+  saved.value = false;
+  savedSignature.value = '';
+  previewPrompt.value = '';
+  previewReply.value = '';
+  workspace.error = '';
+}
+
+async function loadDraftFromRoute(): Promise<void> {
+  const agentId = editingId.value;
+
+  if (!agentId) {
+    resetDraft();
+    return;
+  }
+
+  loadingDraft.value = true;
+  workspace.error = '';
+
+  try {
+    await workspace.initialize();
+    const agent = workspace.customAgents.find((item) => item.id === agentId);
+
+    if (!agent) {
+      resetDraft();
+      workspace.error = '未找到可编辑的智能体，可能已被删除或不属于当前账号。';
+      return;
+    }
+
+    const storedDraft = workspace.drafts.find((item) => item.id === agentId);
+    const starterPrompts = [...agent.starterPrompts].slice(0, 3);
+
+    while (starterPrompts.length < 3) {
+      starterPrompts.push('');
+    }
+
+    draft.capabilities = [...(agent.capabilities ?? [])];
+    draft.description = agent.description;
+    draft.id = agent.id;
+    draft.instructions = agent.instructions ?? '';
+    draft.name = agent.name;
+    draft.opening = agent.opening;
+    draft.published = storedDraft?.published ?? false;
+    draft.starterPrompts = starterPrompts;
+    draft.tags = [...agent.tags];
+    published.value = draft.published;
+    saved.value = true;
+    savedSignature.value = draftSignature.value;
+    previewPrompt.value = '';
+    previewReply.value = '';
+  } catch (error) {
+    workspace.error = error instanceof Error ? error.message : '智能体加载失败，请稍后重试';
+  } finally {
+    loadingDraft.value = false;
+  }
+}
 
 function snapshotDraft(): AgentDraft {
   return {
@@ -82,6 +180,7 @@ async function saveDraft(): Promise<void> {
     const savedDraft = await workspace.saveDraft(snapshotDraft());
     Object.assign(draft, savedDraft);
     saved.value = true;
+    savedSignature.value = draftSignature.value;
     published.value = savedDraft.published;
   } catch {
     saved.value = false;
@@ -107,6 +206,7 @@ async function publish(): Promise<void> {
     draft.tags = [...customAgent.tags];
     draft.published = true;
     saved.value = true;
+    savedSignature.value = draftSignature.value;
     published.value = true;
     await router.push(`/agents/${customAgent.id}`);
   } catch {
@@ -152,15 +252,25 @@ function sendPreview(): void {
   previewPrompt.value = '';
 }
 
-onMounted(() => {
-  void workspace.initialize();
-});
+watch(
+  editingId,
+  () => {
+    void loadDraftFromRoute();
+  },
+  {
+    immediate: true,
+  },
+);
 </script>
 
 <template>
   <div class="agent-create">
     <header class="agent-create__topbar">
-      <button type="button" aria-label="返回智能体广场" @click="router.push('/agents')">
+      <button
+        type="button"
+        :aria-label="isEditing ? '返回智能体详情' : '返回智能体广场'"
+        @click="router.push(isEditing ? `/agents/${draft.id}` : '/agents')"
+      >
         <ArrowLeftOutlined />
       </button>
       <span class="agent-create__identity">
@@ -173,7 +283,15 @@ onMounted(() => {
       <div class="agent-create__actions">
         <button type="button" :disabled="saving || publishing" @click="saveDraft">
           <SaveOutlined />
-          {{ saving ? '保存中' : saved ? '已保存' : '保存草稿' }}
+          {{
+            saving
+              ? '保存中'
+              : saved && !hasUnsavedChanges
+                ? '已保存'
+                : isEditing
+                  ? '保存更改'
+                  : '保存草稿'
+          }}
         </button>
         <button
           class="agent-create__publish"
@@ -193,7 +311,8 @@ onMounted(() => {
         <div v-if="actionError" class="agent-create__error" role="alert">
           {{ actionError }}
         </div>
-        <h1>配置智能体</h1>
+        <h1>{{ isEditing ? '编辑智能体' : '配置智能体' }}</h1>
+        <p v-if="loadingDraft" class="agent-create__loading">正在加载智能体配置...</p>
 
         <div class="agent-section-title">• 基本配置信息 <span>（必填）</span></div>
 
@@ -508,6 +627,16 @@ onMounted(() => {
   color: #b34040;
   font-size: 12px;
   line-height: 1.55;
+}
+
+.agent-create__loading {
+  margin: -8px 0 14px;
+  padding: 9px 12px;
+  border: 1px solid #d9e7ff;
+  border-radius: 7px;
+  background: #f5f9ff;
+  color: #4c76bd;
+  font-size: 11px;
 }
 
 .agent-section-title {
