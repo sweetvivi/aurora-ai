@@ -615,23 +615,41 @@ function formatConversationTime(value: string | null): string {
 
 <style scoped>
 .chat-view {
-  display: grid;
+  display: block;
   min-height: calc(100vh - 56px);
-  grid-template-columns: 270px minmax(0, 1fr);
   background: #fff;
 }
 
 .chat-history {
+  position: fixed;
+  z-index: 45;
+  top: 56px;
+  bottom: 0;
+  left: 0;
   display: flex;
+  width: min(86vw, 320px);
   min-width: 0;
   flex-direction: column;
   overflow: hidden;
   border-right: 1px solid #e8ebf0;
-  background: #fff;
+  background: rgb(255 255 255 / 98%);
+  box-shadow: 18px 0 44px rgb(31 43 65 / 14%);
+  transform: translateX(-105%);
+  transition: transform 180ms ease;
 }
 
 .chat-history__backdrop {
-  display: none;
+  position: fixed;
+  z-index: 40;
+  inset: 56px 0 0;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: rgb(28 36 50 / 24%);
+}
+
+.chat-history.open {
+  transform: translateX(0);
 }
 
 .chat-history > header {
@@ -801,7 +819,7 @@ function formatConversationTime(value: string | null): string {
 }
 
 .chat-main__history-toggle {
-  display: none;
+  display: grid;
   width: 32px;
   height: 32px;
   place-items: center;
@@ -1396,31 +1414,11 @@ function formatConversationTime(value: string | null): string {
   }
 
   .chat-history {
-    position: fixed;
-    z-index: 45;
-    top: 56px;
-    bottom: 0;
-    left: 0;
-    display: flex;
-    width: min(86vw, 320px);
     border-right: 1px solid #e3e7ec;
-    box-shadow: 18px 0 44px rgb(31 43 65 / 14%);
-    transform: translateX(-105%);
-    transition: transform 180ms ease;
-  }
-
-  .chat-history.open {
-    transform: translateX(0);
   }
 
   .chat-history__backdrop {
-    position: fixed;
-    z-index: 40;
-    inset: 56px 0 0;
     display: block;
-    padding: 0;
-    border: 0;
-    background: rgb(28 36 50 / 24%);
   }
 
   .chat-main {
@@ -1440,10 +1438,6 @@ function formatConversationTime(value: string | null): string {
 
   .chat-main__status {
     display: none;
-  }
-
-  .chat-main__history-toggle {
-    display: grid;
   }
 
   .chat-main__model-select {

@@ -8,7 +8,7 @@
 - 分支：`main`
 - 分支起始提交：`5ced005 docs: mark m1 synchronization complete`
 - 视频链路批次基线：`19af73a feat: connect media workflows and agent history`
-- 当前批次基线：`2673dc4 feat: polish image generation and retouch details`
+- 当前批次基线：`6c3b3c0 docs: sync project status and module coverage`
 - 当前阶段：M2 工具套件闭环收尾；智能体、图片和视频优先链路已打通
 
 ## 2. 本批范围
@@ -353,6 +353,8 @@ node outputs/ui-reference/verify-m2-routes.mjs
 - 图片生成桌面端和移动端通过，分类筛选可正确显示 4 张示例卡片
 - 8 个优先模块在 `1440x1000` 桌面端和 `390x844` 移动端均无横向溢出或页面脚本错误
 - 视频顶部跨模块入口已按参考产品行为修改，自动验证不触发真实视频、图片或对话接口
+- 模型对话会话栏按参考产品改为默认收起的覆盖式抽屉，空态主区铺满可用宽度；桌面端和移动端均保留新对话、搜索、会话切换、遮罩关闭和 `Escape` 行为
+- `verify-chat-m1.mjs` 与 `verify-m2-routes.mjs` 已通过，确认对话成功/错误流、会话抽屉切换和 8 个模块的桌面/移动端无横向溢出
 
 ## 5. 密钥和外部调用边界
 
