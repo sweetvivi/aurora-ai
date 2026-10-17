@@ -148,14 +148,14 @@ async function sendMessage(): Promise<void> {
     return;
   }
 
-  const session = await workspace.sendMessage(
-    agent.value,
-    content,
-    activeSessionId.value ?? undefined,
-  );
+  const sessionId = activeSessionId.value ?? workspace.createSession(agent.value.id).id;
+  activeSessionId.value = sessionId;
+  prompt.value = '';
+  await scrollToLatest();
+
+  const session = await workspace.sendMessage(agent.value, content, sessionId);
 
   activeSessionId.value = session.id;
-  prompt.value = '';
   await scrollToLatest();
 }
 
@@ -177,7 +177,9 @@ async function consumeRoutePrompt(): Promise<void> {
   }
 
   consumedRoutePrompt.value = routeKey;
-  const session = await workspace.sendMessage(agent.value, queryPrompt.trim());
+  const sessionId = activeSessionId.value ?? workspace.createSession(agent.value.id).id;
+  activeSessionId.value = sessionId;
+  const session = await workspace.sendMessage(agent.value, queryPrompt.trim(), sessionId);
   activeSessionId.value = session.id;
   prompt.value = '';
   await scrollToLatest();

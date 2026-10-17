@@ -3,11 +3,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpenAiCompatibleProvider } from './openai-compatible.provider';
 
 function createStreamResponse(): Response {
+  return createSseResponse([
+    'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
+    'data: [DONE]\n\n',
+  ]);
+}
+
+function createSseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
-      controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"ok"}}]}\n\n'));
-      controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+      for (const chunk of chunks) {
+        controller.enqueue(encoder.encode(chunk));
+      }
+
       controller.close();
     },
   });
@@ -147,5 +156,54 @@ describe('OpenAI compatible chat provider', () => {
         }),
       }),
     );
+  });
+
+  it('ignores reasoning deltas while forwarding the final answer', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        createSseResponse([
+          'data: {"choices":[{"delta":{"reasoning_content":"内部推理"}}]}\n\n',
+          'data: {"choices":[{"delta":{"content":"最终答案"}}]}\n\n',
+          'data: [DONE]\n\n',
+        ]),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new OpenAiCompatibleProvider(
+      new ConfigService({
+        LLM_API_KEY: 'default-key',
+        LLM_BASE_URL: 'https://default.example/v1',
+      }),
+    );
+
+    await expect(collectEvents(provider, 'jiguang')).resolves.toEqual([
+      { content: '最终答案', type: 'delta' },
+      { type: 'done' },
+    ]);
+  });
+
+  it('reports a distinct empty response when the provider only returns reasoning', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        createSseResponse([
+          'data: {"choices":[{"delta":{"reasoning_content":"只有内部推理"}}]}\n\n',
+          'data: [DONE]\n\n',
+        ]),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new OpenAiCompatibleProvider(
+      new ConfigService({
+        LLM_API_KEY: 'default-key',
+        LLM_BASE_URL: 'https://default.example/v1',
+      }),
+    );
+
+    await expect(collectEvents(provider, 'jiguang')).rejects.toMatchObject({
+      response: {
+        code: 'LLM_EMPTY_RESPONSE',
+        message: 'LLM provider returned reasoning content without a final answer',
+      },
+    });
   });
 });

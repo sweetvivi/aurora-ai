@@ -39,7 +39,7 @@
 当前批次验证结果：
 
 - `pnpm format:check`、`pnpm lint`、`pnpm typecheck` 通过
-- `pnpm test`：API 16 个文件 57 项，Web 6 个文件 23 项
+- `pnpm test`：API 16 个文件 59 项，Web 6 个文件 24 项
 - `pnpm build` 通过
 - 图片任务 E2E 覆盖多参考图、越权文件拒绝和自由参数注入防护
 

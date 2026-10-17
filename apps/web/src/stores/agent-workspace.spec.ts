@@ -318,4 +318,58 @@ describe('agent workspace store', () => {
     expect(store.error).toBe('生成已中断，本次积分已退回');
     expect(store.status).toBe('error');
   });
+
+  it('streams into a pre-created session so the detail view can bind it immediately', async () => {
+    const agent = getAgentById('visual-prompt')!;
+    let finishStream: (() => void) | undefined;
+
+    apiMocks.streamChat.mockImplementation(
+      async (
+        _input: unknown,
+        handlers: {
+          onMeta: (event: {
+            assistantMessageId: string;
+            balance: number;
+            conversationId: string;
+            modelAlias: string;
+            pointsCost: number;
+            requestId: string;
+          }) => void;
+        },
+      ) =>
+        new Promise<void>((resolve) => {
+          finishStream = resolve;
+          handlers.onMeta({
+            assistantMessageId: 'assistant-agent-visible',
+            balance: 99,
+            conversationId: 'conversation-agent-visible',
+            modelAlias: 'openai-gpt-6-astra',
+            pointsCost: 1,
+            requestId: 'request-agent-visible',
+          });
+        }),
+    );
+
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+    const store = useAgentWorkspaceStore();
+
+    await store.initialize();
+    const session = store.createSession(agent.id);
+    const sendPromise = store.sendMessage(agent, '生成一张赛博城市海报', session.id);
+
+    await vi.waitFor(() => {
+      expect(store.streamingSessionId).toBe(session.id);
+    });
+    expect(store.sessions.find((item) => item.id === session.id)?.messages).toEqual([
+      expect.objectContaining({ role: 'user', content: '生成一张赛博城市海报' }),
+      expect.objectContaining({ role: 'assistant', status: 'STREAMING' }),
+    ]);
+
+    finishStream?.();
+    await sendPromise;
+  });
 });

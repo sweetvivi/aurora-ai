@@ -7,6 +7,8 @@ interface OpenAiStreamPayload {
   choices?: Array<{
     delta?: {
       content?: string;
+      reasoning?: string;
+      reasoning_content?: string;
     };
   }>;
 }
@@ -91,18 +93,35 @@ export class OpenAiCompatibleProvider implements LlmProvider {
         });
       }
 
+      let hasContent = false;
+      let hasReasoningContent = false;
+
       for await (const data of parseServerSentEvents(response.body)) {
         if (data === '[DONE]') {
-          yield { type: 'done' };
-          return;
+          break;
         }
 
         const payload = this.parsePayload(data);
-        const content = payload.choices?.[0]?.delta?.content;
+        const delta = payload.choices?.[0]?.delta;
+        const content = delta?.content;
 
         if (content) {
+          hasContent = true;
           yield { content, type: 'delta' };
         }
+
+        if (delta?.reasoning_content || delta?.reasoning) {
+          hasReasoningContent = true;
+        }
+      }
+
+      if (!hasContent) {
+        throw new ServiceUnavailableException({
+          code: 'LLM_EMPTY_RESPONSE',
+          message: hasReasoningContent
+            ? 'LLM provider returned reasoning content without a final answer'
+            : 'LLM provider returned an empty response',
+        });
       }
 
       yield { type: 'done' };
