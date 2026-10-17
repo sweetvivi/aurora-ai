@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { AudioOutlined, BgColorsOutlined, VideoCameraOutlined } from '@ant-design/icons-vue';
+import {
+  ApartmentOutlined,
+  AudioOutlined,
+  BgColorsOutlined,
+  ShoppingCartOutlined,
+  VideoCameraOutlined,
+} from '@ant-design/icons-vue';
 import type { Component } from 'vue';
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
@@ -21,6 +27,20 @@ const features: Record<string, FeatureConfig> = {
     label: 'Image Tools',
     title: '图片处理',
   },
+  'ai-canvas': {
+    accent: '#7057d8',
+    description: '节点编排、素材连接与多步骤创作工作流',
+    icon: ApartmentOutlined,
+    label: 'AI Canvas',
+    title: 'AI 画布',
+  },
+  'commerce-tools': {
+    accent: '#d05f76',
+    description: '商品图、试衣、换背景与电商视觉效率工具',
+    icon: ShoppingCartOutlined,
+    label: 'Commerce Studio',
+    title: '电商工具',
+  },
   music: {
     accent: '#b44d91',
     description: '音乐生成、配音与声音处理入口',
@@ -36,7 +56,7 @@ const features: Record<string, FeatureConfig> = {
     title: 'AI 视频',
   },
 };
-const fallbackFeature = features['image-tools'] as FeatureConfig;
+const fallbackFeature = features['ai-canvas'] as FeatureConfig;
 const feature = computed(() => features[String(route.name)] ?? fallbackFeature);
 </script>
 

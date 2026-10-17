@@ -28,6 +28,7 @@ export interface DrawWork {
   id: string;
   model: string;
   modelLabel: string;
+  parameters: Record<string, unknown>;
   prompt: string;
   ratio: string;
   resultFileId: string;
@@ -35,6 +36,7 @@ export interface DrawWork {
   size: string;
   sourceFileId: string | null;
   status: DrawWorkStatus;
+  tool: string;
   variant: number;
 }
 
@@ -47,19 +49,23 @@ export interface DrawWorkspaceError {
 
 interface CreateGenerationInput {
   amount: number;
+  extraParameters?: Record<string, unknown>;
   model: string;
   modelLabel: string;
   prompt: string;
   ratio: string;
   size: string;
   sourceFileId?: string;
+  toolKey?: string;
 }
 
 interface TaskDisplayMetadata {
   model: string;
   modelLabel: string;
+  parameters?: Record<string, unknown>;
   ratio: string;
   size: string;
+  tool: string;
 }
 
 interface DrawWorkspaceState {
@@ -177,6 +183,7 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
       const sessionStore = useSessionStore();
       const generationId = createLocalId('generation');
       const createdWorks: DrawWork[] = [];
+      const toolKey = input.toolKey ?? 'draw';
 
       this.submitting = true;
       this.error = null;
@@ -187,10 +194,12 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
             {
               modelAlias: IMAGE_MODEL_ALIAS,
               parameters: {
+                ...input.extraParameters,
                 ratio: input.ratio,
                 size: input.size,
                 uiModel: input.model,
                 uiModelLabel: input.modelLabel,
+                tool: toolKey,
               },
               prompt,
               sourceFileId: input.sourceFileId,
@@ -202,8 +211,10 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
             this.mergeTask(task, {
               model: input.model,
               modelLabel: input.modelLabel,
+              parameters: input.extraParameters,
               ratio: input.ratio,
               size: input.size,
+              tool: toolKey,
             }),
           );
         }
@@ -228,10 +239,12 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
         amount: 1,
         model: work.model,
         modelLabel: work.modelLabel,
+        extraParameters: work.parameters,
         prompt: work.prompt,
         ratio: work.ratio,
         size: work.size,
         sourceFileId: work.sourceFileId ?? undefined,
+        toolKey: work.tool,
       });
     },
     ensurePolling(): void {
@@ -346,6 +359,8 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
           model: metadata?.model ?? asString(task.parameters?.uiModel) ?? existing.model,
           modelLabel:
             metadata?.modelLabel ?? asString(task.parameters?.uiModelLabel) ?? existing.modelLabel,
+          parameters:
+            metadata?.parameters ?? extractExtraParameters(task.parameters) ?? existing.parameters,
           prompt: task.prompt,
           ratio: metadata?.ratio ?? asString(task.parameters?.ratio) ?? existing.ratio,
           resultFileId: task.resultFile?.id ?? '',
@@ -353,6 +368,7 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
           size: metadata?.size ?? asString(task.parameters?.size) ?? existing.size,
           sourceFileId: task.sourceFile?.id ?? null,
           status: mapTaskStatus(task.status),
+          tool: metadata?.tool ?? asString(task.parameters?.tool) ?? existing.tool,
         });
 
         if (task.resultFile && !nextArtworkUrl) {
@@ -373,6 +389,7 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
         model: metadata?.model ?? asString(task.parameters?.uiModel) ?? task.modelAlias,
         modelLabel:
           metadata?.modelLabel ?? asString(task.parameters?.uiModelLabel) ?? task.modelAlias,
+        parameters: metadata?.parameters ?? extractExtraParameters(task.parameters) ?? {},
         prompt: task.prompt,
         ratio: metadata?.ratio ?? asString(task.parameters?.ratio) ?? '智能比例',
         resultFileId: task.resultFile?.id ?? '',
@@ -380,6 +397,7 @@ export const useDrawWorkspaceStore = defineStore('draw-workspace', {
         size: metadata?.size ?? asString(task.parameters?.size) ?? '1K',
         sourceFileId: task.sourceFile?.id ?? null,
         status: mapTaskStatus(task.status),
+        tool: metadata?.tool ?? asString(task.parameters?.tool) ?? 'draw',
         variant: variantFromId(task.id),
       };
 
@@ -575,6 +593,21 @@ function toTimestamp(value: string | null): number | null {
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function extractExtraParameters(
+  parameters: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!parameters) {
+    return null;
+  }
+
+  const displayKeys = new Set(['ratio', 'size', 'tool', 'uiModel', 'uiModelLabel']);
+  const extraParameters = Object.fromEntries(
+    Object.entries(parameters).filter(([key]) => !displayKeys.has(key)),
+  );
+
+  return Object.keys(extraParameters).length > 0 ? extraParameters : null;
 }
 
 function createLocalId(prefix: string): string {

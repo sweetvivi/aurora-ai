@@ -17,7 +17,11 @@ describe('application routes', () => {
     expect(router.resolve('/workbench').matched[0]?.meta.shell).toBe('workbench');
     expect(router.resolve('/draw').matched[0]?.meta.shell).toBe('platform');
     expect(router.resolve('/video').matched[0]?.meta.shell).toBe('platform');
-    expect(router.resolve('/image-tools').matched[0]?.meta.shell).toBe('platform');
+    expect(router.resolve('/retouch').matched[0]?.meta.shell).toBe('platform');
+    expect(router.resolve('/image-generation').matched[0]?.meta.shell).toBe('platform');
+    expect(router.resolve('/canvas').matched[0]?.meta.shell).toBe('platform');
+    expect(router.resolve('/commerce').matched[0]?.meta.shell).toBe('platform');
+    expect(router.resolve('/image-tools').name).toBe('smart-retouch');
     expect(router.resolve('/agents/create').matched[0]?.meta.shell).toBe('platform');
     expect(router.resolve('/agents/code-mentor').matched[0]?.meta.shell).toBe('media');
     expect(router.resolve('/legacy').matched[0]?.meta.shell).toBe('legacy');

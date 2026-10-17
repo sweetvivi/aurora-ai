@@ -156,6 +156,7 @@ describe('draw workspace store', () => {
       parameters: {
         ratio: '16:9',
         size: '2K',
+        tool: 'draw',
         uiModel: 'light-2',
         uiModelLabel: '极光光影 2.1',
       },
@@ -168,6 +169,54 @@ describe('draw workspace store', () => {
     expect(sessionStore.points).toBe(90);
 
     vi.clearAllTimers();
+  });
+
+  it('keeps tool-specific parameters separate for retouch and image generation tasks', () => {
+    const store = useDrawWorkspaceStore();
+
+    store.mergeTasks([
+      makeTask({
+        id: 'task-retouch',
+        parameters: {
+          mode: 'image-to-image',
+          operation: 'cutout',
+          ratio: '保持原图',
+          size: '2K',
+          strength: 65,
+          tool: 'smart-retouch',
+          uiModel: 'smart-retouch',
+          uiModelLabel: '一键抠图',
+        },
+      }),
+      makeTask({
+        id: 'task-generation',
+        parameters: {
+          mode: 'text-to-image',
+          ratio: '16:9',
+          size: '2K',
+          tool: 'image-generation',
+          uiModel: 'generation-light-2',
+          uiModelLabel: '极光光影 2.1',
+        },
+      }),
+    ]);
+
+    expect(store.works.filter((work) => work.tool === 'smart-retouch')).toHaveLength(1);
+    expect(store.works.filter((work) => work.tool === 'image-generation')).toHaveLength(1);
+    expect(store.works.find((work) => work.id === 'task-retouch')).toMatchObject({
+      parameters: {
+        mode: 'image-to-image',
+        operation: 'cutout',
+        strength: 65,
+      },
+      tool: 'smart-retouch',
+    });
+    expect(store.works.find((work) => work.id === 'task-generation')).toMatchObject({
+      parameters: {
+        mode: 'text-to-image',
+      },
+      tool: 'image-generation',
+    });
   });
 
   it('loads a successful result and refreshes the settled balance', async () => {
@@ -293,7 +342,7 @@ describe('draw workspace store', () => {
 function makeTask(overrides: Partial<ImageTask> = {}): ImageTask {
   return {
     completedAt: null,
-    createdAt: '2026-10-17T02:00:00.000Z',
+    createdAt: new Date(Date.now() - 60_000).toISOString(),
     errorCode: null,
     errorMessage: null,
     id: 'task-default',

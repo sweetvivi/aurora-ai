@@ -55,19 +55,44 @@ export const appRoutes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'image-tools',
-        name: 'image-tools',
-        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        path: 'retouch',
+        alias: ['image-tools'],
+        name: 'smart-retouch',
+        component: () => import('@/views/ImageToolWorkbenchView.vue'),
         meta: {
-          title: '图片处理',
+          title: '智能修图',
+        },
+      },
+      {
+        path: 'image-generation',
+        name: 'image-generation',
+        component: () => import('@/views/ImageToolWorkbenchView.vue'),
+        meta: {
+          title: '图片生成',
         },
       },
       {
         path: 'video',
         name: 'video',
-        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        component: () => import('@/views/VideoStudioView.vue'),
         meta: {
           title: 'AI 视频',
+        },
+      },
+      {
+        path: 'canvas',
+        name: 'ai-canvas',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: 'AI 画布',
+        },
+      },
+      {
+        path: 'commerce',
+        name: 'commerce-tools',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: '电商工具',
         },
       },
       {
