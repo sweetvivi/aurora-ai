@@ -485,6 +485,18 @@ node outputs/ui-reference/verify-m2-routes.mjs
 - 模型对话会话栏按参考产品改为默认收起的覆盖式抽屉，空态主区铺满可用宽度；桌面端和移动端均保留新对话、搜索、会话切换、遮罩关闭和 `Escape` 行为
 - `verify-chat-m1.mjs` 与 `verify-m2-routes.mjs` 已通过，确认对话成功/错误流、会话抽屉切换和 8 个模块的桌面/移动端无横向溢出
 
+智能体目录与图表空态补充验证：
+
+```text
+pnpm --filter @aurora/web test -- agent-directory.spec.ts
+node outputs/ui-reference/verify-catalog-charts.mjs
+```
+
+- 官方智能体目录扩展到 6358 条、17 个分类，第一页固定显示 24 条，分类、搜索、收藏和分页空态均已覆盖
+- 模型对话图表空态扩展到 28 类 SVG 缩略图，桌面端和移动端均无横向溢出、无页面脚本错误、无错误状态
+- 智能体验收使用 Mock 会话、模型和模块接口，不读取或输出 Key，不调用真实 Provider
+- 新增 `apps/web/src/data/agent-directory.spec.ts`，验证 6358 条唯一 ID、分类计数、确定性和小目标裁剪
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥

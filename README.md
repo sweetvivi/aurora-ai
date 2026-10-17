@@ -25,8 +25,9 @@
 - M0：pnpm workspace、Vue 3 前端、NestJS 后端、PostgreSQL、Redis、Prisma、五套 Shell 和 GitHub Actions CI
 - M1：邮箱与开发登录、刷新令牌、积分账本、流式模型对话、会话历史、文件上传和图片任务异步状态机
 - 模型对话：8 个公开模型别名、DeepSeek/Qwen/GPT Provider 路由、SSE 增量、停止生成、会话恢复、错误退款，以及参考产品式欢迎语、内嵌输入框、能力入口、示例提示词和图表卡片；助手回复支持安全 Markdown、表格、代码块复制和安全外链；支持最多 3 张图片附件、视觉模型校验、历史缩略图恢复和重新生成保留附件
+- 模型对话图表空态现包含 28 类真实 SVG 缩略图，并在桌面端和移动端保持两行/多列响应式网格，不自动发送或创建任务
 - AI 绘画：新版智能生图模板、旧生成页、批量作品、详情层、跨模块编辑入口、下载、收藏、删除和重试
-- 超级智能体：预置与自建智能体、创建器、能力选择、真实 SSE 对话、历史记录抽屉
+- 超级智能体：预置与自建智能体、6358 条官方目录、17 类筛选、搜索、收藏、分页、创建器、能力选择、真实 SSE 对话和历史记录抽屉
 - 智能修图：画布式工作台、处理方式快捷切换、原图/结果对比、任务记录和真实图片任务链路
 - 图片生成：参考产品式作品历史、高级设置、存储天数、效果示例和底部固定创作栏
 - 视频生成：参考产品式深色工作台、文生视频、单图参考、任务轮询、取消、重试、下载和播放
@@ -42,7 +43,7 @@
 当前批次验证结果：
 
 - `pnpm format:check`、`pnpm lint`、`pnpm typecheck` 通过
-- `pnpm test`：API 18 个文件 73 项，Web 10 个文件 37 项
+- `pnpm test`：API 18 个文件 73 项，Web 11 个文件 40 项
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-canvas-studio.mjs`、`verify-video-tasks.mjs`、`verify-m2-interactions.mjs`、`verify-m2-routes.mjs` 和 `verify-admin-modules.mjs` 全部通过
 - `node outputs/ui-reference/verify-admin-modules.mjs` 通过，模块改名、角标、排序和显隐会同步刷新共享目录；桌面端和移动端无横向溢出、无页面脚本错误
@@ -51,6 +52,7 @@
 - `node outputs/ui-reference/verify-chat-m1.mjs` 通过，对话空态、桌面成功流和移动端错误流保持正常
 - `node outputs/ui-reference/verify-chat-markdown.mjs` 通过，Markdown 标题、列表、表格、代码块复制、安全外链和脚本清理在桌面端与移动端均正常
 - `node outputs/ui-reference/verify-chat-attachments.mjs` 通过，图片上传、预览、发送、消息展示和历史恢复在桌面端与移动端均正常；验收使用 Mock，不调用真实 Provider
+- `node outputs/ui-reference/verify-catalog-charts.mjs` 通过，6358 条智能体目录、分页/空态、28 类图表、无错误状态和无横向溢出在桌面端与移动端均正常
 - 图片任务 E2E 覆盖多参考图、越权文件拒绝和自由参数注入防护
 
 下一步：

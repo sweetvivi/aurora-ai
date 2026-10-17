@@ -167,6 +167,86 @@ const chartTemplates = [
     prompt: '请把下面的数据整理成旭日图分析，展示多层级分类的组成和占比关系。',
     preview: 'sunburst',
   },
+  {
+    label: '面积图',
+    prompt: '请把下面的数据整理成面积图分析，展示总体变化趋势和累计规模。',
+    preview: 'area',
+  },
+  {
+    label: '漏斗图',
+    prompt: '请把下面的数据整理成漏斗图分析，说明各阶段的转化和流失情况。',
+    preview: 'funnel',
+  },
+  {
+    label: '矩形树图',
+    prompt: '请把下面的数据整理成矩形树图分析，比较各类别的规模占比和层级结构。',
+    preview: 'treemap',
+  },
+  {
+    label: 'K 线图',
+    prompt: '请把下面的数据整理成 K 线图分析，说明开盘、收盘、最高和最低价的走势。',
+    preview: 'candlestick',
+  },
+  {
+    label: '流程图',
+    prompt: '请把下面的信息整理成流程图，明确步骤、判断分支和流转方向。',
+    preview: 'flow',
+  },
+  {
+    label: '甘特图',
+    prompt: '请把下面的任务整理成甘特图分析，展示时间范围、依赖关系和关键路径。',
+    preview: 'gantt',
+  },
+  {
+    label: '地图',
+    prompt: '请把下面的数据整理成地图分析，展示地域分布、差异和热点区域。',
+    preview: 'map',
+  },
+  {
+    label: '盒须图',
+    prompt: '请把下面的数据整理成盒须图分析，比较中位数、四分位范围和异常值。',
+    preview: 'box',
+  },
+  {
+    label: '关系图',
+    prompt: '请把下面的数据整理成关系图分析，说明节点之间的联系、强度和群体结构。',
+    preview: 'graph',
+  },
+  {
+    label: '路径图',
+    prompt: '请把下面的信息整理成路径图，展示用户行为顺序、节点跳转和关键路径。',
+    preview: 'path',
+  },
+  {
+    label: '树状图',
+    prompt: '请把下面的数据结构整理成树状图，展示父子关系、层级和分支。',
+    preview: 'tree',
+  },
+  {
+    label: '平行坐标图',
+    prompt: '请把下面的多指标数据整理成平行坐标图，比较不同样本在各维度上的表现。',
+    preview: 'parallel',
+  },
+  {
+    label: '仪表盘',
+    prompt: '请把下面的指标整理成仪表盘分析，展示当前值、目标值和健康区间。',
+    preview: 'gauge',
+  },
+  {
+    label: '日历图',
+    prompt: '请把下面的数据整理成日历热力分析，展示周期规律、峰值日期和异常波动。',
+    preview: 'calendar',
+  },
+  {
+    label: '矩阵图',
+    prompt: '请把下面的数据整理成矩阵图分析，比较两个维度组合下的分布和强弱关系。',
+    preview: 'matrix',
+  },
+  {
+    label: '和弦图',
+    prompt: '请把下面的关系数据整理成和弦图，展示类别之间的双向联系和联系强度。',
+    preview: 'chord',
+  },
 ];
 
 const hasMessages = computed(() => messages.value.length > 0);

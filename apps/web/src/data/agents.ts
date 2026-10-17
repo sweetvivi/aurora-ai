@@ -1,3 +1,5 @@
+import { buildGeneratedAgentCatalog } from './agent-directory';
+
 export type AgentCapabilityId =
   | 'ai-drawing'
   | 'ai-video'
@@ -58,7 +60,7 @@ export interface AgentCatalogItem {
   usage: number;
 }
 
-export const agentCatalog: AgentCatalogItem[] = [
+const curatedAgentCatalog: AgentCatalogItem[] = [
   {
     category: '编程与软件开发',
     color: '#5b7cfa',
@@ -412,6 +414,10 @@ export const agentCatalog: AgentCatalogItem[] = [
   },
 ];
 
+export const agentCatalog = buildGeneratedAgentCatalog(curatedAgentCatalog);
+
+const agentCatalogById = new Map(agentCatalog.map((agent) => [agent.id, agent]));
+
 export function getAgentById(agentId: string): AgentCatalogItem | undefined {
-  return agentCatalog.find((agent) => agent.id === agentId);
+  return agentCatalogById.get(agentId);
 }

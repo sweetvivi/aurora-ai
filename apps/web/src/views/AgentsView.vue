@@ -9,10 +9,12 @@ import {
   FileTextOutlined,
   HighlightOutlined,
   LayoutOutlined,
+  LeftOutlined,
   MessageOutlined,
   PictureOutlined,
   PlusOutlined,
   ReadOutlined,
+  RightOutlined,
   RobotOutlined,
   SearchOutlined,
   ShoppingCartOutlined,
@@ -25,7 +27,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { agentCatalog, type AgentCatalogItem } from '@/data/agents';
 import { useAgentWorkspaceStore } from '@/stores/agent-workspace';
@@ -43,6 +45,9 @@ const workspace = useAgentWorkspaceStore();
 const activeTab = ref<CatalogTab>('official');
 const selectedCategory = ref('全部');
 const search = ref('');
+const currentPage = ref(1);
+const resultsHeading = ref<HTMLElement | null>(null);
+const pageSize = 24;
 
 const hotSearches = ['AI写作助手', '代码生成器', '数据分析', '图像处理', '翻译助手'];
 
@@ -102,7 +107,7 @@ const categories = computed<CategoryItem[]>(() => {
     }));
 });
 
-const visibleAgents = computed(() => {
+const filteredAgents = computed(() => {
   const keyword = search.value.trim().toLowerCase();
 
   return activeCollection.value.filter((agent) => {
@@ -122,6 +127,40 @@ const visibleAgents = computed(() => {
       .toLowerCase()
       .includes(keyword);
   });
+});
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredAgents.value.length / pageSize)));
+
+const visibleAgents = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredAgents.value.slice(start, start + pageSize);
+});
+
+const paginationItems = computed<Array<number | 'left-ellipsis' | 'right-ellipsis'>>(() => {
+  const pages = totalPages.value;
+
+  if (pages <= 7) {
+    return Array.from({ length: pages }, (_, index) => index + 1);
+  }
+
+  const items: Array<number | 'left-ellipsis' | 'right-ellipsis'> = [1];
+  const start = Math.max(2, currentPage.value - 1);
+  const end = Math.min(pages - 1, currentPage.value + 1);
+
+  if (start > 2) {
+    items.push('left-ellipsis');
+  }
+
+  for (let page = start; page <= end; page += 1) {
+    items.push(page);
+  }
+
+  if (end < pages - 1) {
+    items.push('right-ellipsis');
+  }
+
+  items.push(pages);
+  return items;
 });
 
 const collectionLabel = computed(() => {
@@ -152,8 +191,14 @@ const emptyTitle = computed(() => {
   return '当前分类暂无智能体';
 });
 
-watch(activeTab, () => {
-  selectedCategory.value = '全部';
+watch([activeTab, selectedCategory, search], () => {
+  currentPage.value = 1;
+});
+
+watch(totalPages, (pages) => {
+  if (currentPage.value > pages) {
+    currentPage.value = pages;
+  }
 });
 
 function openAgent(agentId: string): void {
@@ -168,6 +213,13 @@ function applyHotSearch(keyword: string): void {
   search.value = keyword;
   activeTab.value = 'official';
   selectedCategory.value = '全部';
+}
+
+function goToPage(page: number): void {
+  currentPage.value = Math.min(totalPages.value, Math.max(1, page));
+  void nextTick(() => {
+    resultsHeading.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 </script>
 
@@ -311,64 +363,101 @@ function applyHotSearch(keyword: string): void {
         </aside>
 
         <main class="agents-results">
-          <header class="agents-results__heading">
+          <header ref="resultsHeading" class="agents-results__heading">
             <div>
               <h2>{{ collectionLabel }}</h2>
               <p>选择智能体即可进入对话，也可以先收藏常用能力。</p>
             </div>
-            <span>{{ visibleAgents.length }} 个结果</span>
+            <span>{{ filteredAgents.length }} 个结果</span>
           </header>
 
-          <div v-if="visibleAgents.length > 0" class="agents-grid">
-            <article
-              v-for="agent in visibleAgents"
-              :key="agent.id"
-              class="agent-card"
-              tabindex="0"
-              @click="openAgent(agent.id)"
-              @keydown.enter="openAgent(agent.id)"
-            >
-              <header class="agent-card__header">
-                <span class="agent-card__avatar" :style="{ background: agent.color }">
-                  {{ agent.glyph }}
-                </span>
-                <div>
-                  <strong>{{ agent.name }}</strong>
-                  <span v-if="activeTab === 'created'">我创建的</span>
-                  <span v-else>AI 助手</span>
+          <template v-if="filteredAgents.length > 0">
+            <div class="agents-grid">
+              <article
+                v-for="agent in visibleAgents"
+                :key="agent.id"
+                class="agent-card"
+                tabindex="0"
+                @click="openAgent(agent.id)"
+                @keydown.enter="openAgent(agent.id)"
+              >
+                <header class="agent-card__header">
+                  <span class="agent-card__avatar" :style="{ background: agent.color }">
+                    {{ agent.glyph }}
+                  </span>
+                  <div>
+                    <strong>{{ agent.name }}</strong>
+                    <span v-if="activeTab === 'created'">我创建的</span>
+                    <span v-else>AI 助手</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="agent-card__favorite"
+                    :class="{ active: workspace.favoriteAgentIds.includes(agent.id) }"
+                    :aria-label="
+                      workspace.favoriteAgentIds.includes(agent.id) ? '取消收藏' : '收藏智能体'
+                    "
+                    @click.stop="toggleFavorite(agent.id)"
+                  >
+                    <StarFilled v-if="workspace.favoriteAgentIds.includes(agent.id)" />
+                    <StarOutlined v-else />
+                  </button>
+                </header>
+
+                <div class="agent-card__metrics">
+                  <span>
+                    <StarFilled />
+                    {{ agent.rating.toFixed(1) }}
+                  </span>
+                  <span>
+                    <MessageOutlined />
+                    {{ agent.usage }}
+                  </span>
                 </div>
+
+                <p>{{ agent.description }}</p>
+
+                <footer>
+                  <span v-for="tag in agent.tags.slice(0, 3)" :key="tag">{{ tag }}</span>
+                </footer>
+              </article>
+            </div>
+
+            <nav
+              v-if="filteredAgents.length > pageSize"
+              class="agents-pagination"
+              aria-label="智能体分页"
+            >
+              <button
+                type="button"
+                aria-label="上一页"
+                :disabled="currentPage === 1"
+                @click="goToPage(currentPage - 1)"
+              >
+                <LeftOutlined />
+              </button>
+              <template v-for="(page, index) in paginationItems" :key="`${page}-${index}`">
+                <span v-if="typeof page !== 'number'">...</span>
                 <button
+                  v-else
                   type="button"
-                  class="agent-card__favorite"
-                  :class="{ active: workspace.favoriteAgentIds.includes(agent.id) }"
-                  :aria-label="
-                    workspace.favoriteAgentIds.includes(agent.id) ? '取消收藏' : '收藏智能体'
-                  "
-                  @click.stop="toggleFavorite(agent.id)"
+                  :class="{ active: currentPage === page }"
+                  :aria-current="currentPage === page ? 'page' : undefined"
+                  @click="goToPage(page)"
                 >
-                  <StarFilled v-if="workspace.favoriteAgentIds.includes(agent.id)" />
-                  <StarOutlined v-else />
+                  {{ page }}
                 </button>
-              </header>
-
-              <div class="agent-card__metrics">
-                <span>
-                  <StarFilled />
-                  {{ agent.rating.toFixed(1) }}
-                </span>
-                <span>
-                  <MessageOutlined />
-                  {{ agent.usage }}
-                </span>
-              </div>
-
-              <p>{{ agent.description }}</p>
-
-              <footer>
-                <span v-for="tag in agent.tags.slice(0, 3)" :key="tag">{{ tag }}</span>
-              </footer>
-            </article>
-          </div>
+              </template>
+              <button
+                type="button"
+                aria-label="下一页"
+                :disabled="currentPage === totalPages"
+                @click="goToPage(currentPage + 1)"
+              >
+                <RightOutlined />
+              </button>
+            </nav>
+          </template>
 
           <div v-else class="agents-empty">
             <span>
