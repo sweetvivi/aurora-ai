@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ModuleDisplayConfigService } from '../models/module-display-config.service';
+import { UpdateModuleDisplayConfigDto } from '../models/dto/update-module-display-config.dto';
 import { AdminGuard } from './admin.guard';
 import { AdminService } from './admin.service';
 import { AdjustAdminUserPointsDto } from './dto/adjust-admin-user-points.dto';
@@ -16,7 +18,10 @@ import { UpdateProviderConfigDto } from './dto/update-provider-config.dto';
 @Controller('admin')
 @UseGuards(AdminGuard)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly moduleDisplayConfigService: ModuleDisplayConfigService,
+  ) {}
 
   @Get('overview')
   getOverview() {
@@ -89,5 +94,15 @@ export class AdminController {
   @Patch('models/:modelId')
   updateModel(@Param('modelId') modelId: string, @Body() input: UpdateModelConfigDto) {
     return this.adminService.updateModel(modelId, input);
+  }
+
+  @Get('modules')
+  listModules() {
+    return this.moduleDisplayConfigService.listAdmin();
+  }
+
+  @Patch('modules/:moduleKey')
+  updateModule(@Param('moduleKey') moduleKey: string, @Body() input: UpdateModuleDisplayConfigDto) {
+    return this.moduleDisplayConfigService.update(moduleKey, input);
   }
 }

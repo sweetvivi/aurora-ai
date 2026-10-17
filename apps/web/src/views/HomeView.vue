@@ -1,23 +1,18 @@
 <script setup lang="ts">
-import {
-  ApartmentOutlined,
-  ArrowRightOutlined,
-  CommentOutlined,
-  EditOutlined,
-  PictureOutlined,
-  RobotOutlined,
-  SearchOutlined,
-  SendOutlined,
-  ShoppingCartOutlined,
-  VideoCameraOutlined,
-} from '@ant-design/icons-vue';
+import { ArrowRightOutlined, SearchOutlined, SendOutlined } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
-import { ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import GalleryArtwork from '@/components/GalleryArtwork.vue';
+import {
+  resolveModuleIcon,
+  useModuleCatalogStore,
+  type ModuleCatalogItem,
+} from '@/stores/module-catalog';
 
 interface ToolItem {
   color: string;
+  cover?: string;
   description: string;
   icon: Component;
   label: string;
@@ -44,7 +39,14 @@ interface CampaignItem {
   variant: number;
 }
 
+interface QuickTabItem {
+  icon: Component;
+  label: string;
+  to: string;
+}
+
 const router = useRouter();
+const moduleCatalogStore = useModuleCatalogStore();
 const prompt = ref('');
 const selectedModel = ref('Aurora Chat 2.6');
 
@@ -132,118 +134,23 @@ const models: ModelItem[] = [
   },
 ];
 
-const homeTabs = [
-  { icon: CommentOutlined, label: '模型对话', to: '/chat' },
-  { icon: PictureOutlined, label: 'AI 绘画', to: '/draw' },
-  { icon: RobotOutlined, label: '超级智能体', to: '/agents' },
-  { icon: EditOutlined, label: '智能修图', to: '/retouch' },
-  { icon: PictureOutlined, label: '图片生成', to: '/image-generation' },
-  { icon: VideoCameraOutlined, label: '视频创作', to: '/video' },
-  { icon: ApartmentOutlined, label: 'AI 画布', to: '/canvas' },
-  { icon: ShoppingCartOutlined, label: '电商工具', to: '/commerce' },
-];
+const homeTabs = computed<QuickTabItem[]>(() =>
+  moduleCatalogStore.catalogItems
+    .filter((item) => item.presentation.homeTab)
+    .map((item) => ({
+      icon: resolveModuleIcon(item.icon),
+      label: item.name,
+      to: item.route,
+    })),
+);
 
-const tools: ToolItem[] = [
-  {
-    color: '#4c84ff',
-    description: '多模型对话与智能体协作',
-    icon: CommentOutlined,
-    label: '智能对话',
-    soft: '#edf3ff',
-    to: '/chat',
-  },
-  {
-    color: '#7758f4',
-    description: '文生图、参考图与图片编辑',
-    icon: PictureOutlined,
-    label: 'AI 绘画',
-    soft: '#f1edff',
-    to: '/draw',
-  },
-  {
-    color: '#258b70',
-    description: '6000+ 预设助手覆盖专业任务',
-    icon: RobotOutlined,
-    label: '超级智能体',
-    soft: '#eaf7f2',
-    to: '/agents',
-  },
-  {
-    color: '#f18d35',
-    description: '按描述生成商业视觉与创意图片',
-    icon: PictureOutlined,
-    label: '图片生成',
-    soft: '#fff4e7',
-    to: '/image-generation',
-  },
-];
+const tools = computed<ToolItem[]>(() =>
+  moduleCatalogStore.catalogItems.filter((item) => item.presentation.featured).map(toToolItem),
+);
 
-const categories: ToolItem[] = [
-  {
-    color: '#4c84ff',
-    description: '多模型问答与推理',
-    icon: CommentOutlined,
-    label: 'AI 对话',
-    soft: '#edf3ff',
-    to: '/chat',
-  },
-  {
-    color: '#7758f4',
-    description: '创意图像与设计',
-    icon: PictureOutlined,
-    label: 'AI 绘画',
-    soft: '#f1edff',
-    to: '/draw',
-  },
-  {
-    color: '#258b70',
-    description: '预设助手与专业工作流',
-    icon: RobotOutlined,
-    label: '超级智能体',
-    soft: '#eaf7f2',
-    to: '/agents',
-  },
-  {
-    color: '#2b9b9a',
-    description: '增强、抠图、擦除与背景替换',
-    icon: EditOutlined,
-    label: '智能修图',
-    soft: '#e9f8f7',
-    to: '/retouch',
-  },
-  {
-    color: '#d97722',
-    description: '文字生成摄影与设计素材',
-    icon: PictureOutlined,
-    label: '图片生成',
-    soft: '#fff4e7',
-    to: '/image-generation',
-  },
-  {
-    color: '#4c74d9',
-    description: '文生视频、图生视频与首尾帧',
-    icon: VideoCameraOutlined,
-    label: '视频生成',
-    soft: '#edf3ff',
-    to: '/video',
-  },
-  {
-    color: '#7057d8',
-    description: '节点编排与多步骤工作流',
-    icon: ApartmentOutlined,
-    label: 'AI 画布',
-    soft: '#f2efff',
-    to: '/canvas',
-  },
-  {
-    color: '#d05f76',
-    description: '商品图、试衣与营销视觉',
-    icon: ShoppingCartOutlined,
-    label: '电商工具',
-    soft: '#fff0f3',
-    to: '/commerce',
-  },
-];
+const categories = computed<ToolItem[]>(() =>
+  moduleCatalogStore.catalogItems.filter((item) => item.presentation.category).map(toToolItem),
+);
 
 function submitPrompt(): void {
   const query = prompt.value.trim();
@@ -260,6 +167,22 @@ function submitPrompt(): void {
     },
   });
 }
+
+function toToolItem(item: ModuleCatalogItem): ToolItem {
+  return {
+    color: item.presentation.color,
+    cover: item.cover ?? undefined,
+    description: item.presentation.description || `${item.name} 已接入平台工作台`,
+    icon: resolveModuleIcon(item.icon),
+    label: item.name,
+    soft: item.presentation.soft,
+    to: item.route,
+  };
+}
+
+onMounted(() => {
+  void moduleCatalogStore.load();
+});
 </script>
 
 <template>
@@ -388,7 +311,10 @@ function submitPrompt(): void {
           class="featured-card"
           :style="{ '--accent': tool.color, '--accent-soft': tool.soft }"
         >
-          <div v-if="index === 1" class="featured-card__art">
+          <div v-if="tool.cover" class="featured-card__art featured-card__art--cover">
+            <img :alt="tool.label" :src="tool.cover" />
+          </div>
+          <div v-else-if="index === 1" class="featured-card__art">
             <GalleryArtwork :variant="4" title="AI 绘画示例作品" />
           </div>
           <div v-else class="featured-card__art featured-card__art--abstract">
@@ -1013,6 +939,13 @@ function submitPrompt(): void {
 .featured-card__art :deep(svg) {
   width: 100%;
   height: 100%;
+}
+
+.featured-card__art--cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .featured-card__art--abstract {

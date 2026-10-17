@@ -3,6 +3,8 @@ import {
   CloudServerOutlined,
   DatabaseOutlined,
   EditOutlined,
+  EyeInvisibleOutlined,
+  EyeOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -16,6 +18,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import {
   ApiError,
   adjustAdminUserPoints,
+  fetchAdminModuleDisplayConfigs,
   createAdminModel,
   createAdminProvider,
   fetchAdminModels,
@@ -25,6 +28,7 @@ import {
   importAdminDiscoveredModels,
   probeAdminProvider,
   updateAdminModel,
+  updateAdminModuleDisplayConfig,
   updateAdminProvider,
   updateAdminUser,
   type AdminModel,
@@ -32,11 +36,15 @@ import {
   type AdminProvider,
   type AdminProviderProbeResult,
   type AdminUser,
+  type ModuleDisplayConfig,
+  type ModuleDisplayGroup,
 } from '@/app/api';
+import { resolveModuleIcon, useModuleCatalogStore } from '@/stores/module-catalog';
 
-type AdminTab = 'models' | 'overview' | 'providers' | 'users';
+type AdminTab = 'models' | 'modules' | 'overview' | 'providers' | 'users';
 type ModelCapability = 'chat' | 'embedding' | 'image' | 'video';
 
+const moduleCatalogStore = useModuleCatalogStore();
 const activeTab = ref<AdminTab>('overview');
 const loading = ref(false);
 const saving = ref(false);
@@ -44,12 +52,16 @@ const overview = ref<AdminOverview | null>(null);
 const users = ref<AdminUser[]>([]);
 const providers = ref<AdminProvider[]>([]);
 const models = ref<AdminModel[]>([]);
+const modules = ref<ModuleDisplayConfig[]>([]);
+const moduleSource = ref<'database' | 'defaults'>('defaults');
 const userSearch = ref('');
 const userRole = ref<'ADMIN' | 'USER' | undefined>();
 const userStatus = ref<'ACTIVE' | 'SUSPENDED' | undefined>();
 const modelSearch = ref('');
 const modelProvider = ref<string | undefined>();
 const modelCapability = ref<ModelCapability | undefined>();
+const moduleSearch = ref('');
+const moduleSavingKey = ref<string | null>(null);
 
 const userModalOpen = ref(false);
 const editingUser = ref<AdminUser | null>(null);
@@ -96,6 +108,19 @@ const modelForm = reactive({
   providerModel: '',
 });
 
+const moduleModalOpen = ref(false);
+const editingModule = ref<ModuleDisplayConfig | null>(null);
+const moduleForm = reactive({
+  badge: '',
+  cover: '',
+  group: 'primary' as ModuleDisplayGroup,
+  icon: '',
+  name: '',
+  route: '',
+  sortOrder: 100,
+  visible: true,
+});
+
 const userColumns = [
   { dataIndex: 'displayName', key: 'displayName', title: '用户' },
   { dataIndex: 'role', key: 'role', title: '角色', width: 92 },
@@ -125,6 +150,32 @@ const modelColumns = [
   { key: 'actions', title: '操作', width: 92 },
 ];
 
+const moduleColumns = [
+  { dataIndex: 'name', key: 'module', title: '模块' },
+  { dataIndex: 'group', key: 'group', title: '分组', width: 112 },
+  { dataIndex: 'route', key: 'route', title: '路由' },
+  { dataIndex: 'sortOrder', key: 'sortOrder', title: '排序', width: 76 },
+  { dataIndex: 'badge', key: 'presentation', title: '展示', width: 168 },
+  { dataIndex: 'visible', key: 'visible', title: '状态', width: 86 },
+  { key: 'actions', title: '操作', width: 170 },
+];
+
+const moduleIconOptions = [
+  'home',
+  'chat',
+  'draw',
+  'agents',
+  'retouch',
+  'image-generation',
+  'video',
+  'canvas',
+  'commerce',
+  'music',
+  'workbench',
+  'map',
+  'all-tools',
+].map((value) => ({ label: value, value }));
+
 const providerOptions = computed(() =>
   providers.value.map((provider) => ({
     label: `${provider.displayName} (${provider.code})`,
@@ -153,30 +204,48 @@ const selectedDiscoveredModelItems = computed(() => {
   return discoveryResult.value?.models.filter((model) => selected.has(model.providerModel)) ?? [];
 });
 
+const filteredModules = computed(() => {
+  const query = moduleSearch.value.trim().toLowerCase();
+
+  if (!query) {
+    return modules.value;
+  }
+
+  return modules.value.filter((item) =>
+    [item.key, item.name, item.route, item.group].some((value) =>
+      value.toLowerCase().includes(query),
+    ),
+  );
+});
+
 async function loadAll(): Promise<void> {
   loading.value = true;
 
   try {
-    const [overviewResult, userResult, providerResult, modelResult] = await Promise.all([
-      fetchAdminOverview(),
-      fetchAdminUsers({
-        limit: 100,
-        role: userRole.value,
-        search: userSearch.value.trim() || undefined,
-        status: userStatus.value,
-      }),
-      fetchAdminProviders(),
-      fetchAdminModels({
-        capability: modelCapability.value,
-        providerCode: modelProvider.value,
-        search: modelSearch.value.trim() || undefined,
-      }),
-    ]);
+    const [overviewResult, userResult, providerResult, modelResult, moduleResult] =
+      await Promise.all([
+        fetchAdminOverview(),
+        fetchAdminUsers({
+          limit: 100,
+          role: userRole.value,
+          search: userSearch.value.trim() || undefined,
+          status: userStatus.value,
+        }),
+        fetchAdminProviders(),
+        fetchAdminModels({
+          capability: modelCapability.value,
+          providerCode: modelProvider.value,
+          search: modelSearch.value.trim() || undefined,
+        }),
+        fetchAdminModuleDisplayConfigs(),
+      ]);
 
     overview.value = overviewResult;
     users.value = userResult.items;
     providers.value = providerResult.items;
     models.value = modelResult.items;
+    modules.value = moduleResult.items;
+    moduleSource.value = moduleResult.source;
   } catch (error) {
     message.error(getErrorMessage(error));
   } finally {
@@ -496,6 +565,87 @@ async function saveModel(): Promise<void> {
   }
 }
 
+function openModuleModal(module: ModuleDisplayConfig): void {
+  editingModule.value = module;
+  moduleForm.badge = module.badge ?? '';
+  moduleForm.cover = module.cover ?? '';
+  moduleForm.group = module.group;
+  moduleForm.icon = module.icon;
+  moduleForm.name = module.name;
+  moduleForm.route = module.route;
+  moduleForm.sortOrder = module.sortOrder;
+  moduleForm.visible = module.visible;
+  moduleModalOpen.value = true;
+}
+
+async function saveModule(): Promise<void> {
+  if (
+    !editingModule.value ||
+    !moduleForm.name.trim() ||
+    !moduleForm.icon.trim() ||
+    !moduleForm.route.trim()
+  ) {
+    message.warning('请完整填写模块名称、图标和路由');
+    return;
+  }
+
+  saving.value = true;
+
+  try {
+    const updated = await updateAdminModuleDisplayConfig(editingModule.value.key, {
+      badge: moduleForm.badge.trim() || null,
+      cover: moduleForm.cover.trim() || null,
+      group: moduleForm.group,
+      icon: moduleForm.icon.trim(),
+      name: moduleForm.name.trim(),
+      route: moduleForm.route.trim(),
+      sortOrder: moduleForm.sortOrder,
+      visible: moduleForm.visible,
+    });
+
+    modules.value = replaceModule(updated);
+    moduleModalOpen.value = false;
+    message.success('模块展示配置已更新');
+    await moduleCatalogStore.load(true);
+  } catch (error) {
+    message.error(getErrorMessage(error));
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function toggleModuleVisibility(module: ModuleDisplayConfig): Promise<void> {
+  moduleSavingKey.value = module.key;
+
+  try {
+    const updated = await updateAdminModuleDisplayConfig(module.key, {
+      visible: !module.visible,
+    });
+
+    modules.value = replaceModule(updated);
+    message.success(updated.visible ? '模块已显示' : '模块已隐藏');
+    await moduleCatalogStore.load(true);
+  } catch (error) {
+    message.error(getErrorMessage(error));
+  } finally {
+    moduleSavingKey.value = null;
+  }
+}
+
+function replaceModule(updated: ModuleDisplayConfig): ModuleDisplayConfig[] {
+  const nextItems = modules.value.some((item) => item.key === updated.key)
+    ? modules.value.map((item) => (item.key === updated.key ? updated : item))
+    : [...modules.value, updated];
+
+  return nextItems.sort(
+    (left, right) => left.sortOrder - right.sortOrder || left.key.localeCompare(right.key),
+  );
+}
+
+function getModuleGroupLabel(group: ModuleDisplayGroup): string {
+  return group === 'creation-office' ? '创作与办公' : '主导航';
+}
+
 async function refreshOverview(): Promise<void> {
   overview.value = await fetchAdminOverview();
 }
@@ -525,7 +675,7 @@ onMounted(() => {
           ADMIN CONSOLE
         </span>
         <h1>管理后台</h1>
-        <p>用户、积分、模型厂商和模型路由统一管理</p>
+        <p>用户、积分、模块展示、模型厂商和模型路由统一管理</p>
       </div>
       <a-button :loading="loading" @click="loadAll">
         <ReloadOutlined />
@@ -881,7 +1031,175 @@ onMounted(() => {
           </a-table>
         </section>
       </a-tab-pane>
+
+      <a-tab-pane key="modules" tab="模块管理">
+        <section class="admin-panel">
+          <header class="admin-panel__toolbar">
+            <div>
+              <strong>模块展示</strong>
+              <span>
+                当前使用{{ moduleSource === 'database' ? '数据库配置' : '内置默认配置' }}
+              </span>
+            </div>
+            <div class="admin-filters">
+              <a-input v-model:value="moduleSearch" allow-clear placeholder="模块名称、标识或路由">
+                <template #prefix><SearchOutlined /></template>
+              </a-input>
+            </div>
+          </header>
+
+          <a-table
+            :columns="moduleColumns"
+            :data-source="filteredModules"
+            :loading="loading"
+            :pagination="false"
+            :scroll="{ x: 980 }"
+            row-key="key"
+            size="middle"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'module'">
+                <div class="admin-module-cell">
+                  <span class="admin-module-cell__icon">
+                    <component :is="resolveModuleIcon(record.icon)" />
+                  </span>
+                  <span>
+                    <strong>{{ record.name }}</strong>
+                    <small>
+                      {{ record.key }}
+                      <a-tag v-if="record.customized" color="purple">已配置</a-tag>
+                    </small>
+                  </span>
+                </div>
+              </template>
+              <template v-else-if="column.key === 'group'">
+                <a-tag :color="record.group === 'primary' ? 'blue' : 'green'">
+                  {{ getModuleGroupLabel(record.group) }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'route'">
+                <code class="admin-code">{{ record.route }}</code>
+              </template>
+              <template v-else-if="column.key === 'presentation'">
+                <div class="admin-module-presentation">
+                  <a-tag v-if="record.badge">{{ record.badge }}</a-tag>
+                  <span v-if="record.cover" class="admin-module-presentation__cover">
+                    <img alt="" :src="record.cover" />
+                    已设置封面
+                  </span>
+                  <span v-else class="admin-module-presentation__empty">默认样式</span>
+                </div>
+              </template>
+              <template v-else-if="column.key === 'visible'">
+                <a-tag :color="record.visible ? 'green' : 'default'">
+                  {{ record.visible ? '显示' : '隐藏' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <div class="admin-row-actions">
+                  <a-button size="small" @click="openModuleModal(record)">
+                    <EditOutlined />
+                    编辑
+                  </a-button>
+                  <a-button
+                    :loading="moduleSavingKey === record.key"
+                    size="small"
+                    @click="toggleModuleVisibility(record)"
+                  >
+                    <EyeInvisibleOutlined v-if="record.visible" />
+                    <EyeOutlined v-else />
+                    {{ record.visible ? '隐藏' : '显示' }}
+                  </a-button>
+                </div>
+              </template>
+            </template>
+          </a-table>
+        </section>
+      </a-tab-pane>
     </a-tabs>
+
+    <a-modal
+      v-model:open="moduleModalOpen"
+      :confirm-loading="saving"
+      title="编辑模块展示"
+      width="680px"
+      @ok="saveModule"
+    >
+      <a-form layout="vertical">
+        <div class="admin-module-preview">
+          <span
+            class="admin-module-preview__icon"
+            :class="{ 'admin-module-preview__icon--hidden': !moduleForm.visible }"
+          >
+            <component :is="resolveModuleIcon(moduleForm.icon)" />
+          </span>
+          <span>
+            <strong>{{ moduleForm.name || '模块名称' }}</strong>
+            <small>{{ moduleForm.route || '/module-route' }}</small>
+          </span>
+          <a-tag :color="moduleForm.visible ? 'green' : 'default'">
+            {{ moduleForm.visible ? '显示' : '隐藏' }}
+          </a-tag>
+        </div>
+
+        <div class="admin-form-grid">
+          <a-form-item label="模块名称">
+            <a-input v-model:value="moduleForm.name" :maxlength="40" />
+          </a-form-item>
+          <a-form-item label="图标">
+            <a-select v-model:value="moduleForm.icon" :options="moduleIconOptions" show-search />
+          </a-form-item>
+        </div>
+
+        <div class="admin-form-grid">
+          <a-form-item label="所属分组">
+            <a-select
+              v-model:value="moduleForm.group"
+              :options="[
+                { label: '主导航', value: 'primary' },
+                { label: '创作与办公', value: 'creation-office' },
+              ]"
+            />
+          </a-form-item>
+          <a-form-item label="排序值">
+            <a-input-number
+              v-model:value="moduleForm.sortOrder"
+              :max="10000"
+              :min="0"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </div>
+
+        <div class="admin-form-grid">
+          <a-form-item label="路由">
+            <a-input v-model:value="moduleForm.route" :maxlength="120" placeholder="/chat" />
+          </a-form-item>
+          <a-form-item label="角标">
+            <a-input
+              v-model:value="moduleForm.badge"
+              :maxlength="20"
+              placeholder="可选，例如 NEW"
+            />
+          </a-form-item>
+        </div>
+
+        <a-form-item label="封面图地址">
+          <a-input
+            v-model:value="moduleForm.cover"
+            allow-clear
+            placeholder="可选，填写可公开访问的图片 URL"
+          />
+        </a-form-item>
+
+        <a-form-item label="导航显示">
+          <div class="admin-module-visibility">
+            <a-switch v-model:checked="moduleForm.visible" />
+            <span>关闭后该模块不会出现在主侧栏、移动导航和首页工具入口。</span>
+          </div>
+        </a-form-item>
+      </a-form>
+    </a-modal>
 
     <a-modal v-model:open="userModalOpen" :confirm-loading="saving" title="编辑用户" @ok="saveUser">
       <a-form layout="vertical">
@@ -1377,6 +1695,160 @@ onMounted(() => {
 .admin-user-cell span {
   color: #969eac;
   font-size: 10px;
+}
+
+.admin-module-cell {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.admin-module-cell__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #e6e8ef;
+  border-radius: 8px;
+  background: #f7f5ff;
+  color: #7251eb;
+}
+
+.admin-module-cell__icon :deep(svg) {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-module-cell > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.admin-module-cell strong {
+  overflow: hidden;
+  color: #313746;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-module-cell small {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: #969eac;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-module-cell small :deep(.ant-tag) {
+  flex: 0 0 auto;
+  margin: 0;
+  font-family: inherit;
+  font-size: 8px;
+  line-height: 16px;
+}
+
+.admin-module-presentation {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.admin-module-presentation__cover {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: #687184;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-module-presentation__cover img {
+  width: 28px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.admin-module-presentation__empty {
+  color: #9aa1ae;
+  font-size: 10px;
+}
+
+.admin-module-preview {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid #e6e8ef;
+  border-radius: 8px;
+  background: #faf9ff;
+}
+
+.admin-module-preview__icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 9px;
+  background: #ede9ff;
+  color: #7251eb;
+}
+
+.admin-module-preview__icon--hidden {
+  background: #f0f1f5;
+  color: #9aa1ae;
+}
+
+.admin-module-preview > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.admin-module-preview strong,
+.admin-module-preview small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-module-preview strong {
+  color: #303644;
+  font-size: 13px;
+}
+
+.admin-module-preview small {
+  color: #8c94a4;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 10px;
+}
+
+.admin-module-visibility {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-module-visibility span {
+  color: #7d8595;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .admin-points-value {

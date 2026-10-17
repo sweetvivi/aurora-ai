@@ -101,6 +101,21 @@ export interface AdminModel {
   updatedAt: string;
 }
 
+export type ModuleDisplayGroup = 'creation-office' | 'primary';
+
+export interface ModuleDisplayConfig {
+  badge: string | null;
+  cover: string | null;
+  customized: boolean;
+  group: ModuleDisplayGroup;
+  icon: string;
+  key: string;
+  name: string;
+  route: string;
+  sortOrder: number;
+  visible: boolean;
+}
+
 export interface AdminProviderProbeModel {
   capabilities: Array<'chat' | 'embedding' | 'image' | 'video'>;
   displayName: string;
@@ -616,6 +631,55 @@ export async function fetchModels(capability?: ChatModel['capabilities'][number]
   });
 
   return response.data.data.items;
+}
+
+export async function fetchModuleDisplayConfigs(): Promise<{
+  items: ModuleDisplayConfig[];
+  source: 'database' | 'defaults';
+}> {
+  const response = await apiClient.get<
+    ApiEnvelope<{
+      items: ModuleDisplayConfig[];
+      source: 'database' | 'defaults';
+    }>
+  >('/api/v1/modules/display');
+
+  return response.data.data;
+}
+
+export async function fetchAdminModuleDisplayConfigs(): Promise<{
+  items: ModuleDisplayConfig[];
+  source: 'database' | 'defaults';
+}> {
+  const response = await apiClient.get<
+    ApiEnvelope<{
+      items: ModuleDisplayConfig[];
+      source: 'database' | 'defaults';
+    }>
+  >('/api/v1/admin/modules');
+
+  return response.data.data;
+}
+
+export async function updateAdminModuleDisplayConfig(
+  moduleKey: string,
+  input: {
+    badge?: string | null;
+    cover?: string | null;
+    group?: ModuleDisplayGroup;
+    icon?: string;
+    name?: string;
+    route?: string;
+    sortOrder?: number;
+    visible?: boolean;
+  },
+): Promise<ModuleDisplayConfig> {
+  const response = await apiClient.patch<ApiEnvelope<ModuleDisplayConfig>>(
+    `/api/v1/admin/modules/${encodeURIComponent(moduleKey)}`,
+    input,
+  );
+
+  return response.data.data;
 }
 
 export async function uploadImageFile(file: File): Promise<FileAsset> {

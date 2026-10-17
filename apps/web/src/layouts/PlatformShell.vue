@@ -1,28 +1,24 @@
 <script setup lang="ts">
 import {
-  AppstoreOutlined,
-  ApartmentOutlined,
   ArrowRightOutlined,
-  AudioOutlined,
   CommentOutlined,
-  EditOutlined,
-  FileTextOutlined,
   GiftOutlined,
-  HighlightOutlined,
   HomeOutlined,
   PictureOutlined,
   RobotOutlined,
   SearchOutlined,
   SettingOutlined,
-  ShoppingCartOutlined,
-  ThunderboltOutlined,
-  VideoCameraOutlined,
 } from '@ant-design/icons-vue';
 import { storeToRefs } from 'pinia';
 import type { Component } from 'vue';
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
 import GlobalTopbar from '@/components/GlobalTopbar.vue';
+import {
+  resolveModuleIcon,
+  useModuleCatalogStore,
+  type ModuleCatalogItem,
+} from '@/stores/module-catalog';
 import { useSessionStore } from '@/stores/session';
 
 interface NavigationItem {
@@ -39,32 +35,32 @@ interface NavigationGroup {
 
 const route = useRoute();
 const sessionStore = useSessionStore();
+const moduleCatalogStore = useModuleCatalogStore();
 const { user } = storeToRefs(sessionStore);
+const { catalogItems } = storeToRefs(moduleCatalogStore);
 
-const navigationGroups: NavigationGroup[] = [
+const mobileModuleKeys = ['home', 'chat', 'draw', 'agents', 'map'];
+const navigationGroups = computed<NavigationGroup[]>(() => [
   {
-    items: [
-      { icon: HomeOutlined, label: '首页', to: '/' },
-      { icon: CommentOutlined, label: '模型对话', badge: '100+', to: '/chat' },
-      { icon: HighlightOutlined, label: 'AI 绘画', to: '/draw' },
-      { icon: RobotOutlined, label: '超级智能体', badge: '6000+', to: '/agents' },
-      { icon: EditOutlined, label: '智能修图', to: '/retouch' },
-      { icon: PictureOutlined, label: '图片生成', to: '/image-generation' },
-      { icon: VideoCameraOutlined, label: 'AI 视频', to: '/video' },
-      { icon: ApartmentOutlined, label: 'AI 画布', to: '/canvas' },
-      { icon: ShoppingCartOutlined, label: '电商工具', to: '/commerce' },
-      { icon: AudioOutlined, label: 'AI 音乐', to: '/music' },
-    ],
+    items: catalogItems.value.filter((item) => item.group === 'primary').map(toNavigationItem),
   },
   {
     label: '创作与办公',
-    items: [
-      { icon: FileTextOutlined, label: '文档处理', to: '/workbench' },
-      { icon: ThunderboltOutlined, label: '工具地图', to: '/map' },
-      { icon: AppstoreOutlined, label: '全部工具', to: '/map' },
-    ],
+    items: catalogItems.value
+      .filter((item) => item.group === 'creation-office')
+      .map(toNavigationItem),
   },
-];
+]);
+const mobileNavigation = computed<NavigationItem[]>(() => {
+  const itemsByKey = new Map(catalogItems.value.map((item) => [item.key, item]));
+  const preferred = mobileModuleKeys
+    .map((key) => itemsByKey.get(key))
+    .filter((item): item is ModuleCatalogItem => Boolean(item));
+  const preferredKeys = new Set(preferred.map((item) => item.key));
+  const remaining = catalogItems.value.filter((item) => !preferredKeys.has(item.key));
+
+  return [...preferred, ...remaining].slice(0, 5).map(toNavigationItem);
+});
 
 const currentTitle = computed(() => String(route.meta.title ?? '工作台'));
 const isAdmin = computed(() => user.value?.role === 'ADMIN');
@@ -88,6 +84,19 @@ function isActivePath(path: string, target: string): boolean {
 
   return path === target || path.startsWith(`${target}/`);
 }
+
+function toNavigationItem(item: ModuleCatalogItem): NavigationItem {
+  return {
+    badge: item.badge ?? undefined,
+    icon: resolveModuleIcon(item.icon),
+    label: item.name,
+    to: item.route,
+  };
+}
+
+onMounted(() => {
+  void moduleCatalogStore.load();
+});
 </script>
 
 <template>
@@ -112,13 +121,17 @@ function isActivePath(path: string, target: string): boolean {
     <div class="platform-shell__body">
       <aside class="platform-sidebar">
         <nav class="platform-sidebar__navigation" aria-label="平台导航">
-          <section v-for="group in navigationGroups" :key="group.label ?? 'primary'">
+          <section
+            v-for="group in navigationGroups"
+            v-show="group.items.length > 0"
+            :key="group.label ?? 'primary'"
+          >
             <span v-if="group.label" class="platform-sidebar__group-label">
               {{ group.label }}
             </span>
             <RouterLink
               v-for="item in group.items"
-              :key="`${group.label}-${item.label}`"
+              :key="`${group.label}-${item.to}-${item.label}`"
               :to="item.to"
               class="platform-sidebar__link"
               :class="{ 'platform-sidebar__link--active': isActivePath(route.path, item.to) }"
@@ -159,25 +172,14 @@ function isActivePath(path: string, target: string): boolean {
     </div>
 
     <nav class="mobile-navigation" aria-label="移动端主导航">
-      <RouterLink to="/" :class="{ active: route.path === '/' }">
-        <HomeOutlined />
-        <small>首页</small>
-      </RouterLink>
-      <RouterLink to="/chat" :class="{ active: route.path.startsWith('/chat') }">
-        <CommentOutlined />
-        <small>对话</small>
-      </RouterLink>
-      <RouterLink to="/draw" :class="{ active: route.path.startsWith('/draw') }">
-        <PictureOutlined />
-        <small>绘画</small>
-      </RouterLink>
-      <RouterLink to="/agents" :class="{ active: route.path.startsWith('/agents') }">
-        <RobotOutlined />
-        <small>智能体</small>
-      </RouterLink>
-      <RouterLink to="/map" :class="{ active: route.path.startsWith('/map') }">
-        <SearchOutlined />
-        <small>发现</small>
+      <RouterLink
+        v-for="item in mobileNavigation"
+        :key="`mobile-${item.to}-${item.label}`"
+        :to="item.to"
+        :class="{ active: isActivePath(route.path, item.to) }"
+      >
+        <component :is="item.icon" />
+        <small>{{ item.label }}</small>
       </RouterLink>
     </nav>
   </div>

@@ -7,7 +7,7 @@
 - 项目：极光AI，参考 `https://参考产品/` 的产品结构和交互重新实现。
 - 本地目录：`C:\Users\Administrator\Desktop\project2`
 - GitHub 远端：[https://github.com/sweetvivi/web-ai-design-clone-b](https://github.com/sweetvivi/web-ai-design-clone-b)（Private）
-- 当前阶段：M1 首条垂直切片已在 `feature/m1-vertical-slice` 完成本地实现和验收，等待用户确认普通推送。
+- 当前阶段：M0-M3 已完成并通过本地验证，当前在 `main` 持续打磨六个优先模块、AI 画布和电商工具。
 - 实现边界：按 D-011 修订后的策略，界面结构、视觉和交互尽可能接近参考产品；品牌与受保护内容必须替换，原页面打包资源不得复用。
 - 主开发工具：按 D-033，Codex 作为主要开发工具；除非用户明确决定切换，否则不再按换模型流程重置方向。
 
@@ -30,10 +30,10 @@
 
 ## 当前进度
 
-- 已完成：M0 工程基础和参考产品原创化 UI 重构；M1 认证、积分冻结/结算/退回、模型列表、对话流、会话历史、文件上传、图片任务状态机和绘画工作台真实后端接入。
-- 本地验证：M1-7 的 `pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过；API 29/29、Web 16/16；API 健康接口返回数据库和 Redis 为 `up`；桌面与 390px 移动端绘图流程通过，无横向溢出。
-- 下一步：先说明远端、分支、提交范围和提交哈希，等待用户确认后推送 M1；之后按参考产品优先顺序继续智能体和图片工作台闭环，视频功能后置。
-- Git 续接：当前分支 `feature/m1-vertical-slice`。每次接手先用 `git status --short --branch` 和 `git log --oneline -8` 核验最新状态，不依赖本文件中的旧提交哈希判断。
+- 已完成：M0 工程基础、M1 核心业务闭环、M2 六个优先工具首版、AI 画布和电商工具首版，以及 M3 管理后台、厂商模型探测、运行时模型注册表和模块展示管理。
+- 本地验证：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过；API 18 个文件 68 项，Web 7 个文件 27 项；模块管理、厂商探测、后台布局、画布、对话、绘画和工具页面的桌面与移动端验收均通过。
+- 下一步：继续按参考产品精修模型对话、AI 绘画、超级智能体、智能修图、图片生成和视频生成，并深化 AI 画布与电商工具；真实付费接口继续使用 Mock 或请求拦截验证。
+- Git 续接：当前分支 `main`。每次接手先用 `git status --short --branch` 和 `git log --oneline -8` 核验最新状态，不依赖本文件中的旧提交哈希判断。
 
 ## 本轮新增注意事项
 
