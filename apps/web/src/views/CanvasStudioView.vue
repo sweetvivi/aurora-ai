@@ -186,7 +186,7 @@ const activeWorkflowTab = ref<'mine' | 'samples'>('mine');
 const canvasTitle = ref('新建画布');
 const selectedNodeId = ref('');
 const connectionFromId = ref('');
-const inspirationOpen = ref(true);
+const inspirationOpen = ref(false);
 const inspirationMessage = ref('');
 const composerPrompt = ref('');
 const selectedModel = ref(generationModels[0]?.value ?? 'canvas-aurora-3');
@@ -198,7 +198,7 @@ const assetError = ref('');
 const saveState = ref<'idle' | 'saved' | 'saving'>('saved');
 const lastSavedAt = ref('10:30');
 const viewport = ref({
-  scale: 0.88,
+  scale: 1,
   x: 28,
   y: 32,
 });
@@ -285,7 +285,7 @@ function createSeedCanvas(): CanvasSnapshot {
         status: 'done',
         title: '主视觉素材',
         width: 330,
-        x: 390,
+        x: 350,
         y: 145,
       },
       {
@@ -297,7 +297,7 @@ function createSeedCanvas(): CanvasSnapshot {
         status: 'done',
         title: '背景素材',
         width: 300,
-        x: 805,
+        x: 720,
         y: 420,
       },
       {
@@ -321,8 +321,8 @@ function createSeedCanvas(): CanvasSnapshot {
         status: 'done',
         title: '输出结果',
         width: 330,
-        x: 1180,
-        y: 225,
+        x: 820,
+        y: 175,
       },
     ],
   };
@@ -438,6 +438,12 @@ function readJson<T>(key: string): T | null {
 }
 
 function openRail(action: RailAction['value']): void {
+  if (action === 'inspiration') {
+    activeRailMenu.value = null;
+    inspirationOpen.value = !inspirationOpen.value;
+    return;
+  }
+
   activeRailMenu.value = activeRailMenu.value === action ? null : action;
 }
 
@@ -454,7 +460,7 @@ function createCanvas(): void {
   edges.value = seed.edges;
   selectedNodeId.value = '';
   connectionFromId.value = '';
-  viewport.value = { scale: 0.88, x: 28, y: 32 };
+  viewport.value = { scale: 1, x: 28, y: 32 };
   persistCanvas();
 }
 
@@ -2001,7 +2007,7 @@ onBeforeUnmount(() => {
 .canvas-workflow-panel {
   top: 190px;
   left: 68px;
-  width: min(480px, calc(100% - 96px));
+  width: min(680px, calc(100% - 96px));
   padding: 15px;
 }
 
@@ -2117,7 +2123,7 @@ onBeforeUnmount(() => {
 .canvas-asset-panel {
   top: 114px;
   left: 68px;
-  width: min(500px, calc(100% - 96px));
+  width: min(590px, calc(100% - 96px));
   max-height: min(650px, calc(100% - 136px));
   overflow: auto;
   padding: 15px;
@@ -2335,7 +2341,7 @@ onBeforeUnmount(() => {
 .canvas-history-panel {
   top: 230px;
   left: 68px;
-  width: min(690px, calc(100% - 96px));
+  width: min(820px, calc(100% - 96px));
   max-height: min(560px, calc(100% - 260px));
   overflow: auto;
   padding: 15px;
@@ -2451,6 +2457,52 @@ onBeforeUnmount(() => {
   background: #111216;
   box-shadow: 0 18px 42px rgb(0 0 0 / 34%);
   cursor: move;
+}
+
+.canvas-node--image,
+.canvas-node--output {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.canvas-node--image .canvas-node__header,
+.canvas-node--output .canvas-node__header {
+  display: none;
+}
+
+.canvas-node--image .canvas-node__visual,
+.canvas-node--output .canvas-node__visual {
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 8px;
+  background: #15161a;
+  box-shadow: 0 14px 34px rgb(0 0 0 / 34%);
+}
+
+.canvas-node--image.canvas-node--selected .canvas-node__visual,
+.canvas-node--output.canvas-node--selected .canvas-node__visual,
+.canvas-node--image.canvas-node--connecting .canvas-node__visual,
+.canvas-node--output.canvas-node--connecting .canvas-node__visual {
+  border-color: #4b82ff;
+  box-shadow:
+    0 0 0 1px #4b82ff,
+    0 14px 34px rgb(0 0 0 / 38%);
+}
+
+.canvas-node--image.canvas-node--connecting .canvas-node__visual,
+.canvas-node--output.canvas-node--connecting .canvas-node__visual {
+  border-color: #8f6fff;
+  box-shadow:
+    0 0 0 1px #8f6fff,
+    0 0 22px rgb(111 77 255 / 28%);
+}
+
+.canvas-node--image .canvas-node__toolbar,
+.canvas-node--output .canvas-node__toolbar {
+  top: -43px;
 }
 
 .canvas-node--selected,
@@ -2604,6 +2656,31 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   pointer-events: none;
+}
+
+.canvas-node--image .canvas-node__meta,
+.canvas-node--output .canvas-node__meta {
+  top: 9px;
+  right: auto;
+  bottom: auto;
+  left: -64px;
+  width: 58px;
+  height: 18px;
+  justify-content: flex-end;
+}
+
+.canvas-node--image .canvas-node__meta span,
+.canvas-node--output .canvas-node__meta span {
+  padding: 0;
+  background: transparent;
+  color: #8c929e;
+  font-size: 11px;
+  backdrop-filter: none;
+}
+
+.canvas-node--image .canvas-node__meta small,
+.canvas-node--output .canvas-node__meta small {
+  display: none;
 }
 
 .canvas-node__meta span,
