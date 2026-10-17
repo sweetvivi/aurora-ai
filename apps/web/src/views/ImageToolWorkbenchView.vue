@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import {
   BgColorsOutlined,
+  BulbOutlined,
   CheckOutlined,
   CloseOutlined,
+  CloudDownloadOutlined,
   CommentOutlined,
   CopyOutlined,
   DeleteOutlined,
@@ -19,6 +21,7 @@ import {
   ScanOutlined,
   ScissorOutlined,
   SendOutlined,
+  SettingOutlined,
   StarOutlined,
   ThunderboltFilled,
   UndoOutlined,
@@ -286,6 +289,12 @@ const selectedOperation = ref(retouchOperations[0]?.value ?? 'enhance');
 const activeGenerationCategory = ref('all');
 const selectedRatio = ref('智能比例');
 const selectedSize = ref('2K');
+const selectedStorageDays = ref(1);
+const generationStyleStrength = ref(60);
+const generationSeed = ref('');
+const generationPromptOptimize = ref(true);
+const advancedGenerationOpen = ref(false);
+const generationExamplesOpen = ref(false);
 const retouchStrength = ref(65);
 const legacyGenerationMode = ref(false);
 const legacyRetouchMode = ref(false);
@@ -383,6 +392,12 @@ function resetLocalForm(): void {
   activeGenerationCategory.value = 'all';
   selectedRatio.value = '智能比例';
   selectedSize.value = '2K';
+  selectedStorageDays.value = 1;
+  generationStyleStrength.value = 60;
+  generationSeed.value = '';
+  generationPromptOptimize.value = true;
+  advancedGenerationOpen.value = false;
+  generationExamplesOpen.value = false;
   retouchStrength.value = 65;
   legacyGenerationMode.value = false;
   legacyRetouchMode.value = false;
@@ -573,7 +588,13 @@ async function submitTask(): Promise<void> {
     amount: isGeneration.value ? selectedAmount.value : 1,
     extraParameters: isGeneration.value
       ? {
+          advanced: {
+            promptOptimize: generationPromptOptimize.value,
+            seed: generationSeed.value.trim(),
+            styleStrength: generationStyleStrength.value,
+          },
           mode: 'text-to-image',
+          storageDays: selectedStorageDays.value,
         }
       : {
           mode: 'image-to-image',
@@ -1148,6 +1169,32 @@ onBeforeUnmount(() => {
         @change="handleSourceUpload"
       />
 
+      <div v-if="generationExamplesOpen" class="generation-composer__examples-panel">
+        <header>
+          <span>
+            <BulbOutlined />
+            <strong>效果示例</strong>
+          </span>
+          <button type="button" aria-label="关闭效果示例" @click="generationExamplesOpen = false">
+            <CloseOutlined />
+          </button>
+        </header>
+        <div>
+          <button
+            v-for="showcase in generationShowcases"
+            :key="showcase.id"
+            type="button"
+            @click="
+              useGenerationShowcase(showcase);
+              generationExamplesOpen = false;
+            "
+          >
+            <img :src="showcase.image" alt="" />
+            <span>{{ showcase.label }}</span>
+          </button>
+        </div>
+      </div>
+
       <div v-if="sourceImage" class="generation-composer__source">
         <img :src="sourceImage.url" :alt="sourceImage.name" />
         <span>
@@ -1168,6 +1215,28 @@ onBeforeUnmount(() => {
         />
         <small>{{ prompt.length }}/1000</small>
       </label>
+
+      <div v-if="advancedGenerationOpen" class="generation-composer__advanced">
+        <label>
+          <span>风格强度</span>
+          <input v-model.number="generationStyleStrength" type="range" min="0" max="100" step="5" />
+          <em>{{ generationStyleStrength }}%</em>
+        </label>
+        <label>
+          <span>随机种子</span>
+          <input
+            v-model.trim="generationSeed"
+            type="text"
+            inputmode="numeric"
+            maxlength="12"
+            placeholder="随机"
+          />
+        </label>
+        <label class="generation-composer__advanced-switch">
+          <input v-model="generationPromptOptimize" type="checkbox" />
+          <span>智能优化提示词</span>
+        </label>
+      </div>
 
       <div class="generation-composer__actions">
         <div class="generation-composer__settings">
@@ -1213,6 +1282,36 @@ onBeforeUnmount(() => {
             </select>
             <DownOutlined />
           </label>
+          <button
+            type="button"
+            class="generation-composer__advanced-toggle"
+            :class="{ active: advancedGenerationOpen }"
+            :aria-expanded="advancedGenerationOpen"
+            @click="advancedGenerationOpen = !advancedGenerationOpen"
+          >
+            <SettingOutlined />
+            高级设置
+            <DownOutlined />
+          </button>
+          <label class="generation-composer__storage">
+            <CloudDownloadOutlined />
+            <select v-model.number="selectedStorageDays" aria-label="存储时长">
+              <option :value="1">存储 1 天</option>
+              <option :value="7">存储 7 天</option>
+              <option :value="30">存储 30 天</option>
+            </select>
+            <DownOutlined />
+          </label>
+          <button
+            type="button"
+            class="generation-composer__examples-toggle"
+            :class="{ active: generationExamplesOpen }"
+            :aria-expanded="generationExamplesOpen"
+            @click="generationExamplesOpen = !generationExamplesOpen"
+          >
+            <BulbOutlined />
+            查看示例
+          </button>
         </div>
         <button
           type="button"
@@ -2196,13 +2295,15 @@ onBeforeUnmount(() => {
 }
 
 .generation-studio__title {
-  display: flex;
+  display: grid;
   min-width: 0;
   align-items: center;
-  gap: 9px;
+  gap: 1px 9px;
+  grid-template-columns: auto minmax(0, 1fr);
 }
 
 .generation-studio__title > span:not(.generation-studio__title-icon) {
+  align-self: end;
   color: #258b70;
   font-size: 10px;
   font-weight: 900;
@@ -2214,6 +2315,7 @@ onBeforeUnmount(() => {
   width: 30px;
   height: 30px;
   flex: 0 0 30px;
+  grid-row: 1 / 3;
   place-items: center;
   border: 1px solid #b9dfd3;
   border-radius: 8px;
@@ -2223,6 +2325,7 @@ onBeforeUnmount(() => {
 }
 
 .generation-studio__header h1 {
+  align-self: start;
   margin: 0;
   color: #26313a;
   font-size: 28px;
@@ -3013,6 +3116,73 @@ onBeforeUnmount(() => {
   font-size: 8px;
 }
 
+.generation-composer__advanced {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.7fr) auto;
+  padding: 9px 10px;
+  border: 1px solid #e1ebe7;
+  border-radius: 9px;
+  background: #f7fbf9;
+}
+
+.generation-composer__advanced > label {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  color: #5b666e;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.generation-composer__advanced input[type='range'] {
+  width: 100%;
+  accent-color: #249674;
+}
+
+.generation-composer__advanced input[type='text'] {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #dbe7e3;
+  border-radius: 6px;
+  outline: 0;
+  background: #fff;
+  color: #3e4a52;
+  font: inherit;
+  font-size: 9px;
+}
+
+.generation-composer__advanced input[type='text']:focus {
+  border-color: #8dcab7;
+  box-shadow: 0 0 0 3px rgb(36 150 116 / 8%);
+}
+
+.generation-composer__advanced em {
+  color: #288a6d;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.generation-composer__advanced-switch {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px !important;
+  white-space: nowrap;
+}
+
+.generation-composer__advanced-switch input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #249674;
+}
+
 .generation-composer__actions {
   display: flex;
   align-items: center;
@@ -3046,6 +3216,113 @@ onBeforeUnmount(() => {
 
 .generation-composer__settings > button {
   cursor: pointer;
+}
+
+.generation-composer__settings > button.active {
+  border-color: #8dcab7;
+  background: #eff9f6;
+  color: #247b63;
+}
+
+.generation-composer__advanced-toggle :deep(svg:last-child) {
+  width: 9px;
+  font-size: 8px;
+  transition: transform 160ms ease;
+}
+
+.generation-composer__advanced-toggle.active :deep(svg:last-child) {
+  transform: rotate(180deg);
+}
+
+.generation-composer__storage :deep(svg:first-child),
+.generation-composer__examples-toggle :deep(svg:first-child) {
+  color: #249674;
+}
+
+.generation-composer__examples-toggle {
+  white-space: nowrap;
+}
+
+.generation-composer__examples-panel {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #d9e9e4;
+  border-radius: 10px;
+  background: #f8fcfb;
+}
+
+.generation-composer__examples-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.generation-composer__examples-panel > header > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #31413c;
+  font-size: 10px;
+}
+
+.generation-composer__examples-panel > header :deep(svg) {
+  color: #249674;
+}
+
+.generation-composer__examples-panel > header > button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #7f8a91;
+  cursor: pointer;
+}
+
+.generation-composer__examples-panel > div {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.generation-composer__examples-panel > div > button {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #dfe9e6;
+  border-radius: 7px;
+  background: #eef3f1;
+  cursor: pointer;
+}
+
+.generation-composer__examples-panel img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 180ms ease;
+}
+
+.generation-composer__examples-panel > div > button:hover img {
+  transform: scale(1.04);
+}
+
+.generation-composer__examples-panel > div > button span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 12px 5px 4px;
+  background: linear-gradient(transparent, rgb(10 20 18 / 76%));
+  color: #fff;
+  font-size: 8px;
+  font-weight: 750;
+  text-align: center;
 }
 
 .generation-composer__settings :deep(svg) {
@@ -3120,7 +3397,7 @@ onBeforeUnmount(() => {
 .retouch-studio {
   display: grid;
   min-height: calc(100vh - 56px);
-  grid-template-columns: minmax(0, 1fr) 420px;
+  grid-template-columns: minmax(0, 1fr) 350px;
   gap: 20px;
   overflow-x: hidden;
   padding: 20px;
@@ -3257,7 +3534,7 @@ onBeforeUnmount(() => {
 
 .retouch-empty-guide {
   display: grid;
-  width: min(100%, 520px);
+  width: min(100%, 420px);
   justify-items: center;
   gap: 22px;
 }
@@ -3727,10 +4004,8 @@ onBeforeUnmount(() => {
 
 .retouch-composer__operations {
   display: flex;
-  gap: 6px;
-  overflow-x: auto;
+  gap: 3px;
   padding-bottom: 2px;
-  scrollbar-width: none;
 }
 
 .retouch-composer__operations::-webkit-scrollbar {
@@ -3740,16 +4015,24 @@ onBeforeUnmount(() => {
 .retouch-composer__operations button {
   display: inline-flex;
   height: 28px;
-  flex: 0 0 auto;
+  min-width: 0;
+  flex: 1 1 0;
   align-items: center;
-  gap: 4px;
-  padding: 0 8px;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 3px;
   border: 1px solid #2a3148;
   border-radius: 999px;
   background: #161c2e;
   color: #8d96ac;
-  font-size: 9px;
+  font-size: 8px;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.retouch-composer__operations button :deep(svg) {
+  flex: 0 0 auto;
+  font-size: 9px;
 }
 
 .retouch-composer__operations button.active {
@@ -3885,7 +4168,7 @@ onBeforeUnmount(() => {
   }
 
   .retouch-studio {
-    grid-template-columns: minmax(0, 1fr) 350px;
+    grid-template-columns: minmax(0, 1fr) 340px;
     gap: 14px;
     padding: 14px;
   }
@@ -4011,6 +4294,14 @@ onBeforeUnmount(() => {
 
   .generation-composer__submit {
     width: 100%;
+  }
+
+  .generation-composer__advanced {
+    grid-template-columns: 1fr;
+  }
+
+  .generation-composer__examples-panel > div {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -4152,6 +4443,20 @@ onBeforeUnmount(() => {
 
   .generation-composer__settings select {
     max-width: 94px;
+  }
+
+  .retouch-composer__operations {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .retouch-composer__operations::-webkit-scrollbar {
+    display: none;
+  }
+
+  .retouch-composer__operations button {
+    flex: 0 0 auto;
+    padding: 0 8px;
   }
 }
 </style>
