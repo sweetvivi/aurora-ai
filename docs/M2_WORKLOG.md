@@ -93,6 +93,7 @@
 - 能力：原图上传、画质增强、超清放大、一键抠图、智能擦除、背景替换、风格调整、处理强度、任务记录、收藏、下载、删除和重试
 - 默认界面：深色无限画布、顶部“我的创作”、底部缩放/撤销/恢复工具条和右侧对话式修图面板
 - 交互：上传原图、切换处理方式、输入补充指令、选择修图模型、提交真实图片任务、点击最近作品切换画布内容
+- 画布历史：示例选择、原图上传、历史作品切换、删除原图和缩放会写入最多 30 步撤销栈；恢复栈支持逐步重做，上传图片的 Blob URL 在历史栈仍被引用时不会提前释放
 - 空态示例：换个发型、换个穿搭、换个背景和一键抠图使用真实项目资产；点击后仅更新画布预览和处理方式，不上传文件、不创建任务、不消耗积分
 - 状态隔离：上传原图、删除原图和切换最近作品时会清除示例预览，避免示例状态覆盖用户素材或真实结果
 - 兼容：点击“返回旧版”可回到原有白绿色表单工作台；`/image-generation` 继续使用原工作台，不受本次重构影响
@@ -352,6 +353,20 @@ node outputs/ui-reference/verify-m2-routes.mjs
 - 4 张真实示例素材均能正确渲染；点击示例会更新画布和处理方式，但不会调用上传或生成接口
 - 桌面端和 `390x844` 移动端均无横向溢出、无页面脚本错误
 - 截图保存在本地忽略目录 `outputs/ui-reference/m2-retouch-desktop.png` 和 `outputs/ui-reference/m2-retouch-mobile.png`
+
+智能修图撤销/恢复补充验证：
+
+```text
+pnpm exec prettier --check apps/web/src/views/ImageToolWorkbenchView.vue outputs/ui-reference/verify-retouch-history.mjs
+pnpm --filter @aurora/web typecheck
+pnpm --filter @aurora/web test
+node outputs/ui-reference/verify-retouch-history.mjs
+```
+
+- 初始撤销/恢复均禁用；选择示例、上传图片、撤销回示例、恢复上传图和缩放历史均按预期工作
+- 画布缩放覆盖 `100% -> 110% -> 100% -> 110%`，撤销/恢复按钮状态与栈内容同步
+- 桌面端 `1440x1000` 和移动端 `390x844` 均无横向溢出、无页面脚本错误；验收使用 Mock 路由，不调用真实 Provider，不读取或输出 Key
+- 截图保存在本地忽略目录 `outputs/ui-reference/retouch-history-desktop.png` 和 `outputs/ui-reference/retouch-history-mobile.png`
 
 补充验证：
 

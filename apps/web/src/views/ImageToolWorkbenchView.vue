@@ -66,6 +66,13 @@ interface SourceImage {
   url: string;
 }
 
+interface RetouchHistorySnapshot {
+  canvasZoom: number;
+  selectedCanvasWorkId: string;
+  selectedRetouchShowcaseId: string;
+  sourceImage: SourceImage | null;
+}
+
 interface RetouchModelOption {
   description: string;
   label: string;
@@ -294,6 +301,9 @@ const legacyRetouchMode = ref(false);
 const canvasZoom = ref(100);
 const selectedCanvasWorkId = ref('');
 const selectedRetouchShowcaseId = ref('');
+const retouchUndoStack = ref<RetouchHistorySnapshot[]>([]);
+const retouchRedoStack = ref<RetouchHistorySnapshot[]>([]);
+const retainedSourceUrls = new Set<string>();
 const sourceError = ref('');
 const sourceImage = ref<SourceImage | null>(null);
 const sourceInput = ref<HTMLInputElement | null>(null);
@@ -367,25 +377,33 @@ const generationGroups = computed(() => {
 const latestCanvasWork = computed(() =>
   visibleWorks.value.find((work) => work.status === 'done' && work.artworkUrl),
 );
-const activeCanvasWork = computed(
+const selectedCanvasWork = computed(
   () =>
     visibleWorks.value.find(
       (work) => work.id === selectedCanvasWorkId.value && work.status === 'done' && work.artworkUrl,
-    ) ?? latestCanvasWork.value,
+    ) ?? undefined,
+);
+const activeCanvasWork = computed(
+  () =>
+    selectedCanvasWork.value ??
+    (sourceImage.value || selectedRetouchShowcase.value ? undefined : latestCanvasWork.value),
 );
 const canvasImageUrl = computed(
   () =>
-    activeCanvasWork.value?.artworkUrl ??
     sourceImage.value?.url ??
     selectedRetouchShowcase.value?.image ??
+    activeCanvasWork.value?.artworkUrl ??
     '',
 );
 const canvasImageName = computed(
   () =>
-    activeCanvasWork.value?.prompt ??
     sourceImage.value?.name ??
-    (selectedRetouchShowcase.value ? `示例演示 · ${selectedRetouchShowcase.value.label}` : ''),
+    (selectedRetouchShowcase.value
+      ? `示例演示 · ${selectedRetouchShowcase.value.label}`
+      : (activeCanvasWork.value?.prompt ?? '')),
 );
+const canUndoRetouch = computed(() => retouchUndoStack.value.length > 0);
+const canRedoRetouch = computed(() => retouchRedoStack.value.length > 0);
 const submitting = computed(() => workspace.submitting || uploading.value);
 const canSubmit = computed(() => {
   if (submitting.value) {
@@ -394,6 +412,96 @@ const canSubmit = computed(() => {
 
   return isGeneration.value ? Boolean(prompt.value.trim()) : Boolean(sourceImage.value);
 });
+
+function cloneSourceImage(source: SourceImage | null): SourceImage | null {
+  return source ? { ...source } : null;
+}
+
+function captureRetouchSnapshot(): RetouchHistorySnapshot {
+  return {
+    canvasZoom: canvasZoom.value,
+    selectedCanvasWorkId: selectedCanvasWorkId.value,
+    selectedRetouchShowcaseId: selectedRetouchShowcaseId.value,
+    sourceImage: cloneSourceImage(sourceImage.value),
+  };
+}
+
+function applyRetouchSnapshot(snapshot: RetouchHistorySnapshot): void {
+  canvasZoom.value = snapshot.canvasZoom;
+  selectedCanvasWorkId.value = snapshot.selectedCanvasWorkId;
+  selectedRetouchShowcaseId.value = snapshot.selectedRetouchShowcaseId;
+  sourceImage.value = cloneSourceImage(snapshot.sourceImage);
+  sourceError.value = '';
+
+  const showcase = retouchShowcases.find((item) => item.id === selectedRetouchShowcaseId.value);
+
+  if (showcase) {
+    selectedOperation.value = showcase.operation;
+  }
+}
+
+function releaseUnusedSourceUrls(): void {
+  const referencedUrls = new Set<string>();
+
+  if (sourceImage.value) {
+    referencedUrls.add(sourceImage.value.url);
+  }
+
+  for (const snapshot of [...retouchUndoStack.value, ...retouchRedoStack.value]) {
+    if (snapshot.sourceImage) {
+      referencedUrls.add(snapshot.sourceImage.url);
+    }
+  }
+
+  for (const url of retainedSourceUrls) {
+    if (!referencedUrls.has(url)) {
+      URL.revokeObjectURL(url);
+      retainedSourceUrls.delete(url);
+    }
+  }
+}
+
+function resetRetouchHistory(): void {
+  retouchUndoStack.value = [];
+  retouchRedoStack.value = [];
+
+  for (const url of retainedSourceUrls) {
+    URL.revokeObjectURL(url);
+  }
+
+  retainedSourceUrls.clear();
+}
+
+function commitRetouchHistory(): void {
+  retouchUndoStack.value = [...retouchUndoStack.value.slice(-29), captureRetouchSnapshot()];
+  retouchRedoStack.value = [];
+}
+
+function undoRetouch(): void {
+  const snapshot = retouchUndoStack.value.at(-1);
+
+  if (!snapshot) {
+    return;
+  }
+
+  retouchRedoStack.value = [...retouchRedoStack.value, captureRetouchSnapshot()];
+  retouchUndoStack.value = retouchUndoStack.value.slice(0, -1);
+  applyRetouchSnapshot(snapshot);
+  releaseUnusedSourceUrls();
+}
+
+function redoRetouch(): void {
+  const snapshot = retouchRedoStack.value.at(-1);
+
+  if (!snapshot) {
+    return;
+  }
+
+  retouchUndoStack.value = [...retouchUndoStack.value, captureRetouchSnapshot()];
+  retouchRedoStack.value = retouchRedoStack.value.slice(0, -1);
+  applyRetouchSnapshot(snapshot);
+  releaseUnusedSourceUrls();
+}
 
 function resetLocalForm(): void {
   prompt.value = '';
@@ -415,9 +523,9 @@ function resetLocalForm(): void {
   selectedCanvasWorkId.value = '';
   selectedRetouchShowcaseId.value = '';
   sourceError.value = '';
+  resetRetouchHistory();
 
   if (sourceImage.value) {
-    URL.revokeObjectURL(sourceImage.value.url);
     sourceImage.value = null;
   }
 }
@@ -472,16 +580,18 @@ async function consumeRouteContext(): Promise<void> {
 
     const blob = await fetchFileBlob(work.resultFileId);
 
-    if (sourceImage.value) {
-      URL.revokeObjectURL(sourceImage.value.url);
-    }
-
+    commitRetouchHistory();
+    sourceImage.value = null;
     sourceImage.value = {
       assetId: work.resultFileId,
       id: work.resultFileId,
       name: work.resultFileName || `draw-${work.id}.png`,
       url: URL.createObjectURL(blob),
     };
+    retainedSourceUrls.add(sourceImage.value.url);
+    selectedCanvasWorkId.value = '';
+    selectedRetouchShowcaseId.value = '';
+    releaseUnusedSourceUrls();
   } catch (error) {
     sourceError.value = error instanceof Error ? error.message : '原作品载入失败，请重新上传图片';
   } finally {
@@ -490,12 +600,30 @@ async function consumeRouteContext(): Promise<void> {
 }
 
 function changeCanvasZoom(delta: number): void {
-  canvasZoom.value = Math.min(200, Math.max(25, canvasZoom.value + delta));
+  const nextZoom = Math.min(200, Math.max(25, canvasZoom.value + delta));
+
+  if (nextZoom === canvasZoom.value) {
+    return;
+  }
+
+  commitRetouchHistory();
+  canvasZoom.value = nextZoom;
 }
 
 function selectCanvasWork(workId: string): void {
+  if (
+    selectedCanvasWorkId.value === workId &&
+    !sourceImage.value &&
+    !selectedRetouchShowcaseId.value
+  ) {
+    return;
+  }
+
+  commitRetouchHistory();
+  sourceImage.value = null;
   selectedRetouchShowcaseId.value = '';
   selectedCanvasWorkId.value = workId;
+  releaseUnusedSourceUrls();
 }
 
 async function reuseGenerationPrompt(value: string): Promise<void> {
@@ -530,17 +658,18 @@ async function handleSourceUpload(event: Event): Promise<void> {
   try {
     const asset: FileAsset = await workspace.uploadReference(file);
 
-    if (sourceImage.value) {
-      URL.revokeObjectURL(sourceImage.value.url);
-    }
-
+    commitRetouchHistory();
+    sourceImage.value = null;
     selectedRetouchShowcaseId.value = '';
+    selectedCanvasWorkId.value = '';
     sourceImage.value = {
       assetId: asset.id,
       id: asset.id,
       name: asset.originalName,
       url: URL.createObjectURL(file),
     };
+    retainedSourceUrls.add(sourceImage.value.url);
+    releaseUnusedSourceUrls();
   } catch (error) {
     sourceError.value = error instanceof Error ? error.message : '图片上传失败，请重试';
   } finally {
@@ -554,10 +683,11 @@ function removeSource(): void {
     return;
   }
 
-  URL.revokeObjectURL(sourceImage.value.url);
+  commitRetouchHistory();
   sourceImage.value = null;
   selectedRetouchShowcaseId.value = '';
   sourceError.value = '';
+  releaseUnusedSourceUrls();
 }
 
 function showRetouchShowcase(showcase?: RetouchShowcase): void {
@@ -572,9 +702,21 @@ function showRetouchShowcase(showcase?: RetouchShowcase): void {
     return;
   }
 
+  if (
+    selectedRetouchShowcaseId.value === nextShowcase.id &&
+    !sourceImage.value &&
+    !selectedCanvasWorkId.value
+  ) {
+    return;
+  }
+
+  commitRetouchHistory();
+  sourceImage.value = null;
+  selectedCanvasWorkId.value = '';
   selectedRetouchShowcaseId.value = nextShowcase.id;
   selectedOperation.value = nextShowcase.operation;
   sourceError.value = '';
+  releaseUnusedSourceUrls();
 }
 
 async function submitTask(): Promise<void> {
@@ -682,9 +824,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  if (sourceImage.value) {
-    URL.revokeObjectURL(sourceImage.value.url);
-  }
+  resetRetouchHistory();
 });
 </script>
 
@@ -1442,11 +1582,11 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <div class="retouch-toolbar__history">
-          <button type="button" disabled aria-label="撤销">
+          <button type="button" :disabled="!canUndoRetouch" aria-label="撤销" @click="undoRetouch">
             <UndoOutlined />
             <span>撤销</span>
           </button>
-          <button type="button" disabled aria-label="恢复">
+          <button type="button" :disabled="!canRedoRetouch" aria-label="恢复" @click="redoRetouch">
             <RedoOutlined />
             <span>恢复</span>
           </button>
@@ -3827,6 +3967,17 @@ onBeforeUnmount(() => {
   height: 54px;
   flex-direction: column;
   border-radius: 8px;
+}
+
+.retouch-toolbar__history button:not(:disabled) {
+  border-color: #4c456a;
+  background: #191a2b;
+  color: #cfc7eb;
+}
+
+.retouch-toolbar__history button:not(:disabled):hover {
+  border-color: #7b65bd;
+  color: #f1ecff;
 }
 
 .retouch-toolbar__history span {
