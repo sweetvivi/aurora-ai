@@ -371,6 +371,9 @@ const activeEffectCategory = ref('全部');
 const activeGalleryFilter = ref('全部');
 const selectedEffectId = ref('');
 const selectedWorkDetailId = ref('');
+const detailPrompt = ref('');
+const detailSubmitting = ref(false);
+const workEditDrafts = ref<Record<string, string>>({});
 const referenceImages = ref<ReferenceImage[]>([]);
 const referenceError = ref('');
 const referenceInput = ref<HTMLInputElement | null>(null);
@@ -425,6 +428,14 @@ const activeWorkDetail = computed(
     workspace.works.find(
       (work) => work.id === selectedWorkDetailId.value && work.status === 'done',
     ) ?? null,
+);
+
+watch(
+  activeWorkDetail,
+  (work) => {
+    detailPrompt.value = work?.prompt ?? '';
+  },
+  { immediate: true },
 );
 
 function inferGalleryCategory(prompt: string, modelLabel: string): string {
@@ -729,6 +740,26 @@ function formatWorkTime(timestamp: number): string {
   }).format(timestamp);
 }
 
+function formatWorkId(workId: string): string {
+  return (
+    workId
+      .replace(/[^a-z0-9]/gi, '')
+      .slice(-10)
+      .toUpperCase() || workId
+  );
+}
+
+function getWorkEditDraft(workId: string, prompt: string): string {
+  return workEditDrafts.value[workId] ?? prompt;
+}
+
+function setWorkEditDraft(workId: string, value: string): void {
+  workEditDrafts.value = {
+    ...workEditDrafts.value,
+    [workId]: value,
+  };
+}
+
 function downloadWork(workId: string): void {
   void workspace.downloadWork(workId);
 }
@@ -767,6 +798,42 @@ function reuseWorkPrompt(workId: string): void {
 function regenerateWork(workId: string): void {
   void workspace.retryWork(workId);
   closeWorkDetail();
+}
+
+async function submitWorkModification(workId: string, rawPrompt?: string): Promise<void> {
+  const work = workspace.works.find((item) => item.id === workId);
+  const nextPrompt = (rawPrompt ?? getWorkEditDraft(workId, work?.prompt ?? '')).trim();
+
+  if (!work || !nextPrompt || detailSubmitting.value) {
+    return;
+  }
+
+  detailSubmitting.value = true;
+
+  try {
+    const createdWorks = await workspace.createGenerationWorks({
+      amount: 1,
+      extraParameters: work.parameters,
+      model: work.model,
+      modelLabel: work.modelLabel,
+      prompt: nextPrompt,
+      ratio: work.ratio,
+      size: work.size,
+      sourceFileId: work.resultFileId || work.sourceFileId || undefined,
+      toolKey: work.tool,
+    });
+
+    if (createdWorks.length === 0) {
+      return;
+    }
+
+    delete workEditDrafts.value[work.id];
+    detailPrompt.value = nextPrompt;
+    activeResultTab.value = 'mine';
+    closeWorkDetail();
+  } finally {
+    detailSubmitting.value = false;
+  }
 }
 
 function editWork(operation: string, workId: string): void {
@@ -1248,19 +1315,57 @@ onBeforeUnmount(() => {
               <button type="button" @click="workspace.clearError">关闭</button>
             </div>
 
-            <div v-if="visibleWorks.length > 0" class="draw-generator__work-grid">
+            <div
+              v-if="visibleWorks.length > 0"
+              class="draw-generator__work-grid"
+              :class="{ 'draw-generator__work-grid--mine': activeResultTab === 'mine' }"
+            >
               <article
                 v-for="work in visibleWorks"
                 :key="work.id"
                 class="draw-work-card"
-                :class="`draw-work-card--${work.status}`"
+                :class="[
+                  `draw-work-card--${work.status}`,
+                  { 'draw-work-card--mine': activeResultTab === 'mine' },
+                ]"
               >
                 <header>
                   <span>{{ work.modelLabel }}</span>
                   <small>{{ formatWorkTime(work.createdAt) }}</small>
+                  <small class="draw-work-card__id">ID: {{ formatWorkId(work.id) }}</small>
                   <em :class="work.status">
                     {{ workStatusLabel(work.status) }}
                   </em>
+                  <div v-if="work.status === 'done'" class="draw-work-card__header-actions">
+                    <button
+                      type="button"
+                      aria-label="下载作品"
+                      title="下载作品"
+                      @click="downloadWork(work.id)"
+                    >
+                      <DownloadOutlined />
+                      <span>下载</span>
+                    </button>
+                    <button
+                      type="button"
+                      :class="{ active: work.favorite }"
+                      :aria-label="work.favorite ? '取消收藏' : '收藏作品'"
+                      :title="work.favorite ? '取消收藏' : '收藏作品'"
+                      @click="workspace.toggleFavorite(work.id)"
+                    >
+                      <StarOutlined />
+                      <span>{{ work.favorite ? '已收藏' : '收藏' }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="draw-work-card__delete"
+                      aria-label="删除作品"
+                      title="删除作品"
+                      @click="workspace.removeWork(work.id)"
+                    >
+                      <DeleteOutlined />
+                    </button>
+                  </div>
                 </header>
 
                 <div
@@ -1298,7 +1403,69 @@ onBeforeUnmount(() => {
                   <span>{{ work.model }}</span>
                 </div>
 
-                <footer v-if="work.status === 'done'">
+                <form
+                  v-if="activeResultTab === 'mine' && work.status === 'done'"
+                  class="draw-work-card__edit"
+                  @submit.prevent="submitWorkModification(work.id)"
+                >
+                  <span>提示词</span>
+                  <input
+                    :aria-label="`修改${work.modelLabel}作品的提示词`"
+                    :value="getWorkEditDraft(work.id, work.prompt)"
+                    placeholder="请输入修改上方图片的描述"
+                    @input="setWorkEditDraft(work.id, ($event.target as HTMLInputElement).value)"
+                  />
+                  <button
+                    type="submit"
+                    :disabled="
+                      detailSubmitting ||
+                      !getWorkEditDraft(work.id, work.prompt).trim() ||
+                      getWorkEditDraft(work.id, work.prompt).trim() === work.prompt
+                    "
+                  >
+                    {{ detailSubmitting ? '提交中' : '提交修改' }}
+                  </button>
+                </form>
+
+                <footer
+                  v-if="activeResultTab === 'mine' && work.status === 'done'"
+                  class="draw-work-card__edit-actions"
+                >
+                  <button type="button" @click="openWorkDetail(work.id)">
+                    <EditOutlined />
+                    编辑
+                  </button>
+                  <button type="button" @click="regenerateWork(work.id)">
+                    <ReloadOutlined />
+                    重新生成
+                  </button>
+                  <button type="button" @click="animateWork(work.id)">
+                    <VideoCameraOutlined />
+                    视频
+                  </button>
+                  <button type="button" @click="editWork('cutout', work.id)">
+                    <ScissorOutlined />
+                    抠图
+                  </button>
+                  <button type="button" @click="editWork('upscale', work.id)">
+                    <ExpandOutlined />
+                    裁剪
+                  </button>
+                  <button type="button" @click="editWork('upscale', work.id)">
+                    <ExpandOutlined />
+                    扩图
+                  </button>
+                  <button type="button" @click="editWork('enhance', work.id)">
+                    <HighlightOutlined />
+                    重绘
+                  </button>
+                  <button type="button" @click="editWork('erase', work.id)">
+                    <CloseOutlined />
+                    消除
+                  </button>
+                </footer>
+
+                <footer v-else-if="work.status === 'done'">
                   <button type="button" @click="usePromptInComposer(work.prompt)">
                     <ThunderboltFilled />
                     使用提示词
@@ -1625,6 +1792,28 @@ onBeforeUnmount(() => {
                 <span>{{ formatWorkTime(activeWorkDetail.createdAt) }}</span>
               </div>
               <p>{{ activeWorkDetail.prompt }}</p>
+
+              <form
+                class="draw-work-detail__edit-prompt"
+                @submit.prevent="submitWorkModification(activeWorkDetail.id, detailPrompt)"
+              >
+                <span>提示词</span>
+                <input
+                  v-model="detailPrompt"
+                  aria-label="修改作品提示词"
+                  placeholder="请输入修改上方图片的描述"
+                />
+                <button
+                  type="submit"
+                  :disabled="
+                    detailSubmitting ||
+                    !detailPrompt.trim() ||
+                    detailPrompt.trim() === activeWorkDetail.prompt
+                  "
+                >
+                  {{ detailSubmitting ? '提交中' : '提交修改' }}
+                </button>
+              </form>
 
               <div class="draw-work-detail__primary">
                 <button type="button" @click="downloadWork(activeWorkDetail.id)">
@@ -2954,6 +3143,10 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
 }
 
+.draw-generator__work-grid--mine {
+  grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));
+}
+
 .draw-work-card {
   display: grid;
   min-width: 0;
@@ -2969,7 +3162,7 @@ onBeforeUnmount(() => {
   min-height: 37px;
   align-items: center;
   gap: 7px;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, auto) auto auto minmax(0, 1fr) auto;
   padding: 0 10px;
   border-bottom: 1px solid #eef0f3;
 }
@@ -2989,7 +3182,14 @@ onBeforeUnmount(() => {
   font-size: 7px;
 }
 
+.draw-work-card > header .draw-work-card__id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .draw-work-card > header em {
+  justify-self: start;
   padding: 2px 5px;
   border-radius: 999px;
   background: #edf3ff;
@@ -3012,6 +3212,96 @@ onBeforeUnmount(() => {
 .draw-work-card > header em.failed {
   background: #fff0ee;
   color: #bd4c42;
+}
+
+.draw-work-card__header-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.draw-work-card__header-actions button {
+  display: inline-flex;
+  min-width: 30px;
+  height: 27px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: 1px solid #e0e4e9;
+  border-radius: 6px;
+  background: #fff;
+  color: #5f6977;
+  font-size: 7px;
+  cursor: pointer;
+}
+
+.draw-work-card__header-actions button:hover {
+  border-color: #bdd4e9;
+  color: #2f72df;
+}
+
+.draw-work-card__header-actions button.active {
+  border-color: #efd49a;
+  background: #fffaf0;
+  color: #bd7b13;
+}
+
+.draw-work-card__header-actions button.draw-work-card__delete {
+  padding: 0;
+  color: #9a6260;
+}
+
+.draw-work-card--mine {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgb(31 43 61 / 7%);
+}
+
+.draw-work-card--mine > header {
+  min-height: 48px;
+  order: 1;
+  grid-template-columns: minmax(0, auto) auto auto auto auto;
+  padding: 0 14px;
+}
+
+.draw-work-card--mine > header > span {
+  font-size: 9px;
+}
+
+.draw-work-card--mine > header .draw-work-card__header-actions {
+  justify-self: end;
+}
+
+.draw-work-card--mine > p {
+  display: block;
+  min-height: 0;
+  order: 2;
+  padding: 15px 16px 11px;
+  color: #3f4854;
+  font-size: 10px;
+  line-height: 1.6;
+  -webkit-line-clamp: initial;
+}
+
+.draw-work-card--mine .draw-work-card__visual {
+  order: 3;
+  margin: 0 16px;
+  border-radius: 8px;
+  aspect-ratio: 3 / 2;
+  background: #f5f6f8;
+}
+
+.draw-work-card--mine .draw-work-card__visual > img {
+  object-fit: contain;
+}
+
+.draw-work-card--mine .draw-work-card__meta {
+  order: 4;
+  padding: 10px 16px;
 }
 
 .draw-work-card__visual {
@@ -3148,12 +3438,87 @@ onBeforeUnmount(() => {
   font-size: 7px;
 }
 
+.draw-work-card__edit {
+  display: grid;
+  order: 5;
+  align-items: center;
+  gap: 7px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin: 0 16px 12px;
+}
+
+.draw-work-card__edit > span,
+.draw-work-detail__edit-prompt > span {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 11px;
+  border: 1px solid #dfe4ea;
+  border-radius: 7px;
+  background: #fff;
+  color: #657080;
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.draw-work-card__edit input,
+.draw-work-detail__edit-prompt input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid #dfe4ea;
+  border-radius: 7px;
+  outline: 0;
+  background: #fff;
+  color: #3f4854;
+  font-size: 9px;
+}
+
+.draw-work-card__edit input:focus,
+.draw-work-detail__edit-prompt input:focus {
+  border-color: #9f8bea;
+  box-shadow: 0 0 0 3px rgb(115 82 232 / 8%);
+}
+
+.draw-work-card__edit button,
+.draw-work-detail__edit-prompt button {
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: #6544d7;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.draw-work-card__edit button:disabled,
+.draw-work-detail__edit-prompt button:disabled {
+  background: #d8dce3;
+  cursor: not-allowed;
+}
+
 .draw-work-card > footer {
   display: grid;
   gap: 5px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   padding: 8px;
   border-top: 1px solid #eef0f3;
+}
+
+.draw-work-card > footer.draw-work-card__edit-actions {
+  order: 6;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 10px 12px 12px;
+}
+
+.draw-work-card > footer.draw-work-card__edit-actions button {
+  height: 32px;
+  font-size: 8px;
 }
 
 .draw-work-card--failed > footer {
@@ -3311,6 +3676,14 @@ onBeforeUnmount(() => {
   color: #3f4854;
   font-size: 10px;
   line-height: 1.75;
+}
+
+.draw-work-detail__edit-prompt {
+  display: grid;
+  align-items: center;
+  gap: 7px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin: -6px 0 18px;
 }
 
 .draw-work-detail__primary {
@@ -4075,6 +4448,46 @@ onBeforeUnmount(() => {
 @media (max-width: 760px) {
   .draw-generator__model-grid,
   .draw-generator__work-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .draw-generator__work-grid--mine {
+    grid-template-columns: 1fr;
+  }
+
+  .draw-work-card--mine > header {
+    gap: 7px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .draw-work-card--mine > header .draw-work-card__id,
+  .draw-work-card--mine > header em {
+    display: none;
+  }
+
+  .draw-work-card--mine > header .draw-work-card__header-actions {
+    width: 100%;
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  .draw-work-card__header-actions button {
+    flex: 1;
+  }
+
+  .draw-work-card__header-actions button.draw-work-card__delete {
+    flex: 0 0 38px;
+  }
+
+  .draw-work-card__edit {
+    grid-template-columns: 1fr;
+  }
+
+  .draw-work-card__edit > span {
+    display: none;
+  }
+
+  .draw-work-card > footer.draw-work-card__edit-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
