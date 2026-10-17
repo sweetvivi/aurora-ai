@@ -58,6 +58,7 @@
 - 2026-10-17：生图前端统一使用后端别名 `volc-seedream-5`，单张任务成本 5 积分；本地 M1 仍使用确定性 Mock provider，不读取真实生图 Key。
 - 2026-10-17：绘图验收脚本改为直接进入生成页，避免经首页提交造成重复任务；桌面两张参考图批量生成和 390px 移动端单张生成均通过，下载文件名、PNG 渲染、余额结算和无横向溢出均符合预期。
 - 2026-10-17：M1-7 完整验证通过，API 29/29、Web 16/16；`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过；当前等待用户确认普通推送。
+- 2026-10-17：核对 GitHub Actions 失败邮件后确认两项环境问题：根级 `storage/` 忽略规则误伤后端存储源码，且 CI 在 Typecheck 前未生成 Prisma Client；现已修正忽略边界、补交源码并增加 CI 生成步骤。
 
 ## 中断后恢复步骤
 

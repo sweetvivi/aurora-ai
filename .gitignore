@@ -28,7 +28,7 @@ logs/
 *.sqlite
 *.sqlite3
 data/
-storage/
+/storage/
 uploads/
 
 # Browser and automation
