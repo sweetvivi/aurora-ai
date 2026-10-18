@@ -1856,7 +1856,7 @@ function formatConversationTime(value: string | null): string {
 
 .chat-messages {
   display: grid;
-  max-width: 940px;
+  max-width: 820px;
   gap: 28px;
   margin: 0 auto;
 }

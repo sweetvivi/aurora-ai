@@ -670,8 +670,8 @@ watch(
   min-width: 0;
   align-items: center;
   gap: 9px;
-  grid-template-columns: 34px minmax(0, 1fr);
-  padding: 9px 10px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  padding: 10px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
@@ -689,10 +689,10 @@ watch(
 
 .agent-detail__session-avatar {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   place-items: center;
-  border-radius: 9px;
+  border-radius: 10px;
   color: #fff;
   font-size: 11px;
   font-weight: 800;
@@ -850,7 +850,7 @@ watch(
 
 .agent-detail__welcome {
   display: grid;
-  max-width: 920px;
+  max-width: 820px;
   width: 100%;
   margin: 6vh auto 0;
   padding-bottom: 27px;
@@ -872,7 +872,7 @@ watch(
 
 .agent-detail__messages {
   display: grid;
-  max-width: 920px;
+  max-width: 820px;
   gap: 24px;
   margin: 0 auto;
 }

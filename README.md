@@ -45,7 +45,7 @@
 当前批次验证结果：
 
 - `pnpm format:check`、`pnpm lint`、`pnpm typecheck` 通过
-- `pnpm test`：API 26 个文件 110 项，Web 19 个文件 84 项
+- `pnpm test`：API 26 个文件 110 项，Web 19 个文件 85 项
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-canvas-studio.mjs`、`verify-video-tasks.mjs`、`verify-m2-interactions.mjs`、`verify-m2-routes.mjs` 和 `verify-admin-modules.mjs` 全部通过
 - `node outputs/ui-reference/verify-admin-modules.mjs` 通过，模块改名、导航说明、角标、排序和显隐会同步刷新共享目录；桌面端和移动端无横向溢出、无页面脚本错误
