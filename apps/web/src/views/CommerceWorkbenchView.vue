@@ -1137,32 +1137,32 @@ const commercePreviewExamples: Record<string, PreviewExample> = {
 
 const uploadMeta: Record<UploadRole, UploadMeta> = {
   product: {
-    description: '点击或拖拽上传，支持 JPG、PNG、WebP，不超过 10MB',
+    description: '点击或拖拽上传，支持 JPG、JPEG、PNG、WebP，≤ 10MB',
     icon: ShoppingCartOutlined,
     label: '上传商品图片',
   },
   background: {
-    description: '上传希望替换到的目标背景图',
+    description: '点击或拖拽上传，支持 JPG、JPEG、PNG、WebP，≤ 10MB',
     icon: BgColorsOutlined,
     label: '上传目标背景图',
   },
   clothing: {
-    description: '上传需要替换图案的基础服饰图片',
+    description: '点击或拖拽上传，支持 JPG、JPEG、PNG、WebP，≤ 10MB',
     icon: PictureOutlined,
     label: '上传基础服饰图片',
   },
   pattern: {
-    description: '上传花型、纹理或设计图案素材',
+    description: '点击或拖拽上传，支持 JPG、JPEG、PNG、WebP，≤ 10MB',
     icon: FileImageOutlined,
     label: '上传图案素材',
   },
   replacement: {
-    description: '上传需要替换成的包装、部件或材质参考图',
+    description: '点击或拖拽上传，支持 JPG、JPEG、PNG、WebP，≤ 10MB',
     icon: FileImageOutlined,
     label: '上传替换参考素材',
   },
   model: {
-    description: '可选上传人物或模特参考图',
+    description: '点击或拖拽上传，支持 JPG、JPEG、PNG、WebP，≤ 10MB',
     icon: UserOutlined,
     label: '上传模特参考图',
   },
@@ -1491,95 +1491,19 @@ const canSubmit = computed(
 );
 const visibleWorks = computed(() => workspace.works.filter((work) => work.tool === 'commerce'));
 const toolSteps = computed(() => {
-  if (isBackgroundTool.value) {
-    return [
-      '上传包含原商品的图片',
-      '上传希望替换到的目标背景图',
-      '选择商品类目和融合模式',
-      '点击开始处理，等待 AI 完成融合',
-    ];
-  }
-
-  if (isPatternTool.value) {
-    return [
-      '上传需要替换图案的基础服饰图',
-      '上传新的图案或纹理素材',
-      '选择服饰类目和图案融合度',
-      '点击开始处理，等待 AI 完成替换',
-    ];
-  }
-
-  if (isReplaceTool.value) {
-    return [
-      '上传包含完整结构的商品原图',
-      `上传${activeReplacementProfile.value.previewLabel}`,
-      '选择替换类型、替换范围和输出分辨率',
-      '点击开始处理，等待 AI 完成结构匹配',
-    ];
-  }
-
-  if (isRetouchTool.value) {
-    return [
-      '上传需要处理的商品图片',
-      '选择抠图、精修、放大或补光方式',
-      '选择输出分辨率并补充额外要求',
-      '点击开始处理，等待 AI 返回结果',
-    ];
-  }
-
-  if (isTryOnTool.value) {
-    return [
-      '上传需要试穿的服饰或商品素材',
-      '上传模特姿态参考图',
-      '选择展示姿态、场景和输出分辨率',
-      '点击开始处理，生成自然试穿效果',
-    ];
-  }
-
-  return ['先选择左侧可用工具', '按面板提示上传素材', '调整参数后开始处理'];
+  return [
+    '上传包含原商品的图片',
+    '上传要替换的新商品图片',
+    '选择替换模式和融合强度',
+    '点击开始处理，等待 AI 完成替换',
+  ];
 });
 const toolTips = computed(() => {
-  if (isBackgroundTool.value) {
-    return [
-      '确保原图和目标背景的商品方向一致',
-      '高分辨率商品图会保留更多材质细节',
-      '目标背景的光照方向与商品越接近越自然',
-    ];
-  }
-
-  if (isPatternTool.value) {
-    return [
-      '图案分辨率越高，面料纹理越清晰',
-      '服饰主体不要被大面积遮挡',
-      '复杂褶皱会由 AI 自动匹配图案透视',
-    ];
-  }
-
-  if (isReplaceTool.value) {
-    return [
-      '原图主体完整、边缘清晰时结构识别更准确',
-      `${activeReplacementProfile.value.previewLabel}与目标区域方向一致会更自然`,
-      '复杂材质和透明区域建议补充额外要求',
-    ];
-  }
-
-  if (isRetouchTool.value) {
-    return [
-      '商品主体越完整，边缘处理越准确',
-      '高分辨率原图能保留更多材质细节',
-      '复杂透明材质建议补充额外要求',
-    ];
-  }
-
-  if (isTryOnTool.value) {
-    return [
-      '服饰图尽量使用正面平铺或无遮挡商品图',
-      '模特参考图与目标姿态越接近，结果越自然',
-      '场景选择会影响光影和整体商品氛围',
-    ];
-  }
-
-  return ['尚未开放的工具会保留和参考产品一致的入口位置'];
+  return [
+    '确保原图和替换商品的角度相似',
+    '建议使用分辨率高的图片获得更好效果',
+    '光线条件相近的图片替换效果更佳',
+  ];
 });
 
 function clearParameters(): void {

@@ -373,3 +373,12 @@
 - 浏览器验收：`node outputs/ui-reference/verify-commerce-studio.mjs` 桌面端 `1440x1000` 与移动端 `390x844` 全部通过，空态、目录展开、搜索、上传、替换/材质/部件任务体、历史记录、帮助抽屉和建议箱断言保持一致，无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或调用任何真实 Key，未消耗参考产品积分
+
+## 31. 2026-10-19 电商工具说明栏与上传文案对齐
+
+- 对照 `C:\Users\Administrator\Desktop\参考网站截图合集\参考网站电商工具点击左边工具中服饰图案替换设计师的界面.png` 与 `参考网站电商工具点击左边工具中智能背景融合的界面.png`，参考产品在两个工具页面右侧显示的是同一套通用说明，而不是按工具拆分的专属步骤
+- `CommerceWorkbenchView.vue` 的 `toolSteps`、`toolTips` 统一为参考产品文案：四步流程为“上传包含原商品的图片 / 上传要替换的新商品图片 / 选择替换模式和融合强度 / 点击开始处理，等待 AI 完成替换”，三条技巧为“确保原图和替换商品的角度相似 / 建议使用分辨率高的图片获得更好效果 / 光线条件相近的图片替换效果更佳”
+- 各上传位统一使用“点击或拖拽上传，支持 JPG、JPEG、PNG、WebP，≤ 10MB”辅助说明，保留现有上传、拖拽、预览、移除和文件校验逻辑不变
+- 浏览器验收复跑：`node outputs/ui-reference/verify-commerce-studio.mjs` 与 `node outputs/ui-reference/measure-commerce.mjs` 均通过；桌面端 `1440x1000` 与移动端 `390x844` 无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或调用任何真实 Key，未消耗参考产品积分
