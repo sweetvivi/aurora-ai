@@ -801,16 +801,16 @@ onBeforeUnmount(() => {
 
     <div class="video-workbench">
       <aside class="video-model-rail" aria-label="视频模型">
-        <span class="video-model-rail__label">模型</span>
         <button
           v-for="model in models"
           :key="model.value"
           type="button"
           :class="{ active: selectedModel === model.value }"
+          :style="{ '--model-accent': model.accent }"
           :title="model.label"
           @click="selectVideoModel(model.value)"
         >
-          <i :style="{ '--model-accent': model.accent }">{{ model.short }}</i>
+          <i>{{ model.short }}</i>
           <span>{{ model.label }}</span>
           <small v-if="model.badge">{{ model.badge }}</small>
         </button>
@@ -1419,7 +1419,7 @@ onBeforeUnmount(() => {
   display: grid;
   height: calc(100dvh - 60px);
   min-height: 0;
-  grid-template-columns: 80px 400px minmax(0, 1fr);
+  grid-template-columns: 88px 384px minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -1427,8 +1427,8 @@ onBeforeUnmount(() => {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 5px;
-  padding: 18px 9px;
+  gap: 3px;
+  padding: 16px 7px;
   overflow-y: auto;
   border-right: 1px solid #1d1e23;
   background: #0b0b0e;
@@ -1439,21 +1439,13 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-.video-model-rail__label {
-  padding: 0 6px 9px;
-  color: #64646d;
-  font-size: 10px;
-  font-weight: 760;
-  letter-spacing: 0.08em;
-}
-
 .video-model-rail button {
   position: relative;
   display: grid;
   min-width: 0;
   justify-items: center;
-  gap: 5px;
-  padding: 8px 2px;
+  gap: 4px;
+  padding: 7px 3px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -1464,40 +1456,52 @@ onBeforeUnmount(() => {
 .video-model-rail button:hover,
 .video-model-rail button.active {
   background: #17171c;
+}
+
+.video-model-rail button:hover {
   color: #e7e7eb;
 }
 
 .video-model-rail button i {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   place-items: center;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--model-accent) 18%, #15151a);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--model-accent) 15%, #101014);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--model-accent) 20%, transparent);
   color: var(--model-accent);
-  font-size: 12px;
+  font-size: 13px;
   font-style: normal;
   font-weight: 850;
 }
 
 .video-model-rail button span {
+  display: -webkit-box;
   width: 100%;
   overflow: hidden;
-  font-size: 8px;
+  color: #93939e;
+  font-size: 10px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.video-model-rail button.active span {
+  color: #d9ddf5;
 }
 
 .video-model-rail button small {
   position: absolute;
-  top: 3px;
-  right: 2px;
+  top: 2px;
+  right: 1px;
   padding: 1px 3px;
   border-radius: 3px;
   background: #7a66f4;
   color: #fff;
-  font-size: 5px;
+  font-size: 6px;
   line-height: 1.3;
 }
 
@@ -2687,7 +2691,6 @@ onBeforeUnmount(() => {
     display: none;
   }
 
-  .video-model-rail__label,
   .video-model-rail__footer {
     display: none;
   }

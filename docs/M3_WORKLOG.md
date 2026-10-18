@@ -527,3 +527,14 @@
 - 移动端断点将分类栏恢复为无额外缩进的横向滚动，不改变原有单列卡片和底部创作区
 - `capture-targets.mjs` 与 `verify-image-workbench-detail.mjs` 桌面端、移动端均通过，无横向溢出、无页面脚本错误
 - 本轮只读取本地代码与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
+
+## 46. 2026-10-19 视频工作台左侧模型栏对齐参考产品
+
+- 参考产品视频页的登录弹窗遮住了参数区大半，因此先把可读的左栏放大核对：`reference-public-video.png` 与 `reference-video-layout-1800.png` 裁切后确认参考产品模型栏没有「模型」分组标题，激活项只是浅色圆角卡片，图标约 `28px` 且底很淡，模型名以约 `10px` 完整换行显示、最多两行
+- `VideoStudioView.vue` 删除 `.video-model-rail__label` 节点和对应样式，并把移动端断点里对它的隐藏声明一并去掉；`--model-accent` 由内联在 `<i>` 上改为挂在按钮上，标签与图标共用同一强调色
+- 图标从 `36px` 方形色块收敛到 `28px` 圆角块，改用 `color-mix` 淡底加内侧描边；标签从 `8px` 单行省略号改为 `10px` 两行换行（`-webkit-line-clamp: 2`）
+- 激活项标签改为亮色强调、去掉加粗：加粗会让 `Grok Imagine Video` 在 70px 宽度里折成三行并被裁成省略号，去掉后四个模型名都能完整显示
+- 工作台网格由 `80px + 400px` 调整为 `88px + 384px`，参数栏右边界从约 `x=480` 回到参考产品的约 `x=470`；`≤1180px` 断点仍按比例收缩为 `72px + 360px`
+- 回归验收通过：`verify-video-studio.mjs`、`verify-video-preview.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`
+- 本轮只读取本地代码与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
