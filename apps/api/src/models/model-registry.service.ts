@@ -159,6 +159,7 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
       video: {
         maxDuration: 12,
         resolutions: ['480P', '720P', '1080P'],
+        supportsAudio: true,
         supportsLastFrame: true,
       },
     },
@@ -300,6 +301,7 @@ function resolveVideoCapabilityProfile(identity: string): VideoCapabilityProfile
   return {
     maxDuration: 12,
     resolutions: ['480P', '720P', '1080P'],
+    supportsAudio: true,
     supportsLastFrame: true,
   };
 }

@@ -14,7 +14,7 @@ vi.mock('@/app/api', async () => {
   };
 });
 
-import { useModelCatalogStore } from './model-catalog';
+import { normalizeModels, useModelCatalogStore } from './model-catalog';
 
 describe('model catalog store', () => {
   beforeEach(() => {
@@ -85,6 +85,97 @@ describe('model catalog store', () => {
       },
     });
     expect(store.modelsFor('chat')).toHaveLength(0);
+  });
+
+  it('preserves explicit unsupported capability flags across partial records', () => {
+    const state = useModelCatalogStore();
+    state.items = normalizeModels([
+      {
+        alias: 'video-partial',
+        capabilities: ['video', 'image'],
+        displayName: 'Partial Video',
+        profile: {
+          image: {
+            maxReferenceImages: 10,
+            sizePresets: ['1K', '2K'],
+            supportsLayerDecomposition: false,
+            supportsSequentialGeneration: true,
+          },
+          video: {
+            maxDuration: 12,
+            resolutions: ['720P'],
+            supportsAudio: false,
+            supportsLastFrame: false,
+            supportsVideoInput: false,
+          },
+        },
+      },
+      {
+        alias: 'video-partial',
+        capabilities: ['video', 'image'],
+        displayName: 'Partial Video Updated',
+        profile: {
+          image: {
+            maxReferenceImages: 14,
+            sizePresets: ['4K'],
+          },
+          video: {
+            maxDuration: 15,
+            resolutions: ['1080P'],
+          },
+        },
+      },
+    ]);
+
+    expect(state.modelsFor('video')[0]?.profile).toMatchObject({
+      image: {
+        maxReferenceImages: 14,
+        sizePresets: ['1K', '2K', '4K'],
+        supportsLayerDecomposition: false,
+        supportsSequentialGeneration: true,
+      },
+      video: {
+        maxDuration: 15,
+        resolutions: ['720P', '1080P'],
+        supportsAudio: false,
+        supportsLastFrame: false,
+        supportsVideoInput: false,
+      },
+    });
+  });
+
+  it('keeps capability flags unknown when neither record declares them', () => {
+    const state = useModelCatalogStore();
+    state.items = normalizeModels([
+      {
+        alias: 'video-unknown',
+        capabilities: ['video'],
+        displayName: 'Unknown Video',
+        profile: {
+          video: {
+            maxDuration: 10,
+            resolutions: ['720P'],
+          },
+        },
+      },
+      {
+        alias: 'video-unknown',
+        capabilities: ['video'],
+        displayName: 'Unknown Video Updated',
+        profile: {
+          video: {
+            maxDuration: 12,
+            resolutions: ['1080P'],
+          },
+        },
+      },
+    ]);
+
+    expect(state.modelsFor('video')[0]?.profile?.video).toMatchObject({
+      supportsAudio: undefined,
+      supportsLastFrame: undefined,
+      supportsVideoInput: undefined,
+    });
   });
 
   it('uses fallback models when the API is unavailable', async () => {

@@ -115,6 +115,7 @@ const fallbackModels: ModelCatalogItem[] = [
       video: {
         maxDuration: 12,
         resolutions: ['480P', '720P', '1080P'],
+        supportsAudio: true,
         supportsLastFrame: true,
       },
     },
@@ -287,12 +288,14 @@ function mergeModelProfiles(
                 ...(incoming.image?.sizePresets ?? []),
               ]),
             ),
-            supportsLayerDecomposition:
-              current.image?.supportsLayerDecomposition ||
+            supportsLayerDecomposition: mergeCapabilityFlag(
+              current.image?.supportsLayerDecomposition,
               incoming.image?.supportsLayerDecomposition,
-            supportsSequentialGeneration:
-              current.image?.supportsSequentialGeneration ||
+            ),
+            supportsSequentialGeneration: mergeCapabilityFlag(
+              current.image?.supportsSequentialGeneration,
               incoming.image?.supportsSequentialGeneration,
+            ),
           },
         }
       : {}),
@@ -309,13 +312,35 @@ function mergeModelProfiles(
                 ...(incoming.video?.resolutions ?? []),
               ]),
             ),
-            supportsAudio: current.video?.supportsAudio || incoming.video?.supportsAudio,
-            supportsLastFrame:
-              current.video?.supportsLastFrame || incoming.video?.supportsLastFrame,
-            supportsVideoInput:
-              current.video?.supportsVideoInput || incoming.video?.supportsVideoInput,
+            supportsAudio: mergeCapabilityFlag(
+              current.video?.supportsAudio,
+              incoming.video?.supportsAudio,
+            ),
+            supportsLastFrame: mergeCapabilityFlag(
+              current.video?.supportsLastFrame,
+              incoming.video?.supportsLastFrame,
+            ),
+            supportsVideoInput: mergeCapabilityFlag(
+              current.video?.supportsVideoInput,
+              incoming.video?.supportsVideoInput,
+            ),
           },
         }
       : {}),
   };
+}
+
+function mergeCapabilityFlag(
+  current: boolean | undefined,
+  incoming: boolean | undefined,
+): boolean | undefined {
+  if (current === true || incoming === true) {
+    return true;
+  }
+
+  if (current === false || incoming === false) {
+    return false;
+  }
+
+  return undefined;
 }

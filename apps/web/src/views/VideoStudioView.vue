@@ -58,6 +58,7 @@ interface ShowcaseItem {
 
 interface VideoModeOption {
   available?: boolean;
+  availabilityLabel?: string;
   description: string;
   label: string;
   value: VideoMode;
@@ -67,7 +68,6 @@ const modes: VideoModeOption[] = [
   { description: '用文字描述镜头', label: '文生视频', value: 'text-to-video' },
   { description: '上传图片生成视频', label: '图生视频', value: 'image-to-video' },
   {
-    available: false,
     description: '控制首尾画面',
     label: '首尾帧',
     value: 'first-last-frame',
@@ -164,6 +164,7 @@ const selectedModel = ref(modelCatalog.resolveAlias('video'));
 const selectedRatio = ref('16:9');
 const selectedDuration = ref(5);
 const selectedResolution = ref('1080P');
+const audioEnabled = ref(false);
 const prompt = ref('');
 const sourceFrames = ref<SourceFrame[]>([]);
 const sourceInput = ref<HTMLInputElement | null>(null);
@@ -193,12 +194,44 @@ const activeVideoProfile = computed(
     modelCatalog.modelsFor('video').find((model) => model.alias === selectedModel.value)?.profile
       ?.video,
 );
+const firstLastFrameAvailability = computed(() => {
+  const supportsLastFrame = activeVideoProfile.value?.supportsLastFrame;
+
+  if (supportsLastFrame === true) {
+    return {
+      available: true,
+      availabilityLabel: '控制首尾画面',
+    };
+  }
+
+  if (supportsLastFrame === false) {
+    return {
+      available: false,
+      availabilityLabel: '模型不支持',
+    };
+  }
+
+  return {
+    available: false,
+    availabilityLabel: '能力待确认',
+  };
+});
+const audioAvailability = computed<'supported' | 'unknown' | 'unsupported'>(() => {
+  const supportsAudio = activeVideoProfile.value?.supportsAudio;
+
+  if (supportsAudio === true) {
+    return 'supported';
+  }
+
+  return supportsAudio === false ? 'unsupported' : 'unknown';
+});
 const availableModes = computed<VideoModeOption[]>(() =>
   modes.map((item) =>
     item.value === 'first-last-frame'
       ? {
           ...item,
-          available: activeVideoProfile.value?.supportsLastFrame ?? true,
+          available: firstLastFrameAvailability.value.available,
+          availabilityLabel: firstLastFrameAvailability.value.availabilityLabel,
         }
       : item,
   ),
@@ -387,8 +420,14 @@ async function consumeRouteContext(): Promise<void> {
 }
 
 function changeMode(nextMode: VideoMode): void {
-  if (availableModes.value.find((item) => item.value === nextMode)?.available === false) {
-    showNotice('首尾帧能力待接入，当前支持文生视频和单图参考');
+  const nextModeOption = availableModes.value.find((item) => item.value === nextMode);
+
+  if (nextModeOption?.available === false) {
+    showNotice(
+      nextModeOption.availabilityLabel === '模型不支持'
+        ? '当前模型不支持首尾帧，请切换为文生视频或图生视频'
+        : '当前模型的视频能力待确认',
+    );
     return;
   }
 
@@ -425,8 +464,12 @@ function applyActiveModelConstraints(): void {
       : (resolutions.at(-1) ?? '720P');
   }
 
-  if (mode.value === 'first-last-frame' && activeVideoProfile.value?.supportsLastFrame === false) {
+  if (mode.value === 'first-last-frame' && !firstLastFrameAvailability.value.available) {
     changeMode('image-to-video');
+  }
+
+  if (audioAvailability.value !== 'supported') {
+    audioEnabled.value = false;
   }
 }
 
@@ -447,6 +490,7 @@ async function submitTask(): Promise<void> {
   const sourceIds = sourceFrames.value.map((frame) => frame.id);
   const task = await videoWorkspace.createGeneration({
     duration: selectedDuration.value,
+    generateAudio: audioEnabled.value,
     lastFrameFileId: mode.value === 'first-last-frame' ? sourceIds[1] : undefined,
     mode: mode.value,
     model: selectedModel.value,
@@ -500,6 +544,7 @@ function reuseTask(task: VideoWork): void {
   selectedDuration.value = task.duration;
   selectedResolution.value = task.resolution;
   selectVideoModel(task.modelAlias);
+  audioEnabled.value = task.generateAudio && audioAvailability.value === 'supported';
 
   if (isVideoMode(task.mode)) {
     changeMode(task.mode);
@@ -727,13 +772,15 @@ onBeforeUnmount(() => {
               type="button"
               :class="{ active: mode === item.value }"
               :disabled="item.available === false"
-              :title="item.available === false ? '首尾帧能力待接入' : item.description"
+              :title="item.available === false ? item.availabilityLabel : item.description"
               @click="changeMode(item.value)"
             >
               <PlayCircleOutlined />
               <span>
                 <strong>{{ item.label }}</strong>
-                <small>{{ item.available === false ? '待接入' : item.description }}</small>
+                <small>{{
+                  item.available === false ? item.availabilityLabel : item.description
+                }}</small>
               </span>
               <CheckOutlined v-if="mode === item.value" />
             </button>
@@ -798,13 +845,28 @@ onBeforeUnmount(() => {
         </div>
 
         <section class="video-enhancements" aria-label="创作增强">
-          <div>
+          <button
+            type="button"
+            :class="{ active: audioEnabled }"
+            :disabled="audioAvailability !== 'supported'"
+            :title="
+              audioAvailability === 'supported'
+                ? '根据画面自动匹配声音'
+                : audioAvailability === 'unsupported'
+                  ? '当前模型不支持音频生成'
+                  : '当前模型音频能力待确认'
+            "
+            @click="audioEnabled = !audioEnabled"
+          >
             <span>
               <strong>AI 音效</strong>
               <small>根据画面自动匹配声音</small>
             </span>
-            <em>待接入</em>
-          </div>
+            <em v-if="audioEnabled">已开启</em>
+            <em v-else-if="audioAvailability === 'unsupported'">模型不支持</em>
+            <em v-else-if="audioAvailability === 'unknown'">能力待确认</em>
+            <em v-else>关闭</em>
+          </button>
           <div>
             <span>
               <strong>极速模式</strong>
@@ -1637,18 +1699,39 @@ onBeforeUnmount(() => {
   background: #18181d;
 }
 
-.video-enhancements > div {
+.video-enhancements > div,
+.video-enhancements > button {
   display: flex;
+  width: 100%;
   min-width: 0;
   min-height: 40px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 7px 9px;
+  border: 0;
   background: #111115;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 
-.video-enhancements > div > span {
+.video-enhancements > button:hover:not(:disabled) {
+  background: #16151c;
+}
+
+.video-enhancements > button.active {
+  background: #171522;
+}
+
+.video-enhancements > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.78;
+}
+
+.video-enhancements > div > span,
+.video-enhancements > button > span {
   display: grid;
   min-width: 0;
   gap: 2px;
@@ -1675,6 +1758,11 @@ onBeforeUnmount(() => {
   color: #9c83e5;
   font-size: 6px;
   font-style: normal;
+}
+
+.video-enhancements > button.active em {
+  border-color: #28483c;
+  color: #70c9a0;
 }
 
 .video-enhancements > div:last-child em {

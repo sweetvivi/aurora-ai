@@ -25,6 +25,7 @@ export interface VideoWork {
   duration: number;
   errorMessage: string;
   favorite: boolean;
+  generateAudio: boolean;
   id: string;
   lastFrameFileId: string | null;
   mode: string;
@@ -55,6 +56,7 @@ export interface VideoWorkspaceError {
 
 interface CreateVideoGenerationInput {
   duration: number;
+  generateAudio?: boolean;
   lastFrameFileId?: string;
   mode: string;
   model: string;
@@ -68,6 +70,7 @@ interface CreateVideoGenerationInput {
 
 interface VideoTaskDisplayMetadata {
   duration?: number;
+  generateAudio?: boolean;
   mode?: string;
   model?: string;
   modelAlias?: string;
@@ -200,6 +203,7 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
             modelAlias: input.modelAlias || VIDEO_MODEL_ALIAS,
             parameters: {
               duration: input.duration,
+              ...(input.generateAudio ? { generate_audio: true } : {}),
               mode: input.mode,
               ratio: input.ratio,
               resolution: input.resolution,
@@ -214,6 +218,7 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
 
         return this.mergeTask(task, {
           duration: input.duration,
+          generateAudio: input.generateAudio,
           mode: input.mode,
           model: input.model,
           modelAlias: input.modelAlias || VIDEO_MODEL_ALIAS,
@@ -239,6 +244,7 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
 
       return this.createGeneration({
         duration: work.duration,
+        generateAudio: work.generateAudio,
         lastFrameFileId: work.lastFrameFileId ?? undefined,
         mode: work.mode,
         model: work.model,
@@ -372,6 +378,10 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
           completedAt: toTimestamp(task.completedAt),
           duration: metadata?.duration ?? asNumber(task.parameters?.duration) ?? existing.duration,
           errorMessage: task.errorMessage ?? '',
+          generateAudio:
+            metadata?.generateAudio ??
+            asBoolean(task.parameters?.generate_audio) ??
+            existing.generateAudio,
           lastFrameFileId: task.lastFrameFile?.id ?? null,
           mode: metadata?.mode ?? asString(task.parameters?.mode) ?? existing.mode,
           model: metadata?.model ?? asString(task.parameters?.uiModel) ?? existing.model,
@@ -406,6 +416,8 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
         duration: metadata?.duration ?? asNumber(task.parameters?.duration) ?? 5,
         errorMessage: task.errorMessage ?? '',
         favorite: false,
+        generateAudio:
+          metadata?.generateAudio ?? asBoolean(task.parameters?.generate_audio) ?? false,
         id: task.id,
         lastFrameFileId: task.lastFrameFile?.id ?? null,
         mode: metadata?.mode ?? asString(task.parameters?.mode) ?? 'text-to-video',
@@ -632,6 +644,22 @@ function asNumber(value: unknown): number | null {
   const number = Number(value);
 
   return Number.isFinite(number) ? number : null;
+}
+
+function asBoolean(value: unknown): boolean | null {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return !['0', 'false', 'no', 'off', 'disabled'].includes(value.trim().toLowerCase());
 }
 
 function extractExtraParameters(
