@@ -10,6 +10,7 @@
 - 视频链路批次基线：`19af73a feat: connect media workflows and agent history`
 - 当前批次基线：`e3a71ad fix: keep mobile canvas controls above bottom nav`
 - 画布增强批次基线：`60f470d feat: complete commerce replacement tools`
+- 画布交互批次基线：`d82616f feat: align commerce catalog with reference`
 - 运行时模型目录批次基线：`136e1f5 feat: add configurable platform modules`
 - 超级对话批次基线：`d87fefd feat: expand newdraw template studio`
 - 当前阶段：M2 工具套件闭环收尾；智能体、图片和视频优先链路已打通
@@ -76,6 +77,18 @@
 - 验证通过：`pnpm exec prettier --write apps/web/src/views/CanvasStudioView.vue`、`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`node outputs/ui-reference/verify-canvas-studio.mjs`、`node outputs/ui-reference/verify-canvas-workflow-library.mjs`
 - 实测创作条与导航间距约 `60px`，缩放控件与导航间距约 `18px`；桌面端和移动端均无横向溢出或页面脚本错误
 - 本批仅修改前端样式和本地验收脚本，不调用真实 Provider，不读取、输出或提交 Key
+
+### AI 画布交互与空节点上传闭环
+
+- 页面：`apps/web/src/views/CanvasStudioView.vue`
+- 默认视口缩放统一为 `100%`，新建、导入、重置视角和服务端恢复缺省值保持一致，避免不同入口产生画布比例跳变
+- 空图片/输出节点显示上传引导，提供“图生图”和“图生视频”快捷动作；文件保存成功后自动进入对应生成流程，文件无效或上传失败时会清理待执行动作并显示错误
+- 节点工具栏调整为调整视角、上传、编辑、下载、网格和更多操作；复制、连接、组合与删除统一收进“更多操作”，网格按钮显示当前启用状态
+- 工作流与历史面板支持最大化/还原，底部创作区支持展开/收起；移动端同步调整浮层、生成菜单和更多操作菜单宽度，避免遮挡节点或产生横向溢出
+- 修复节点“更多操作”点击后立即关闭的问题，并为空图片节点快捷按钮补充稳定 `aria-label`，避免图标辅助名称影响浏览器验收
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`
+- 浏览器验收通过：`node outputs/ui-reference/verify-canvas-studio.mjs`、`node outputs/ui-reference/verify-canvas-workflow-library.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出或页面脚本错误
+- 本批使用 Mock 和 Playwright 路由拦截，不调用真实 Provider，不读取、输出或提交任何 Key
 
 ### 电商工具移动端底部避让
 
@@ -207,7 +220,7 @@
 - 默认界面：纯黑点阵无限画布、悬浮图片节点、左侧窄工具栏、顶部保存/新建操作、底部创作输入框和默认展开的“灵感画板”
 - 弹层结构：加号菜单、我的工作流/示例工作流、素材库、图片历史/视频历史均保持深色半透明悬浮面板
 - 灵感画板：桌面端宽 360px、窄屏宽 330px；采用“你好，Creator / 在找灵感吗？”、真实示例图、说明文案和“我知道了”按钮，空历史不占用面板；底部保留素材、浏览、设置和发送入口
-- 画布布局：左侧工具栏按视口垂直居中，默认缩放为 90%，种子节点重新排布并避免被灵感画板遮挡
+- 画布布局：左侧工具栏按视口垂直居中，默认缩放为 100%，种子节点重新排布并避免被灵感画板遮挡
 - 交互边界：可点击左侧灵感按钮或右下圆钮关闭/重新打开；继续保留节点、连线、历史、工作流和本地任务能力
 - 云端持久化：启动时并行读取本地备份和当前用户的最近画布，云端版本较新时优先加载；编辑后自动写入服务端，同时保留本地版本化副本
 - 失败回退：云端加载或保存不可用时不会丢节点，界面显示“云端加载失败”或“仅本地保存”；并发保存合并为队列，避免较旧请求覆盖新编辑

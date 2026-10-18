@@ -236,10 +236,16 @@ const canvasTitle = ref('新建画布');
 const selectedNodeId = ref('');
 const selectedNodeIds = ref<string[]>([]);
 const nodeMenuNodeId = ref('');
+const nodeToolbarMenuNodeId = ref('');
 const connectionFromId = ref('');
 const contextMenu = ref<CanvasContextMenu | null>(null);
 const canvasNotice = ref('');
 const inspirationOpen = ref(true);
+const composerExpanded = ref(false);
+const canvasGridVisible = ref(true);
+const workflowPanelExpanded = ref(false);
+const historyPanelExpanded = ref(false);
+const pendingNodeQuickAction = ref<'image' | 'video' | ''>('');
 const inspirationMessage = ref('');
 const composerPrompt = ref('');
 const composerSourceNodeId = ref('');
@@ -256,7 +262,7 @@ const batchCancelRequested = ref(false);
 const saveState = ref<'error' | 'idle' | 'saved' | 'saving'>('idle');
 const lastSavedAt = ref('');
 const viewport = ref({
-  scale: 0.9,
+  scale: 1,
   x: 28,
   y: 52,
 });
@@ -391,6 +397,7 @@ function setSelection(ids: string[], primaryId = ''): void {
 function clearSelection(): void {
   selectedNodeIds.value = [];
   selectedNodeId.value = '';
+  nodeToolbarMenuNodeId.value = '';
 }
 
 function isNodeSelected(nodeId: string): boolean {
@@ -554,7 +561,7 @@ function applyCanvasDocument(document: CanvasWorkflowDocument): void {
     ? document.groups.map((group) => ({ ...group, nodeIds: [...group.nodeIds] }))
     : [];
   canvasTitle.value = document.title?.trim() || '新建画布';
-  viewport.value = document.viewport ?? { scale: 0.9, x: 28, y: 52 };
+  viewport.value = document.viewport ?? { scale: 1, x: 28, y: 52 };
 }
 
 function normalizeCanvasDocument(value: unknown): CanvasWorkflowDocument | null {
@@ -800,6 +807,7 @@ function readJson<T>(key: string): T | null {
 
 function openRail(action: RailAction['value']): void {
   nodeMenuNodeId.value = '';
+  nodeToolbarMenuNodeId.value = '';
   contextMenu.value = null;
 
   if (action === 'inspiration') {
@@ -820,7 +828,20 @@ function openRail(action: RailAction['value']): void {
 function closeRailMenu(): void {
   activeRailMenu.value = null;
   nodeMenuNodeId.value = '';
+  nodeToolbarMenuNodeId.value = '';
   contextMenu.value = null;
+}
+
+function toggleCanvasGrid(): void {
+  canvasGridVisible.value = !canvasGridVisible.value;
+}
+
+function toggleWorkflowPanel(): void {
+  workflowPanelExpanded.value = !workflowPanelExpanded.value;
+}
+
+function toggleHistoryPanel(): void {
+  historyPanelExpanded.value = !historyPanelExpanded.value;
 }
 
 function createCanvas(): void {
@@ -839,7 +860,7 @@ function createCanvas(): void {
   composerTargetNodeId.value = '';
   composerSourceNodeId.value = '';
   connectionFromId.value = '';
-  viewport.value = { scale: 0.9, x: 28, y: 52 };
+  viewport.value = { scale: 1, x: 28, y: 52 };
   persistCanvas();
 }
 
@@ -998,10 +1019,12 @@ function duplicateSelectedNode(): void {
     duplicates.at(-1)?.id,
   );
   contextMenu.value = null;
+  nodeToolbarMenuNodeId.value = '';
 }
 
 function startConnection(nodeId: string): void {
   connectionFromId.value = connectionFromId.value === nodeId ? '' : nodeId;
+  nodeToolbarMenuNodeId.value = '';
 }
 
 function canConnectNodes(source: CanvasNode, target: CanvasNode): boolean {
@@ -1112,6 +1135,7 @@ function handleNodePointerDown(event: PointerEvent, node: CanvasNode): void {
   }
 
   nodeMenuNodeId.value = '';
+  nodeToolbarMenuNodeId.value = '';
   contextMenu.value = null;
   commitHistory();
   const dragIds = isNodeSelected(node.id) ? selectedNodeIds.value : [node.id];
@@ -1136,6 +1160,7 @@ function handleCanvasPointerDown(event: PointerEvent): void {
   connectionFromId.value = '';
   activeRailMenu.value = null;
   nodeMenuNodeId.value = '';
+  nodeToolbarMenuNodeId.value = '';
   contextMenu.value = null;
   panState = {
     originX: viewport.value.x,
@@ -1182,7 +1207,7 @@ function setZoom(value: number): void {
 }
 
 function resetViewport(): void {
-  viewport.value = { scale: 0.88, x: 28, y: 32 };
+  viewport.value = { scale: 1, x: 28, y: 32 };
 }
 
 function handleWheel(event: WheelEvent): void {
@@ -1294,10 +1319,12 @@ function replaceNodeImage(event: Event): void {
   const node = selectedNode.value;
 
   if (!file || !node) {
+    pendingNodeQuickAction.value = '';
     input.value = '';
     return;
   }
 
+  const quickAction = pendingNodeQuickAction.value;
   const previewUrl = URL.createObjectURL(file);
 
   objectUrls.add(previewUrl);
@@ -1316,9 +1343,19 @@ function replaceNodeImage(event: Event): void {
     .then((asset) => {
       node.sourceFileId = asset.id;
       void loadFileUrl(asset.id);
+
+      pendingNodeQuickAction.value = '';
+
+      if (quickAction === 'image') {
+        prepareImageNodeGeneration(node, '图生图');
+      } else if (quickAction === 'video') {
+        createVideoNodeFromSource(node);
+      }
+
       persistCanvas();
     })
     .catch((error: unknown) => {
+      pendingNodeQuickAction.value = '';
       assetError.value = error instanceof Error ? error.message : '图片保存失败';
     });
 }
@@ -1367,8 +1404,33 @@ function closeNodeGenerationMenu(): void {
 
 function toggleNodeGenerationMenu(nodeId: string): void {
   setSelection([nodeId], nodeId);
+  nodeToolbarMenuNodeId.value = '';
   contextMenu.value = null;
   nodeMenuNodeId.value = nodeMenuNodeId.value === nodeId ? '' : nodeId;
+}
+
+function toggleNodeToolbarMenu(nodeId: string): void {
+  setSelection([nodeId], nodeId);
+  nodeMenuNodeId.value = '';
+  contextMenu.value = null;
+  nodeToolbarMenuNodeId.value = nodeToolbarMenuNodeId.value === nodeId ? '' : nodeId;
+}
+
+function isEmptyImageNode(node: CanvasNode): boolean {
+  return (
+    (node.kind === 'image' || node.kind === 'output') &&
+    nodeStatus(node) === 'idle' &&
+    !nodeImageUrl(node) &&
+    !nodeSourceFileId(node)
+  );
+}
+
+function beginNodeUpload(node: CanvasNode, quickAction: 'image' | 'video' | '' = ''): void {
+  setSelection([node.id], node.id);
+  nodeMenuNodeId.value = '';
+  nodeToolbarMenuNodeId.value = '';
+  pendingNodeQuickAction.value = quickAction;
+  nodeUploadInput.value?.click();
 }
 
 function nodeSourceFileId(node: CanvasNode | undefined): string | undefined {
@@ -2059,6 +2121,7 @@ function openNodeContextMenu(event: MouseEvent, node: CanvasNode): void {
   const position = clampContextMenuPosition(event.clientX, event.clientY);
 
   nodeMenuNodeId.value = '';
+  nodeToolbarMenuNodeId.value = '';
   contextMenu.value = {
     ...position,
     kind: 'node',
@@ -2240,7 +2303,7 @@ async function importWorkflow(event: Event): Promise<void> {
     edges.value = importedEdges;
     groups.value = importedGroups;
     canvasTitle.value = parsed.title?.trim() || file.name.replace(/\.json$/i, '') || '导入画布';
-    viewport.value = parsed.viewport ?? { scale: 0.88, x: 28, y: 32 };
+    viewport.value = parsed.viewport ?? { scale: 1, x: 28, y: 32 };
     clearSelection();
     batchSelectedIds.value = [];
     closeRailMenu();
@@ -2285,6 +2348,8 @@ function handleKeyboard(event: KeyboardEvent): void {
       contextMenu.value = null;
     } else if (nodeMenuNodeId.value) {
       closeNodeGenerationMenu();
+    } else if (nodeToolbarMenuNodeId.value) {
+      nodeToolbarMenuNodeId.value = '';
     } else {
       closeRailMenu();
     }
@@ -2425,11 +2490,15 @@ onBeforeUnmount(() => {
     <main
       ref="workspaceElement"
       class="canvas-workspace"
-      :class="{ 'canvas-workspace--plain': activeRailMenu === 'inspiration' }"
+      :class="{
+        'canvas-workspace--grid-hidden': !canvasGridVisible,
+        'canvas-workspace--plain': activeRailMenu === 'inspiration',
+      }"
       @pointerdown="handleCanvasPointerDown"
       @contextmenu.prevent="openCanvasContextMenu"
       @wheel="handleWheel"
     >
+      <input ref="nodeUploadInput" type="file" accept="image/*" hidden @change="handleNodeUpload" />
       <header class="canvas-topbar">
         <div class="canvas-topbar__title">
           <span class="canvas-topbar__mark">
@@ -2474,7 +2543,8 @@ onBeforeUnmount(() => {
             type="button"
             class="canvas-topbar__icon-button"
             aria-label="切换网格"
-            @click="activeRailMenu = activeRailMenu === 'inspiration' ? null : 'inspiration'"
+            :class="{ active: canvasGridVisible }"
+            @click="toggleCanvasGrid"
           >
             <BgColorsOutlined />
           </button>
@@ -2496,13 +2566,6 @@ onBeforeUnmount(() => {
 
       <Transition name="canvas-pop">
         <div v-if="activeRailMenu === 'add'" class="canvas-rail-menu" @pointerdown.stop>
-          <input
-            ref="nodeUploadInput"
-            type="file"
-            accept="image/*"
-            hidden
-            @change="handleNodeUpload"
-          />
           <button type="button" @click="nodeUploadInput?.click()">
             <UploadOutlined />
             <span>上传图片节点</span>
@@ -2557,6 +2620,7 @@ onBeforeUnmount(() => {
         <section
           v-if="activeRailMenu === 'workflow'"
           class="canvas-floating-panel canvas-workflow-panel"
+          :class="{ 'canvas-floating-panel--expanded': workflowPanelExpanded }"
         >
           <header>
             <div>
@@ -2587,6 +2651,13 @@ onBeforeUnmount(() => {
             </button>
             <button type="button" aria-label="导出工作流" @click="exportWorkflow">
               <DownloadOutlined />
+            </button>
+            <button
+              type="button"
+              :aria-label="workflowPanelExpanded ? '还原工作流面板' : '最大化工作流面板'"
+              @click="toggleWorkflowPanel"
+            >
+              <ExpandOutlined :class="{ 'panel-collapse-icon': workflowPanelExpanded }" />
             </button>
             <button type="button" aria-label="关闭工作流" @click="closeRailMenu">
               <CloseOutlined />
@@ -2797,6 +2868,7 @@ onBeforeUnmount(() => {
         <section
           v-if="activeRailMenu === 'history'"
           class="canvas-floating-panel canvas-history-panel"
+          :class="{ 'canvas-floating-panel--expanded': historyPanelExpanded }"
         >
           <header>
             <div>
@@ -2819,6 +2891,13 @@ onBeforeUnmount(() => {
                 <span>0</span>
               </button>
             </div>
+            <button
+              type="button"
+              :aria-label="historyPanelExpanded ? '还原历史面板' : '最大化历史面板'"
+              @click="toggleHistoryPanel"
+            >
+              <ExpandOutlined :class="{ 'panel-collapse-icon': historyPanelExpanded }" />
+            </button>
             <button type="button" aria-label="关闭历史" @click="closeRailMenu">
               <CloseOutlined />
             </button>
@@ -3022,7 +3101,8 @@ onBeforeUnmount(() => {
             `canvas-node--${node.kind}`,
             {
               'canvas-node--connecting': connectionFromId === node.id,
-              'canvas-node--menu-open': nodeMenuNodeId === node.id,
+              'canvas-node--menu-open':
+                nodeMenuNodeId === node.id || nodeToolbarMenuNodeId === node.id,
               'canvas-node--selected': isNodeSelected(node.id),
             },
           ]"
@@ -3039,20 +3119,11 @@ onBeforeUnmount(() => {
             <span v-if="selectedNodeCount > 1" class="canvas-node__selection-count">
               已选 {{ selectedNodeCount }} 项
             </span>
-            <button
-              type="button"
-              class="canvas-node__toolbar-generate"
-              aria-label="从该节点生成"
-              @click="toggleNodeGenerationMenu(node.id)"
-            >
-              <ThunderboltFilled />
-              <span>从该节点生成</span>
-            </button>
             <button type="button" aria-label="调整视角" @click="resetViewport">
               <ExpandOutlined />
               <span>调整视角</span>
             </button>
-            <button type="button" aria-label="上传替换图片" @click="nodeUploadInput?.click()">
+            <button type="button" aria-label="上传替换图片" @click="beginNodeUpload(node)">
               <UploadOutlined />
               <span>上传</span>
             </button>
@@ -3062,16 +3133,51 @@ onBeforeUnmount(() => {
             <button type="button" aria-label="下载节点" @click="downloadSelectedNode">
               <DownloadOutlined />
             </button>
-            <button type="button" aria-label="复制节点" @click="duplicateSelectedNode">
-              <CopyOutlined />
+            <button
+              type="button"
+              class="canvas-node__toolbar-grid"
+              :class="{ active: canvasGridVisible }"
+              aria-label="切换网格"
+              @click="toggleCanvasGrid"
+            >
+              <BgColorsOutlined />
             </button>
-            <button type="button" aria-label="连接节点" @click="startConnection(node.id)">
-              <LinkOutlined />
-            </button>
-            <button type="button" aria-label="更多操作" @click="deleteSelectedNode">
+            <button type="button" aria-label="更多操作" @click="toggleNodeToolbarMenu(node.id)">
               <MoreOutlined />
             </button>
           </div>
+
+          <Transition name="canvas-pop">
+            <section
+              v-if="nodeToolbarMenuNodeId === node.id"
+              class="canvas-node__toolbar-more-menu"
+              aria-label="更多节点操作"
+              @pointerdown.stop
+            >
+              <button type="button" @click="duplicateSelectedNode">
+                <CopyOutlined />
+                <span>复制节点</span>
+                <small>Ctrl D</small>
+              </button>
+              <button type="button" @click="startConnection(node.id)">
+                <LinkOutlined />
+                <span>连接节点</span>
+              </button>
+              <button
+                type="button"
+                :disabled="selectedNodeCount < 2"
+                @click="createGroupFromSelection"
+              >
+                <AppstoreOutlined />
+                <span>组合选中</span>
+              </button>
+              <i />
+              <button type="button" class="danger" @click="deleteSelectedNode">
+                <DeleteOutlined />
+                <span>删除节点</span>
+              </button>
+            </section>
+          </Transition>
 
           <Transition name="canvas-pop">
             <section
@@ -3221,6 +3327,34 @@ onBeforeUnmount(() => {
               <small>{{ nodeError(node) || '请调整参数后重试' }}</small>
             </div>
             <div
+              v-else-if="isEmptyImageNode(node)"
+              class="canvas-node__state canvas-node__state--empty"
+            >
+              <UploadOutlined />
+              <strong>上传图片开始创作</strong>
+              <small>上传后可继续图生图或图生视频</small>
+              <div class="canvas-node__empty-actions">
+                <button
+                  type="button"
+                  aria-label="图生图"
+                  @pointerdown.stop
+                  @click.stop="beginNodeUpload(node, 'image')"
+                >
+                  <PictureOutlined />
+                  图生图
+                </button>
+                <button
+                  type="button"
+                  aria-label="图生视频"
+                  @pointerdown.stop
+                  @click.stop="beginNodeUpload(node, 'video')"
+                >
+                  <VideoCameraOutlined />
+                  图生视频
+                </button>
+              </div>
+            </div>
+            <div
               v-else-if="node.kind === 'video'"
               class="canvas-node__state canvas-node__state--video"
             >
@@ -3260,13 +3394,26 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div class="canvas-composer" @pointerdown.stop>
+      <div
+        class="canvas-composer"
+        :class="{ 'canvas-composer--expanded': composerExpanded }"
+        @pointerdown.stop
+      >
         <textarea
           v-model="composerPrompt"
           maxlength="1000"
           placeholder="描述你想生成的内容..."
           @keydown.ctrl.enter="submitComposer"
         />
+        <button
+          type="button"
+          class="canvas-composer__expand"
+          :aria-label="composerExpanded ? '收起创作区' : '展开创作区'"
+          @click="composerExpanded = !composerExpanded"
+        >
+          <ExpandOutlined :class="{ 'panel-collapse-icon': composerExpanded }" />
+          <span>{{ composerExpanded ? '收起' : '展开' }}</span>
+        </button>
         <small>{{ composerPrompt.length }} / 1000</small>
         <footer>
           <label>
@@ -3607,6 +3754,10 @@ onBeforeUnmount(() => {
     radial-gradient(circle at 42% 35%, rgb(92 68 208 / 7%), transparent 360px);
 }
 
+.canvas-workspace--grid-hidden {
+  background-image: none;
+}
+
 .canvas-topbar {
   position: absolute;
   top: 0;
@@ -3716,11 +3867,11 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.canvas-topbar__icon-button:last-child {
-  border-color: rgb(245 180 71 / 30%);
-  background: rgb(55 41 21 / 72%);
-  color: #f2b552;
-  font-size: 15px;
+.canvas-topbar__icon-button.active {
+  border-color: rgb(64 142 255 / 62%);
+  background: #286ac7;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgb(64 142 255 / 16%);
 }
 
 .canvas-rail {
@@ -3844,6 +3995,18 @@ onBeforeUnmount(() => {
   background: rgb(30 31 35 / 98%);
   box-shadow: 0 24px 58px rgb(0 0 0 / 45%);
   backdrop-filter: blur(18px);
+}
+
+.canvas-floating-panel.canvas-floating-panel--expanded {
+  top: 72px;
+  left: 68px;
+  width: min(1080px, calc(100% - 88px));
+  max-height: calc(100% - 92px);
+  z-index: 48;
+}
+
+.panel-collapse-icon {
+  transform: rotate(180deg);
 }
 
 .canvas-floating-panel > header {
@@ -4965,6 +5128,42 @@ onBeforeUnmount(() => {
   color: #f1a29c;
 }
 
+.canvas-node__state--empty {
+  background:
+    radial-gradient(circle at 50% 28%, rgb(88 104 255 / 16%), transparent 46%),
+    linear-gradient(145deg, #17191f, #131419);
+  color: #aeb4c2;
+}
+
+.canvas-node__state--empty :deep(svg) {
+  color: #7e92ff;
+}
+
+.canvas-node__empty-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.canvas-node__empty-actions button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 7px;
+  background: #292b32;
+  color: #dfe2ea;
+  font-size: 7px;
+  cursor: pointer;
+}
+
+.canvas-node__empty-actions button:hover {
+  border-color: rgb(92 131 255 / 58%);
+  background: #32364a;
+  color: #fff;
+}
+
 .canvas-node__state--video {
   background:
     radial-gradient(circle at 50% 22%, rgb(81 120 255 / 30%), transparent 42%),
@@ -5114,14 +5313,75 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.canvas-node__toolbar button:hover,
-.canvas-node__toolbar button:nth-last-child(2) {
+.canvas-node__toolbar button:hover {
   background: #33353c;
   color: #fff;
 }
 
-.canvas-node__toolbar button:nth-last-child(2) {
+.canvas-node__toolbar .canvas-node__toolbar-grid.active {
+  width: 26px;
+  padding: 0;
+  border-radius: 999px;
   background: #2384e8;
+  color: #fff;
+}
+
+.canvas-node__toolbar-more-menu {
+  position: absolute;
+  top: -6px;
+  right: -166px;
+  z-index: 19;
+  display: grid;
+  width: 158px;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 9px;
+  background: rgb(37 38 43 / 99%);
+  box-shadow: 0 20px 48px rgb(0 0 0 / 46%);
+  cursor: default;
+}
+
+.canvas-node__toolbar-more-menu button {
+  display: grid;
+  min-height: 32px;
+  align-items: center;
+  grid-template-columns: 17px minmax(0, 1fr) auto;
+  gap: 7px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #d7d9df;
+  font-size: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.canvas-node__toolbar-more-menu button:hover:not(:disabled) {
+  background: #34363d;
+  color: #fff;
+}
+
+.canvas-node__toolbar-more-menu button:disabled {
+  color: #656a75;
+  cursor: default;
+}
+
+.canvas-node__toolbar-more-menu button.danger:hover {
+  background: #48292e;
+  color: #ffb9b5;
+}
+
+.canvas-node__toolbar-more-menu button small {
+  color: #747a85;
+  font-size: 7px;
+}
+
+.canvas-node__toolbar-more-menu > i {
+  height: 1px;
+  margin: 3px 2px;
+  background: rgb(255 255 255 / 7%);
 }
 
 .canvas-node__selection-count {
@@ -5156,7 +5416,7 @@ onBeforeUnmount(() => {
   left: calc(100% + 29px);
   z-index: 18;
   display: grid;
-  width: 276px;
+  width: 240px;
   max-height: min(520px, calc(100vh - 150px));
   gap: 8px;
   padding: 10px;
@@ -5217,10 +5477,10 @@ onBeforeUnmount(() => {
 .canvas-node__generate-angle button {
   position: relative;
   display: grid;
-  min-height: 55px;
+  min-height: 50px;
   align-items: center;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 8px;
   padding: 7px 9px;
   border: 0;
   border-radius: 8px;
@@ -5386,6 +5646,15 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(18px);
 }
 
+.canvas-composer--expanded {
+  width: min(760px, calc(100% - 76px));
+  min-height: 300px;
+}
+
+.canvas-composer--expanded textarea {
+  min-height: 210px;
+}
+
 .canvas-composer textarea {
   width: 100%;
   min-height: 82px;
@@ -5405,10 +5674,37 @@ onBeforeUnmount(() => {
 
 .canvas-composer > small {
   position: absolute;
-  right: 15px;
-  bottom: 49px;
+  right: 88px;
+  bottom: 50px;
   color: #666c78;
   font-size: 7px;
+}
+
+.canvas-composer__expand {
+  position: absolute;
+  right: 14px;
+  bottom: 43px;
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #858b97;
+  font-size: 7px;
+  cursor: pointer;
+}
+
+.canvas-composer__expand:hover {
+  background: #34363d;
+  color: #fff;
+}
+
+.canvas-composer__expand :deep(svg) {
+  font-size: 9px;
+  transition: transform 140ms ease;
 }
 
 .canvas-composer footer {
@@ -6260,6 +6556,13 @@ onBeforeUnmount(() => {
     width: calc(100% - 68px);
   }
 
+  .canvas-floating-panel.canvas-floating-panel--expanded {
+    top: 105px;
+    left: 58px;
+    width: calc(100% - 68px);
+    max-height: calc(100% - 115px);
+  }
+
   .canvas-workflow-grid,
   .canvas-asset-grid,
   .canvas-history-groups > section > div {
@@ -6307,6 +6610,14 @@ onBeforeUnmount(() => {
     min-height: 154px;
   }
 
+  .canvas-composer--expanded {
+    min-height: 238px;
+  }
+
+  .canvas-composer--expanded textarea {
+    min-height: 148px;
+  }
+
   .canvas-composer footer {
     flex-wrap: wrap;
   }
@@ -6330,9 +6641,14 @@ onBeforeUnmount(() => {
     top: calc(50% + 46px);
     right: -14px;
     left: auto;
-    width: min(276px, calc(100vw - 82px));
+    width: min(240px, calc(100vw - 82px));
     max-height: min(470px, calc(100vh - 150px));
     transform: none;
+  }
+
+  .canvas-node__toolbar-more-menu {
+    top: 36px;
+    right: 0;
   }
 
   .canvas-angle-backdrop {
