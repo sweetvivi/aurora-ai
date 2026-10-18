@@ -199,3 +199,14 @@
 - 桌面端 `1440x1000` 验收中，模型对话助手正文左边界由 `414px` 调整到 `474px`，正文宽度由 `896px` 收窄到 `776px`
 - 智能体详情操作验收通过，用户消息、助手正文、积分提示和消息操作栏保持正常；移动端 `390x844` 无横向溢出或页面脚本错误
 - 验证通过：`@aurora/web` 类型检查、`verify-agent-detail-actions.mjs`、`verify-chat-message-layout.mjs`
+
+## 15. 2026-10-19 AI 绘画生成台参数区对齐
+
+- 对照参考产品生成态截图，把 `/draw?view=generate` 参数面板的模型区从“全量平铺”改为“先展示 6 个 + 加载更多”，与参考产品“加载更多生图模型 (n/m)”的展示方式一致
+- 模型网格默认保留当前已选模型，展开后才显示全量；模型数量未超过阈值时不渲染该按钮
+- 提交区改为固定底栏容器，把“本次消耗 N 积分 · 余额 M”积分条放在 `立即生成` 按钮正上方，位置与参考产品的积分徽标一致
+- 修复积分条直接写成 sticky 按钮的同级兄弟节点时被固定按钮覆盖的问题（原测量 `cost.y=961`、`button.y=934`，现为 `cost.y=918`、`button.y=934`，不再重叠）
+- 桌面端 `1440x1000` 与移动端 `390x844` 无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`@aurora/web` 类型检查、`pnpm test`（API 26 个文件 110 项、Web 19 个文件 85 项）、`pnpm build`
+- 绘画相关浏览器验收通过：`verify-draw.mjs`、`verify-draw-completion.mjs`、`verify-draw-editor.mjs`、`verify-draw-navigation.mjs`、`verify-newdraw-templates.mjs`、`verify-draw-modes.mjs`
+- 本轮只使用 Mock 路由验收，未读取、输出或调用任何真实 Key

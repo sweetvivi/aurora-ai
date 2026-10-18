@@ -92,6 +92,7 @@ const navigation: NavigationItem[] = [
 ];
 
 const modelAccents = ['#7a5cff', '#ff7043', '#20a66a', '#2f8ddb', '#d05b9a', '#d69a2d'];
+const MODEL_GRID_LIMIT = 6;
 
 const topNavigation = ['做电商', '做视频', '拍写真', '搞设计'];
 const creationModes = DRAW_CREATION_MODES;
@@ -403,6 +404,7 @@ const selectedEffectId = ref('');
 const selectedStorage = ref('1天');
 const templateAdvancedOpen = ref(false);
 const generatorAdvancedOpen = ref(false);
+const modelGridExpanded = ref(false);
 const templateExampleId = ref('');
 const selectedWorkDetailId = ref('');
 const detailPrompt = ref('');
@@ -473,6 +475,21 @@ const filteredImageToolGroups = computed(() => {
 const selectedModelLabel = computed(
   () => models.value.find((model) => model.value === currentModel.value)?.label ?? '选择模型',
 );
+const visibleModels = computed(() => {
+  if (modelGridExpanded.value || models.value.length <= MODEL_GRID_LIMIT) {
+    return models.value;
+  }
+
+  const preview = models.value.slice(0, MODEL_GRID_LIMIT);
+
+  if (preview.some((model) => model.value === currentModel.value)) {
+    return preview;
+  }
+
+  const activeModel = models.value.find((model) => model.value === currentModel.value);
+
+  return activeModel ? [...preview.slice(0, MODEL_GRID_LIMIT - 1), activeModel] : preview;
+});
 
 const isGeneratingView = computed(() => route.query.view === 'generate');
 const isTemplateView = computed(() => route.name === 'newdraw' || route.query.view === 'templates');
@@ -1650,7 +1667,7 @@ onBeforeUnmount(() => {
               </header>
               <div class="draw-generator__model-grid">
                 <button
-                  v-for="model in models"
+                  v-for="model in visibleModels"
                   :key="model.value"
                   type="button"
                   :class="{ active: currentModel === model.value }"
@@ -1663,6 +1680,18 @@ onBeforeUnmount(() => {
                   <CheckOutlined v-if="currentModel === model.value" />
                 </button>
               </div>
+              <button
+                v-if="models.length > MODEL_GRID_LIMIT"
+                type="button"
+                class="draw-generator__model-more"
+                @click="modelGridExpanded = !modelGridExpanded"
+              >
+                {{
+                  modelGridExpanded
+                    ? '收起生图模型'
+                    : `加载更多生图模型 (${visibleModels.length}/${models.length})`
+                }}
+              </button>
             </section>
 
             <section class="draw-generator__prompt">
@@ -1797,16 +1826,22 @@ onBeforeUnmount(() => {
               </div>
             </section>
 
-            <button
-              type="button"
-              class="draw-generator__submit"
-              :disabled="generating || uploadingReference"
-              @click="startGeneration"
-            >
-              <LoadingOutlined v-if="generating" />
-              <ThunderboltFilled v-else />
-              {{ generating ? '正在生成图片...' : selectedModeConfig.submitLabel }}
-            </button>
+            <div class="draw-generator__footer">
+              <p class="draw-generator__cost">
+                <ThunderboltFilled />
+                本次消耗 {{ generationCost }} 积分 · 余额 {{ sessionStore.points }}
+              </p>
+              <button
+                type="button"
+                class="draw-generator__submit"
+                :disabled="generating || uploadingReference"
+                @click="startGeneration"
+              >
+                <LoadingOutlined v-if="generating" />
+                <ThunderboltFilled v-else />
+                {{ generating ? '正在生成图片...' : selectedModeConfig.submitLabel }}
+              </button>
+            </div>
           </aside>
 
           <section class="draw-generator__results">
@@ -3994,6 +4029,25 @@ onBeforeUnmount(() => {
   font-size: 8px;
 }
 
+.draw-generator__model-more {
+  height: 30px;
+  border: 1px solid #e5e8ec;
+  border-radius: 8px;
+  background: #fff;
+  color: #5b74d6;
+  font-size: 9px;
+  font-weight: 720;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.draw-generator__model-more:hover {
+  border-color: #c9d8e9;
+  background: #f7faff;
+}
+
 .draw-generator__prompt {
   display: grid;
   gap: 8px;
@@ -4275,17 +4329,29 @@ onBeforeUnmount(() => {
   font-size: 8px;
 }
 
+.draw-generator__cost {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  margin: 0 0 6px;
+  color: #8b93a0;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.draw-generator__cost :deep(svg) {
+  color: #f0a020;
+  font-size: 9px;
+}
+
 .draw-generator__submit {
-  position: sticky;
-  z-index: 3;
-  bottom: 0;
   display: inline-flex;
   width: 100%;
   height: 42px;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-top: 19px;
   border: 0;
   border-radius: 8px;
   background: #6d49e8;
@@ -4294,6 +4360,15 @@ onBeforeUnmount(() => {
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 10px 24px rgb(74 49 167 / 20%);
+}
+
+.draw-generator__footer {
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
+  margin-top: 8px;
+  padding-top: 6px;
+  background: #fff;
 }
 
 .draw-generator__submit:hover:not(:disabled) {
