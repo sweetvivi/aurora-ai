@@ -10,11 +10,21 @@ export interface UploadedImageFile {
 
 const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/gif', 'image/jpeg', 'image/png', 'image/webp']);
 
-export function validateImageUpload(file: UploadedImageFile | undefined): void {
+export function validateImageUpload(
+  file: UploadedImageFile | undefined,
+  options: { maxBytes?: number } = {},
+): void {
   if (!file || !Buffer.isBuffer(file.buffer) || file.buffer.length === 0) {
     throw new BadRequestException({
       code: 'FILE_REQUIRED',
       message: '请选择要上传的图片文件',
+    });
+  }
+
+  if (options.maxBytes && file.buffer.length > options.maxBytes) {
+    throw new BadRequestException({
+      code: 'FILE_TOO_LARGE',
+      message: '文件超过允许的大小限制',
     });
   }
 
@@ -43,7 +53,7 @@ export function calculateChecksum(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
-function detectImageMimeType(buffer: Buffer): string | null {
+export function detectImageMimeType(buffer: Buffer): string | null {
   if (
     buffer.length >= 8 &&
     buffer[0] === 0x89 &&

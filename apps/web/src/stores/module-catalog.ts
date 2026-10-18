@@ -47,6 +47,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: null,
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'primary',
     icon: 'home',
@@ -59,6 +60,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: '100+',
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'primary',
     icon: 'chat',
@@ -71,6 +73,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: null,
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'primary',
     icon: 'draw',
@@ -83,6 +86,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: '6000+',
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'primary',
     icon: 'agents',
@@ -95,6 +99,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: null,
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'primary',
     icon: 'retouch',
@@ -107,6 +112,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: null,
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'primary',
     icon: 'image-generation',
@@ -119,6 +125,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: null,
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'primary',
     icon: 'video',
@@ -131,6 +138,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: null,
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'primary',
     icon: 'canvas',
@@ -143,6 +151,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: null,
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'primary',
     icon: 'commerce',
@@ -155,6 +164,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: null,
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'primary',
     icon: 'music',
@@ -167,6 +177,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: null,
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'creation-office',
     icon: 'workbench',
@@ -179,6 +190,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: null,
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'creation-office',
     icon: 'map',
@@ -191,6 +203,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
   {
     badge: null,
     cover: null,
+    coverSource: null,
     customized: false,
     group: 'creation-office',
     icon: 'all-tools',

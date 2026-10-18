@@ -2,6 +2,7 @@
 import {
   CloudServerOutlined,
   DatabaseOutlined,
+  DeleteOutlined,
   EditOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
@@ -11,10 +12,11 @@ import {
   SettingOutlined,
   TeamOutlined,
   ThunderboltOutlined,
+  UploadOutlined,
   UserSwitchOutlined,
 } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import {
   ApiError,
   adjustAdminUserPoints,
@@ -31,6 +33,7 @@ import {
   updateAdminModuleDisplayConfig,
   updateAdminProvider,
   updateAdminUser,
+  uploadAdminModuleCover,
   type AdminModel,
   type AdminOverview,
   type AdminProvider,
@@ -112,6 +115,9 @@ const modelForm = reactive({
 
 const moduleModalOpen = ref(false);
 const editingModule = ref<ModuleDisplayConfig | null>(null);
+const moduleCoverFile = ref<File | null>(null);
+const moduleCoverPreviewUrl = ref<string | null>(null);
+const moduleCoverRemoving = ref(false);
 const moduleForm = reactive({
   badge: '',
   cover: '',
@@ -219,6 +225,30 @@ const filteredModules = computed(() => {
       value.toLowerCase().includes(query),
     ),
   );
+});
+
+const moduleCoverPreview = computed(() => {
+  if (moduleCoverPreviewUrl.value) {
+    return moduleCoverPreviewUrl.value;
+  }
+
+  if (moduleCoverRemoving.value) {
+    return null;
+  }
+
+  return moduleForm.cover.trim() || editingModule.value?.cover || null;
+});
+
+const moduleCoverSourceLabel = computed(() => {
+  if (moduleCoverFile.value) {
+    return '待上传';
+  }
+
+  if (moduleCoverRemoving.value || !editingModule.value?.cover) {
+    return '默认样式';
+  }
+
+  return editingModule.value.coverSource === 'local' ? '本地上传' : '外部链接';
 });
 
 async function loadAll(): Promise<void> {
@@ -570,9 +600,10 @@ async function saveModel(): Promise<void> {
 }
 
 function openModuleModal(module: ModuleDisplayConfig): void {
+  resetModuleCoverState();
   editingModule.value = module;
   moduleForm.badge = module.badge ?? '';
-  moduleForm.cover = module.cover ?? '';
+  moduleForm.cover = module.coverSource === 'url' ? (module.cover ?? '') : '';
   moduleForm.group = module.group;
   moduleForm.icon = module.icon;
   moduleForm.name = module.name;
@@ -580,6 +611,62 @@ function openModuleModal(module: ModuleDisplayConfig): void {
   moduleForm.sortOrder = module.sortOrder;
   moduleForm.visible = module.visible;
   moduleModalOpen.value = true;
+}
+
+function closeModuleModal(): void {
+  moduleModalOpen.value = false;
+  resetModuleCoverState();
+}
+
+function handleModuleCoverSelect(file: File): boolean {
+  const allowedTypes = new Set(['image/gif', 'image/jpeg', 'image/png', 'image/webp']);
+
+  if (!allowedTypes.has(file.type)) {
+    message.warning('仅支持 JPEG、PNG、WebP 和 GIF 图片');
+    return false;
+  }
+
+  if (file.size > 8 * 1024 * 1024) {
+    message.warning('封面图不能超过 8 MB');
+    return false;
+  }
+
+  releaseModuleCoverPreviewUrl();
+  moduleForm.cover = '';
+  moduleCoverFile.value = file;
+  moduleCoverRemoving.value = false;
+  moduleCoverPreviewUrl.value = URL.createObjectURL(file);
+  return false;
+}
+
+function clearModuleCover(): void {
+  releaseModuleCoverPreviewUrl();
+  moduleCoverFile.value = null;
+  moduleForm.cover = '';
+  moduleCoverRemoving.value = true;
+}
+
+function handleModuleCoverUrlInput(): void {
+  if (!moduleForm.cover.trim()) {
+    return;
+  }
+
+  releaseModuleCoverPreviewUrl();
+  moduleCoverFile.value = null;
+  moduleCoverRemoving.value = false;
+}
+
+function resetModuleCoverState(): void {
+  releaseModuleCoverPreviewUrl();
+  moduleCoverFile.value = null;
+  moduleCoverRemoving.value = false;
+}
+
+function releaseModuleCoverPreviewUrl(): void {
+  if (moduleCoverPreviewUrl.value) {
+    URL.revokeObjectURL(moduleCoverPreviewUrl.value);
+    moduleCoverPreviewUrl.value = null;
+  }
 }
 
 async function saveModule(): Promise<void> {
@@ -596,9 +683,13 @@ async function saveModule(): Promise<void> {
   saving.value = true;
 
   try {
+    if (moduleCoverFile.value) {
+      await uploadAdminModuleCover(editingModule.value.key, moduleCoverFile.value);
+    }
+
     const updated = await updateAdminModuleDisplayConfig(editingModule.value.key, {
       badge: moduleForm.badge.trim() || null,
-      cover: moduleForm.cover.trim() || null,
+      cover: moduleCoverFile.value ? undefined : moduleForm.cover.trim() || null,
       group: moduleForm.group,
       icon: moduleForm.icon.trim(),
       name: moduleForm.name.trim(),
@@ -608,7 +699,7 @@ async function saveModule(): Promise<void> {
     });
 
     modules.value = replaceModule(updated);
-    moduleModalOpen.value = false;
+    closeModuleModal();
     message.success('模块展示配置已更新');
     await moduleCatalogStore.load(true);
   } catch (error) {
@@ -667,6 +758,10 @@ function getErrorMessage(error: unknown): string {
 
 onMounted(() => {
   void loadAll();
+});
+
+onBeforeUnmount(() => {
+  releaseModuleCoverPreviewUrl();
 });
 </script>
 
@@ -1129,6 +1224,7 @@ onMounted(() => {
       :confirm-loading="saving"
       title="编辑模块展示"
       width="680px"
+      @cancel="closeModuleModal"
       @ok="saveModule"
     >
       <a-form layout="vertical">
@@ -1190,11 +1286,43 @@ onMounted(() => {
           </a-form-item>
         </div>
 
-        <a-form-item label="封面图地址">
+        <a-form-item label="模块封面">
+          <div class="admin-module-cover-editor">
+            <div
+              class="admin-module-cover-editor__preview"
+              :class="{ 'admin-module-cover-editor__preview--empty': !moduleCoverPreview }"
+            >
+              <img v-if="moduleCoverPreview" alt="模块封面预览" :src="moduleCoverPreview" />
+              <UploadOutlined v-else />
+            </div>
+            <div class="admin-module-cover-editor__body">
+              <div class="admin-module-cover-editor__actions">
+                <a-upload
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  :before-upload="handleModuleCoverSelect"
+                  :show-upload-list="false"
+                >
+                  <a-button>
+                    <UploadOutlined />
+                    选择本地图片
+                  </a-button>
+                </a-upload>
+                <a-button danger :disabled="!moduleCoverPreview" @click="clearModuleCover">
+                  <DeleteOutlined />
+                  清除
+                </a-button>
+              </div>
+              <span> {{ moduleCoverSourceLabel }}，支持 JPEG、PNG、WebP、GIF，最大 8 MB </span>
+            </div>
+          </div>
+        </a-form-item>
+
+        <a-form-item label="外部图片地址">
           <a-input
             v-model:value="moduleForm.cover"
             allow-clear
-            placeholder="可选，填写可公开访问的图片 URL"
+            placeholder="可选，填写后可替代本地封面"
+            @input="handleModuleCoverUrlInput"
           />
         </a-form-item>
 
@@ -1794,6 +1922,60 @@ onMounted(() => {
 .admin-module-presentation__empty {
   color: #9aa1ae;
   font-size: 10px;
+}
+
+.admin-module-cover-editor {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.admin-module-cover-editor__preview {
+  display: grid;
+  min-height: 82px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #e2e5ec;
+  border-radius: 8px;
+  background: #f7f8fb;
+  color: #8d95a4;
+}
+
+.admin-module-cover-editor__preview img {
+  width: 100%;
+  height: 100%;
+  min-height: 82px;
+  object-fit: cover;
+}
+
+.admin-module-cover-editor__preview--empty {
+  border-style: dashed;
+}
+
+.admin-module-cover-editor__preview--empty :deep(svg) {
+  width: 22px;
+  height: 22px;
+}
+
+.admin-module-cover-editor__body {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 8px;
+}
+
+.admin-module-cover-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-module-cover-editor__body > span {
+  color: #7d8595;
+  font-size: 10px;
+  line-height: 1.5;
 }
 
 .admin-module-preview {

@@ -7,6 +7,7 @@ import { AppModule } from '../src/app.module';
 import { configureApplication } from '../src/bootstrap/configure-app';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
 import { ModelRegistryService } from '../src/models/model-registry.service';
+import { STORAGE_ADAPTER, type StorageAdapter } from '../src/storage/storage.types';
 
 interface RegisteredUser {
   accessToken: string;
@@ -324,6 +325,155 @@ describe('admin endpoints', () => {
 
     expect(response.body.error.code).toBe('BAD_REQUEST');
     expect(JSON.stringify(response.body)).not.toContain('sk-should-never-be-accepted');
+  });
+
+  it('uploads, serves, replaces, and clears local module covers', async () => {
+    const moduleKey = `admin-e2e-cover-${randomUUID().slice(0, 8)}`;
+    const storage = app.get<StorageAdapter>(STORAGE_ADAPTER);
+    const firstCover = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    );
+    const secondCover = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZfC8AAAAASUVORK5CYII=',
+      'base64',
+    );
+
+    await prisma.moduleDisplayConfig.create({
+      data: {
+        group: 'primary',
+        icon: 'test-cover',
+        key: moduleKey,
+        name: '封面测试模块',
+        route: '/cover-test',
+        sortOrder: 999,
+      },
+    });
+
+    let currentStorageKey: string | null = null;
+
+    try {
+      const regularUser = await registerUser(
+        `cover-uploader-${randomUUID()}${testEmailSuffix}`,
+        '普通上传用户',
+      );
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/admin/modules/${moduleKey}/cover`)
+        .set('authorization', `Bearer ${regularUser.accessToken}`)
+        .attach('file', firstCover, {
+          contentType: 'image/png',
+          filename: 'cover.png',
+        })
+        .expect(403);
+
+      const untouchedRecord = await prisma.moduleDisplayConfig.findUniqueOrThrow({
+        where: { key: moduleKey },
+      });
+
+      expect(untouchedRecord.coverStorageKey).toBeNull();
+
+      const uploadResponse = await request(app.getHttpServer())
+        .post(`/api/v1/admin/modules/${moduleKey}/cover`)
+        .set('authorization', `Bearer ${admin.accessToken}`)
+        .attach('file', firstCover, {
+          contentType: 'image/png',
+          filename: 'cover.png',
+        })
+        .expect(201);
+
+      expect(uploadResponse.body.data).toMatchObject({
+        cover: expect.stringMatching(
+          new RegExp(`^/api/v1/modules/display/${moduleKey}/cover\\?v=\\d+$`),
+        ),
+        coverSource: 'local',
+        customized: true,
+        key: moduleKey,
+      });
+      expect(JSON.stringify(uploadResponse.body)).not.toContain('coverStorageKey');
+      expect(JSON.stringify(uploadResponse.body)).not.toContain('storageKey');
+
+      const firstStoredRecord = await prisma.moduleDisplayConfig.findUniqueOrThrow({
+        where: { key: moduleKey },
+      });
+
+      expect(firstStoredRecord.cover).toBeNull();
+      expect(firstStoredRecord.coverStorageKey).toBeTruthy();
+      currentStorageKey = firstStoredRecord.coverStorageKey;
+
+      const coverResponse = await request(app.getHttpServer())
+        .get(`/api/v1/modules/display/${moduleKey}/cover`)
+        .expect('Content-Type', /image\/png/)
+        .expect(200);
+
+      expect(Buffer.compare(coverResponse.body as Buffer, firstCover)).toBe(0);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/admin/modules/${moduleKey}/cover`)
+        .set('authorization', `Bearer ${admin.accessToken}`)
+        .attach('file', secondCover, {
+          contentType: 'image/png',
+          filename: 'cover-replacement.png',
+        })
+        .expect(201);
+
+      const replacementRecord = await prisma.moduleDisplayConfig.findUniqueOrThrow({
+        where: { key: moduleKey },
+      });
+      const replacedStorageKey = replacementRecord.coverStorageKey;
+
+      expect(replacedStorageKey).toBeTruthy();
+      expect(replacedStorageKey).not.toBe(currentStorageKey);
+      await expect(storage.read(currentStorageKey as string)).rejects.toThrow();
+      currentStorageKey = replacedStorageKey;
+
+      const externalResponse = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/modules/${moduleKey}`)
+        .set('authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          cover: 'https://cdn.example/module-cover.webp',
+        })
+        .expect(200);
+
+      expect(externalResponse.body.data).toMatchObject({
+        cover: 'https://cdn.example/module-cover.webp',
+        coverSource: 'url',
+      });
+      await expect(storage.read(currentStorageKey as string)).rejects.toThrow();
+
+      const externalRecord = await prisma.moduleDisplayConfig.findUniqueOrThrow({
+        where: { key: moduleKey },
+      });
+
+      expect(externalRecord.cover).toBe('https://cdn.example/module-cover.webp');
+      expect(externalRecord.coverStorageKey).toBeNull();
+      currentStorageKey = null;
+
+      const clearResponse = await request(app.getHttpServer())
+        .patch(`/api/v1/admin/modules/${moduleKey}`)
+        .set('authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          cover: null,
+        })
+        .expect(200);
+
+      expect(clearResponse.body.data).toMatchObject({
+        cover: null,
+        coverSource: null,
+      });
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/modules/display/${moduleKey}/cover`)
+        .expect(404);
+    } finally {
+      if (currentStorageKey) {
+        await storage.delete(currentStorageKey);
+      }
+
+      await prisma.moduleDisplayConfig.deleteMany({
+        where: { key: moduleKey },
+      });
+    }
   });
 
   it('probes a provider with a transient key and imports selected models', async () => {

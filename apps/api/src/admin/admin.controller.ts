@@ -1,5 +1,19 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { UploadedImageFile } from '../files/image-file.validator';
+import { MODULE_COVER_MAX_BYTES } from '../models/module-display-config.service';
 import { ModuleDisplayConfigService } from '../models/module-display-config.service';
 import { UpdateModuleDisplayConfigDto } from '../models/dto/update-module-display-config.dto';
 import { AdminGuard } from './admin.guard';
@@ -104,5 +118,22 @@ export class AdminController {
   @Patch('modules/:moduleKey')
   updateModule(@Param('moduleKey') moduleKey: string, @Body() input: UpdateModuleDisplayConfigDto) {
     return this.moduleDisplayConfigService.update(moduleKey, input);
+  }
+
+  @Post('modules/:moduleKey/cover')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: MODULE_COVER_MAX_BYTES,
+        files: 1,
+      },
+    }),
+  )
+  uploadModuleCover(
+    @CurrentUser('id') actorId: string,
+    @Param('moduleKey') moduleKey: string,
+    @UploadedFile() file: UploadedImageFile | undefined,
+  ) {
+    return this.moduleDisplayConfigService.uploadCover(moduleKey, actorId, file);
   }
 }

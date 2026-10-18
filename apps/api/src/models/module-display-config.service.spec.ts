@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import type { SaveFileInput, StorageAdapter, StoredFile } from '../storage/storage.types';
 import type { PrismaService } from '../infrastructure/prisma/prisma.service';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -10,6 +11,7 @@ function moduleRecord(overrides: Record<string, unknown> = {}) {
   return {
     badge: null,
     cover: null,
+    coverStorageKey: null,
     createdAt: new Date('2026-10-17T00:00:00.000Z'),
     group: 'primary',
     icon: 'chat',
@@ -24,19 +26,23 @@ function moduleRecord(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function createService(records: unknown[] = []) {
+function createService(records: unknown[] = [], storage = new MemoryStorageAdapter()) {
   const moduleDisplayConfig = {
     findMany: vi.fn().mockResolvedValue(records),
     findUnique: vi.fn().mockResolvedValue(null),
     upsert: vi.fn(),
   };
-  const service = new ModuleDisplayConfigService({
-    moduleDisplayConfig,
-  } as unknown as PrismaService);
+  const service = new ModuleDisplayConfigService(
+    {
+      moduleDisplayConfig,
+    } as unknown as PrismaService,
+    storage,
+  );
 
   return {
     moduleDisplayConfig,
     service,
+    storage,
   };
 }
 
@@ -135,6 +141,7 @@ describe('module display config service', () => {
       update: {
         badge: 'HOT',
         cover: undefined,
+        coverStorageKey: undefined,
         group: undefined,
         icon: undefined,
         name: undefined,
@@ -159,4 +166,152 @@ describe('module display config service', () => {
       NotFoundException,
     );
   });
+
+  it('serves uploaded module covers through a stable public URL', async () => {
+    const { service } = createService([
+      moduleRecord({
+        cover: 'https://cdn.example/old-cover.png',
+        coverStorageKey: 'users/admin/2026/10/cover.png',
+      }),
+    ]);
+
+    const result = await service.listAdmin();
+    const chat = result.items.find((item) => item.key === 'chat');
+
+    expect(chat).toMatchObject({
+      coverSource: 'local',
+    });
+    expect(chat?.cover).toMatch(/^\/api\/v1\/modules\/display\/chat\/cover\?v=\d+$/);
+  });
+
+  it('removes the old local file when switching back to an external cover URL', async () => {
+    const previousStorageKey = 'users/admin/2026/10/previous.png';
+    const { moduleDisplayConfig, service, storage } = createService([
+      moduleRecord({
+        coverStorageKey: previousStorageKey,
+      }),
+    ]);
+
+    moduleDisplayConfig.findUnique.mockResolvedValue(
+      moduleRecord({
+        coverStorageKey: previousStorageKey,
+      }),
+    );
+    moduleDisplayConfig.upsert.mockResolvedValue(
+      moduleRecord({
+        cover: 'https://cdn.example/new-cover.webp',
+      }),
+    );
+
+    const result = await service.update('chat', {
+      cover: ' https://cdn.example/new-cover.webp ',
+    });
+
+    expect(moduleDisplayConfig.upsert).toHaveBeenCalledWith({
+      create: expect.objectContaining({
+        cover: 'https://cdn.example/new-cover.webp',
+        coverStorageKey: null,
+      }),
+      update: {
+        badge: undefined,
+        cover: 'https://cdn.example/new-cover.webp',
+        coverStorageKey: null,
+        group: undefined,
+        icon: undefined,
+        name: undefined,
+        route: undefined,
+        sortOrder: undefined,
+        visible: undefined,
+      },
+      where: { key: 'chat' },
+    });
+    expect(storage.deletedKeys).toEqual([previousStorageKey]);
+    expect(result).toMatchObject({
+      cover: 'https://cdn.example/new-cover.webp',
+      coverSource: 'url',
+    });
+  });
+
+  it('stores uploaded cover files and replaces the previous local file', async () => {
+    const previousStorageKey = 'users/admin/2026/10/previous.png';
+    const { moduleDisplayConfig, service, storage } = createService([], storageFixture());
+
+    moduleDisplayConfig.findUnique.mockResolvedValue(
+      moduleRecord({
+        coverStorageKey: previousStorageKey,
+      }),
+    );
+    moduleDisplayConfig.upsert.mockImplementation(
+      ({ create }: { create: Record<string, unknown> }) =>
+        Promise.resolve(moduleRecord({ ...create, id: 'created-module' })),
+    );
+
+    const result = await service.uploadCover('chat', 'admin-1', {
+      buffer: PNG_BUFFER,
+      mimetype: 'image/png',
+      originalname: 'cover.png',
+      size: PNG_BUFFER.length,
+    });
+
+    expect(storage.savedInputs).toHaveLength(1);
+    expect(storage.savedInputs[0]).toMatchObject({
+      extension: 'png',
+      mimeType: 'image/png',
+      originalName: 'cover.png',
+      userId: 'admin-1',
+    });
+    const storedFile = storage.storedFiles[0];
+    expect(storedFile).toBeDefined();
+    expect(moduleDisplayConfig.upsert).toHaveBeenCalledWith({
+      create: expect.objectContaining({
+        cover: null,
+        coverStorageKey: storedFile?.storageKey,
+      }),
+      update: {
+        cover: null,
+        coverStorageKey: storedFile?.storageKey,
+      },
+      where: { key: 'chat' },
+    });
+    expect(storage.deletedKeys).toEqual([previousStorageKey]);
+    expect(result.coverSource).toBe('local');
+    expect(result.cover).toContain('/api/v1/modules/display/chat/cover?v=');
+  });
 });
+
+const PNG_BUFFER = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
+
+function storageFixture(): MemoryStorageAdapter {
+  return new MemoryStorageAdapter();
+}
+
+class MemoryStorageAdapter implements StorageAdapter {
+  readonly deletedKeys: string[] = [];
+  readonly savedInputs: SaveFileInput[] = [];
+  readonly storedFiles: StoredFile[] = [];
+  private counter = 0;
+
+  async delete(storageKey: string): Promise<void> {
+    this.deletedKeys.push(storageKey);
+  }
+
+  async read(): Promise<Buffer> {
+    return PNG_BUFFER;
+  }
+
+  async save(input: SaveFileInput): Promise<StoredFile> {
+    this.counter += 1;
+    const stored = {
+      checksum: `checksum-${this.counter}`,
+      size: input.buffer.length,
+      storageKey: `test/cover-${this.counter}.${input.extension}`,
+    };
+
+    this.savedInputs.push(input);
+    this.storedFiles.push(stored);
+    return stored;
+  }
+}

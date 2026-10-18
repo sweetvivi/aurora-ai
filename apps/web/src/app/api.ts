@@ -107,6 +107,7 @@ export type ModuleDisplayGroup = 'creation-office' | 'primary';
 export interface ModuleDisplayConfig {
   badge: string | null;
   cover: string | null;
+  coverSource: 'local' | 'url' | null;
   customized: boolean;
   group: ModuleDisplayGroup;
   icon: string;
@@ -785,6 +786,25 @@ export async function updateAdminModuleDisplayConfig(
   const response = await apiClient.patch<ApiEnvelope<ModuleDisplayConfig>>(
     `/api/v1/admin/modules/${encodeURIComponent(moduleKey)}`,
     input,
+  );
+
+  return response.data.data;
+}
+
+export async function uploadAdminModuleCover(
+  moduleKey: string,
+  file: File,
+): Promise<ModuleDisplayConfig> {
+  const formData = new FormData();
+
+  formData.append('file', file);
+
+  const response = await apiClient.post<ApiEnvelope<ModuleDisplayConfig>>(
+    `/api/v1/admin/modules/${encodeURIComponent(moduleKey)}/cover`,
+    formData,
+    {
+      timeout: 30_000,
+    },
   );
 
   return response.data.data;

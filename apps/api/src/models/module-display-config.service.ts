@@ -1,14 +1,24 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { ModuleDisplayConfig as ModuleDisplayConfigRecord } from '@prisma/client';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
+import {
+  detectImageMimeType,
+  normalizeMimeType,
+  type UploadedImageFile,
+  validateImageUpload,
+} from '../files/image-file.validator';
+import { STORAGE_ADAPTER, type StorageAdapter } from '../storage/storage.types';
 import type {
   ModuleDisplayGroup,
   UpdateModuleDisplayConfigDto,
 } from './dto/update-module-display-config.dto';
 
+export const MODULE_COVER_MAX_BYTES = 8 * 1024 * 1024;
+
 export interface ModuleDisplayConfigItem {
   badge: string | null;
   cover: string | null;
+  coverSource: 'local' | 'url' | null;
   customized: boolean;
   group: ModuleDisplayGroup;
   icon: string;
@@ -19,7 +29,7 @@ export interface ModuleDisplayConfigItem {
   visible: boolean;
 }
 
-type DefaultModuleDisplayConfig = Omit<ModuleDisplayConfigItem, 'customized'>;
+type DefaultModuleDisplayConfig = Omit<ModuleDisplayConfigItem, 'coverSource' | 'customized'>;
 
 export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig[] = [
   {
@@ -171,7 +181,10 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
 export class ModuleDisplayConfigService {
   private readonly logger = new Logger(ModuleDisplayConfigService.name);
 
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    @Inject(STORAGE_ADAPTER) private readonly storageAdapter: StorageAdapter,
+  ) {}
 
   async listPublic(): Promise<{
     items: ModuleDisplayConfigItem[];
@@ -195,11 +208,9 @@ export class ModuleDisplayConfigService {
   async update(key: string, input: UpdateModuleDisplayConfigDto): Promise<ModuleDisplayConfigItem> {
     const normalizedKey = key.trim();
     const defaultConfig = DEFAULT_MODULE_DISPLAY_CONFIGS.find((item) => item.key === normalizedKey);
-    const existing = defaultConfig
-      ? null
-      : await this.prismaService.moduleDisplayConfig.findUnique({
-          where: { key: normalizedKey },
-        });
+    const existing = await this.prismaService.moduleDisplayConfig.findUnique({
+      where: { key: normalizedKey },
+    });
 
     if (!defaultConfig && !existing) {
       throw new NotFoundException({
@@ -208,9 +219,12 @@ export class ModuleDisplayConfigService {
       });
     }
 
+    const externalCoverChanged = input.cover !== undefined;
+    const externalCover = input.cover?.trim() || null;
     const data = {
       badge: input.badge === undefined ? undefined : input.badge?.trim() || null,
-      cover: input.cover === undefined ? undefined : input.cover?.trim() || null,
+      cover: externalCoverChanged ? externalCover : undefined,
+      coverStorageKey: externalCoverChanged ? null : undefined,
       group: input.group,
       icon: input.icon?.trim(),
       name: input.name?.trim(),
@@ -221,7 +235,8 @@ export class ModuleDisplayConfigService {
     const record = await this.prismaService.moduleDisplayConfig.upsert({
       create: {
         badge: data.badge ?? defaultConfig?.badge ?? null,
-        cover: data.cover ?? defaultConfig?.cover ?? null,
+        cover: externalCoverChanged ? externalCover : (defaultConfig?.cover ?? null),
+        coverStorageKey: null,
         group: data.group ?? defaultConfig?.group ?? 'primary',
         icon: data.icon ?? defaultConfig?.icon ?? 'app',
         key: normalizedKey,
@@ -234,7 +249,94 @@ export class ModuleDisplayConfigService {
       where: { key: normalizedKey },
     });
 
+    if (externalCoverChanged && existing?.coverStorageKey) {
+      await this.storageAdapter.delete(existing.coverStorageKey);
+    }
+
     return this.toItem(record, true);
+  }
+
+  async uploadCover(
+    key: string,
+    actorId: string,
+    file: UploadedImageFile | undefined,
+  ): Promise<ModuleDisplayConfigItem> {
+    const normalizedKey = key.trim();
+    const defaultConfig = DEFAULT_MODULE_DISPLAY_CONFIGS.find((item) => item.key === normalizedKey);
+    const existing = await this.prismaService.moduleDisplayConfig.findUnique({
+      where: { key: normalizedKey },
+    });
+
+    if (!defaultConfig && !existing) {
+      throw new NotFoundException({
+        code: 'MODULE_DISPLAY_CONFIG_NOT_FOUND',
+        message: '模块不存在',
+      });
+    }
+
+    validateImageUpload(file, { maxBytes: MODULE_COVER_MAX_BYTES });
+    const uploadedFile = file as UploadedImageFile;
+    const mimeType = normalizeMimeType(uploadedFile.mimetype);
+    const stored = await this.storageAdapter.save({
+      buffer: uploadedFile.buffer,
+      extension: extensionFromMimeType(mimeType),
+      mimeType,
+      originalName: uploadedFile.originalname,
+      userId: actorId,
+    });
+
+    let record: ModuleDisplayConfigRecord;
+
+    try {
+      record = await this.prismaService.moduleDisplayConfig.upsert({
+        create: {
+          badge: defaultConfig?.badge ?? null,
+          cover: null,
+          coverStorageKey: stored.storageKey,
+          group: defaultConfig?.group ?? 'primary',
+          icon: defaultConfig?.icon ?? 'app',
+          key: normalizedKey,
+          name: defaultConfig?.name ?? normalizedKey,
+          route: defaultConfig?.route ?? '/',
+          sortOrder: defaultConfig?.sortOrder ?? 100,
+          visible: defaultConfig?.visible ?? true,
+        },
+        update: {
+          cover: null,
+          coverStorageKey: stored.storageKey,
+        },
+        where: { key: normalizedKey },
+      });
+    } catch (error) {
+      await this.storageAdapter.delete(stored.storageKey);
+      throw error;
+    }
+
+    if (existing?.coverStorageKey) {
+      await this.storageAdapter.delete(existing.coverStorageKey);
+    }
+
+    return this.toItem(record, true);
+  }
+
+  async readPublicCover(key: string): Promise<{ buffer: Buffer; mimeType: string }> {
+    const record = await this.prismaService.moduleDisplayConfig.findUnique({
+      where: { key: key.trim() },
+    });
+
+    if (!record?.coverStorageKey) {
+      throw new NotFoundException({
+        code: 'MODULE_COVER_NOT_FOUND',
+        message: '模块封面不存在',
+      });
+    }
+
+    const buffer = await this.storageAdapter.read(record.coverStorageKey);
+
+    return {
+      buffer,
+      mimeType: detectImageMimeType(buffer) ?? 'application/octet-stream',
+    };
   }
 
   private async listEffective(): Promise<{
@@ -257,6 +359,7 @@ export class ModuleDisplayConfigService {
       return {
         items: DEFAULT_MODULE_DISPLAY_CONFIGS.map((item) => ({
           ...item,
+          coverSource: null,
           customized: false,
         })),
         source: 'defaults',
@@ -270,6 +373,7 @@ export class ModuleDisplayConfigService {
       if (!override) {
         return {
           ...item,
+          coverSource: null,
           customized: false,
         };
       }
@@ -293,9 +397,14 @@ export class ModuleDisplayConfigService {
   }
 
   private toItem(record: ModuleDisplayConfigRecord, customized: boolean): ModuleDisplayConfigItem {
+    const localCover = record.coverStorageKey
+      ? `/api/v1/modules/display/${encodeURIComponent(record.key)}/cover?v=${record.updatedAt.getTime()}`
+      : null;
+
     return {
       badge: record.badge,
-      cover: record.cover,
+      cover: localCover ?? record.cover,
+      coverSource: localCover ? 'local' : record.cover ? 'url' : null,
       customized,
       group: record.group as ModuleDisplayGroup,
       icon: record.icon,
@@ -306,4 +415,15 @@ export class ModuleDisplayConfigService {
       visible: record.visible,
     };
   }
+}
+
+function extensionFromMimeType(mimeType: string): string {
+  return (
+    {
+      'image/gif': 'gif',
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+    }[mimeType] ?? 'bin'
+  );
 }
