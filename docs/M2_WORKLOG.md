@@ -858,6 +858,24 @@ node outputs/ui-reference/verify-chat-conversation-actions.mjs
 - `verify-chat-conversation-actions.mjs` 同步验证抽屉从右侧展开、设置持久化、模型筛选、清空确认取消、会话重命名与删除；桌面端 `1440x1000` 和移动端 `390x844` 均无横向溢出和页面脚本错误
 - 本批使用 Mock 会话接口，不调用真实 Provider，不读取或输出 Key
 
+Provider 动态路由：
+
+```text
+pnpm --filter @aurora/api test -- src/providers/provider-router.spec.ts src/providers/provider-protocol.spec.ts
+node outputs/ui-reference/verify-image-generation.mjs
+node outputs/ui-reference/verify-image-workbench-detail.mjs
+node outputs/ui-reference/verify-video-tasks.mjs
+node outputs/ui-reference/verify-video-studio.mjs
+node outputs/ui-reference/verify-video-preview.mjs
+node outputs/ui-reference/verify-m2-routes.mjs
+```
+
+- 新增 `ImageProviderRouter` 和 `VideoProviderRouter`，根据 `providerCode`、上游模型和 Base URL 识别 OpenAI-compatible、Seedream、xAI 或 Seedance 协议
+- 新增 Ark 兼容的 `SeedreamImageProvider` 和 `SeedanceVideoProvider`；图片任务传递 `providerCode`，视频创建、轮询和首尾帧能力判断传递完整模型元数据
+- `IMAGE_PROVIDER`、`VIDEO_PROVIDER` 的显式 `mock`/旧 Provider 模式始终优先；`auto` 仅在匹配协议且存在对应 Key 时使用新 Provider，否则保留原 Provider 或 Mock
+- Key 解析顺序保持为后台 `providerKeyRef`、专用 Seedream/Seedance Key、通用图片/视频 Key；本轮未调用真实付费接口，也未读取、输出或提交任何真实 Key
+- 新增 Provider 路由、协议和两个适配器单测；本轮图片、视频工作台及八个主路由的桌面端/移动端 Mock 浏览器验收全部通过
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥
@@ -871,7 +889,8 @@ node outputs/ui-reference/verify-chat-conversation-actions.mjs
 ## 6. 已知遗留
 
 - 真实视频 Provider 已完成单元、端到端和浏览器 Mock 验收，但尚未做真实视频低额度人工验收
-- 真实视频 Provider 暂不支持首尾帧；真实模式当前限制为文生视频或单张参考图
+- Seedance 的真实视频链路已完成协议实现和单位测试，但尚未做真实低额度人工验收；在提供合规的 Seedance Key 与 Base URL 前，不把它当作已验证可用
+- xAI 真实视频 Provider 暂不支持首尾帧；Seedance 已声明支持首尾帧，但仍需真实接口验证后再对外确认
 - 真实图片 Provider 已完成主链路验收，但尚未覆盖所有异常分支、批量数量和所有图片尺寸的长期稳定性
 - 参考产品仍有未排期板块，当前只保留入口位置
 - 本批已完成本地验证，提交和推送状态以 Git 日志为准

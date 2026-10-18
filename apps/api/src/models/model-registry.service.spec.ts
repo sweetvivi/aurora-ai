@@ -78,7 +78,7 @@ describe('model registry', () => {
       count: expect.any(Number),
       source: 'defaults',
     });
-    expect(registry.list()).toHaveLength(11);
+    expect(registry.list()).toHaveLength(13);
   });
 
   it('falls back to defaults when the initial database load fails', async () => {
@@ -90,7 +90,7 @@ describe('model registry', () => {
     const registry = new ModelRegistryService(new ConfigService({}), prisma);
 
     await expect(registry.reload()).resolves.toMatchObject({
-      count: 11,
+      count: 13,
       source: 'defaults',
     });
     expect(registry.getByAlias('openai-gpt-6-astra').providerModel).toBe('gpt-6-astra');

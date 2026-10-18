@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { LLM_PROVIDER } from './llm-provider';
 import { IMAGE_PROVIDER } from './image-provider';
+import { ImageProviderRouter } from './image-provider-router';
 import { MockImageProvider } from './mock-image/mock-image.provider';
 import { OpenAiImageProvider } from './openai-image/openai-image.provider';
 import { OpenAiCompatibleProvider } from './openai-compatible/openai-compatible.provider';
+import { SeedanceVideoProvider } from './seedance-video/seedance-video.provider';
+import { SeedreamImageProvider } from './seedream-image/seedream-image.provider';
 import { VIDEO_PROVIDER } from './video-provider';
+import { VideoProviderRouter } from './video-provider-router';
 import { MockVideoProvider } from './mock-video/mock-video.provider';
 import { XaiVideoProvider } from './xai-video/xai-video.provider';
 
@@ -15,62 +18,36 @@ import { XaiVideoProvider } from './xai-video/xai-video.provider';
     OpenAiImageProvider,
     MockImageProvider,
     MockVideoProvider,
+    SeedanceVideoProvider,
+    SeedreamImageProvider,
     XaiVideoProvider,
+    ImageProviderRouter,
+    VideoProviderRouter,
     {
       provide: LLM_PROVIDER,
       useExisting: OpenAiCompatibleProvider,
     },
     {
       provide: IMAGE_PROVIDER,
-      inject: [ConfigService, MockImageProvider, OpenAiImageProvider],
-      useFactory: (
-        configService: ConfigService,
-        mockImageProvider: MockImageProvider,
-        openAiImageProvider: OpenAiImageProvider,
-      ) => {
-        const mode = configService.get<string>('IMAGE_PROVIDER', 'auto');
-
-        if (mode === 'mock') {
-          return mockImageProvider;
-        }
-
-        if (mode === 'openai') {
-          return openAiImageProvider;
-        }
-
-        return configService.get<string>('IMAGE_API_KEY') ? openAiImageProvider : mockImageProvider;
-      },
+      useExisting: ImageProviderRouter,
     },
     {
       provide: VIDEO_PROVIDER,
-      inject: [ConfigService, MockVideoProvider, XaiVideoProvider],
-      useFactory: (
-        configService: ConfigService,
-        mockVideoProvider: MockVideoProvider,
-        xaiVideoProvider: XaiVideoProvider,
-      ) => {
-        const mode = configService.get<string>('VIDEO_PROVIDER', 'auto');
-
-        if (mode === 'mock') {
-          return mockVideoProvider;
-        }
-
-        if (mode === 'xai') {
-          return xaiVideoProvider;
-        }
-
-        return configService.get<string>('VIDEO_API_KEY') ? xaiVideoProvider : mockVideoProvider;
-      },
+      useExisting: VideoProviderRouter,
     },
   ],
   exports: [
     LLM_PROVIDER,
     OpenAiCompatibleProvider,
+    ImageProviderRouter,
     IMAGE_PROVIDER,
     MockImageProvider,
     OpenAiImageProvider,
+    SeedreamImageProvider,
+    VideoProviderRouter,
     VIDEO_PROVIDER,
     MockVideoProvider,
+    SeedanceVideoProvider,
     XaiVideoProvider,
   ],
 })

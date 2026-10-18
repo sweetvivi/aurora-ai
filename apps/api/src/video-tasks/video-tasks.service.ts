@@ -118,7 +118,14 @@ export class VideoTasksService implements OnModuleInit {
 
       await this.filesService.getOwnedAsset(userId, input.lastFrameFileId);
 
-      if (this.videoProvider.supportsLastFrame === false) {
+      const supportsLastFrame =
+        this.videoProvider.supportsLastFrameFor?.({
+          model: model.providerModel,
+          providerBaseUrl: model.baseUrl,
+          providerCode: model.providerCode,
+        }) ?? this.videoProvider.supportsLastFrame !== false;
+
+      if (!supportsLastFrame) {
         throw new ConflictException({
           code: 'VIDEO_LAST_FRAME_UNSUPPORTED',
           message: '当前视频模型暂不支持首尾帧模式，请切换为文生视频或图生视频',
@@ -343,6 +350,7 @@ export class VideoTasksService implements OnModuleInit {
           model: model.providerModel,
           parameters: this.toRecord(task.parameters),
           providerBaseUrl: model.baseUrl,
+          providerCode: model.providerCode,
           providerKeyRef: model.keyRef,
           prompt: task.prompt,
           sourceImage: task.sourceFile
@@ -385,7 +393,9 @@ export class VideoTasksService implements OnModuleInit {
         }
 
         const snapshot = await this.videoProvider.pollGeneration(providerRequestId, {
+          model: model.providerModel,
           providerBaseUrl: model.baseUrl,
+          providerCode: model.providerCode,
           providerKeyRef: model.keyRef,
         });
         progress = Math.max(progress, snapshot.progress);

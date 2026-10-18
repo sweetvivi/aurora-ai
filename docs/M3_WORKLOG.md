@@ -89,7 +89,7 @@
 - `pnpm format:check` 通过
 - `pnpm lint` 通过
 - `pnpm typecheck` 通过
-- `pnpm test`：API 20 个文件 83 项通过，Web 16 个文件 66 项通过
+- `pnpm test`：API 24 个文件 91 项通过，Web 16 个文件 66 项通过
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-admin-console.mjs` 通过
 - `node outputs/ui-reference/verify-admin-provider-probe.mjs` 通过
@@ -115,7 +115,7 @@
 
 ## 6. 已知限制
 
-- Provider 实例选择仍由 `IMAGE_PROVIDER`、`VIDEO_PROVIDER` 等环境变量决定；数据库目前主要控制模型、端点和 Key 引用，尚未按厂商类别动态选择 Provider 实现
+- Provider 已支持按模型元数据动态选择 Seedream/Seedance/OpenAI-compatible/xAI 实现；显式 `IMAGE_PROVIDER`、`VIDEO_PROVIDER` 仍作为覆盖开关，数据库继续控制模型、端点、能力和 Key 引用
 - 真实 Key 尚未提供后台加密持久化；当前仍通过服务端环境变量和 `keyRef` 使用，避免在未确定加密、轮换、审计和备份方案前落库
 - 厂商探测允许管理员填写任意 Base URL，生产启用前需要增加内网地址拦截、域名策略或受控出口，降低 SSRF 风险
 - 模块封面已完成受控上传、MIME/文件头校验、公开读取和旧文件清理；尚未增加像素尺寸校验、格式转换、病毒扫描和对象存储迁移策略
@@ -126,7 +126,7 @@
 
 1. 使用真实低额度 Key 或 Mock Provider 验收超级智能体首轮消息、流式更新、停止生成、错误退款和历史切换
 2. 将 AI 绘画页面中与核心绘画流程无关的视频入口弱化或移除
-3. 为 Provider 类别增加数据库驱动的动态实例化
+3. 为 Seedream/Seedance 补充真实低额度人工验收，并继续完善数据库驱动 Provider 配置的审计和回滚
 4. 为模块封面补充像素尺寸校验、格式转换、站内路由校验和对象存储迁移策略
 5. 继续补充后台操作审计、失败回滚和真实环境恢复测试
 6. 在获得单独确认后设计真实 Key 的加密存储、轮换、审计和备份方案

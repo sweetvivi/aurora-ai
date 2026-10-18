@@ -79,6 +79,13 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
     providerModel: 'gpt-image-2.5',
   },
   {
+    alias: 'doubao-seedream-4-0',
+    capabilities: ['image'],
+    displayName: 'Seedream 4.0',
+    providerCode: 'volcengine',
+    providerModel: 'doubao-seedream-4-0-250828',
+  },
+  {
     alias: 'xai-grok-imagine-video',
     capabilities: ['video'],
     displayName: 'Grok Imagine Video',
@@ -91,6 +98,13 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
     displayName: 'Grok Imagine Video 1.5',
     providerCode: 'xai',
     providerModel: 'grok-imagine-video-1.5',
+  },
+  {
+    alias: 'doubao-seedance-1-0-pro',
+    capabilities: ['video'],
+    displayName: 'Seedance 1.0 Pro',
+    providerCode: 'volcengine',
+    providerModel: 'doubao-seedance-1-0-pro-250528',
   },
 ];
 

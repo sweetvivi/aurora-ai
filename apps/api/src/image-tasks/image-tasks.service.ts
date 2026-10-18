@@ -272,6 +272,7 @@ export class ImageTasksService implements OnModuleInit {
         model: model.providerModel,
         parameters: this.toRecord(task.parameters),
         providerBaseUrl: model.baseUrl,
+        providerCode: model.providerCode,
         providerKeyRef: model.keyRef,
         prompt: task.prompt,
         sourceImages: sourceImages.length > 0 ? sourceImages : undefined,

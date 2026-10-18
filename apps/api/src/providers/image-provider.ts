@@ -2,6 +2,7 @@ export interface GenerateImageInput {
   model?: string;
   parameters?: Record<string, unknown>;
   providerBaseUrl?: string;
+  providerCode?: string;
   providerKeyRef?: string;
   prompt: string;
   sourceImages?: Array<{
