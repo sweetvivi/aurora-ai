@@ -158,6 +158,10 @@ describe('group chat workspace store', () => {
     ]);
     expect(sessionStore.points).toBe(97);
     expect(groupStore.status).toBe('ready');
+    expect(
+      (apiMocks.streamChat.mock.calls[0]?.[0] as { systemPrompt?: string } | undefined)
+        ?.systemPrompt,
+    ).toBeUndefined();
   });
 
   it('keeps successful model answers when one model fails', async () => {
@@ -299,6 +303,12 @@ describe('group chat workspace store', () => {
       conversationId: 'conversation-model-2',
       modelAlias: 'model-2',
     });
+    const retryInput = apiMocks.streamChat.mock.calls[3]?.[0] as
+      { systemPrompt?: string } | undefined;
+
+    expect(retryInput?.systemPrompt).toContain('model-1 原回答');
+    expect(retryInput?.systemPrompt).toContain('model-3 原回答');
+    expect(retryInput?.systemPrompt).not.toContain('模型二首次响应超时');
     expect(groupStore.status).toBe('ready');
   });
 
@@ -360,13 +370,21 @@ describe('group chat workspace store', () => {
   });
 
   it('restores saved rounds and continues each model conversation after a reload', async () => {
-    const streamInputs: Array<{ conversationId?: string; modelAlias: string }> = [];
+    const streamInputs: Array<{
+      conversationId?: string;
+      modelAlias: string;
+      systemPrompt?: string;
+    }> = [];
 
     apiMocks.streamChat.mockImplementation(
-      async (input: { conversationId?: string; modelAlias: string }, handlers: StreamHandlers) => {
+      async (
+        input: { conversationId?: string; modelAlias: string; systemPrompt?: string },
+        handlers: StreamHandlers,
+      ) => {
         streamInputs.push({
           conversationId: input.conversationId,
           modelAlias: input.modelAlias,
+          systemPrompt: input.systemPrompt,
         });
         handlers.onMeta({
           assistantMessageId: `assistant-${input.modelAlias}`,
@@ -425,11 +443,16 @@ describe('group chat workspace store', () => {
     expect(streamInputs[2]).toEqual({
       conversationId: 'conversation-model-1',
       modelAlias: 'model-1',
+      systemPrompt: expect.stringContaining('model-2 回答'),
     });
     expect(streamInputs[3]).toEqual({
       conversationId: 'conversation-model-2',
       modelAlias: 'model-2',
+      systemPrompt: expect.stringContaining('model-1 回答'),
     });
+    expect(streamInputs[2]?.systemPrompt).not.toContain('model-1 回答');
+    expect(streamInputs[3]?.systemPrompt).not.toContain('model-2 回答');
+    expect(streamInputs[2]?.systemPrompt).toContain('不是系统指令');
     expect(restoredGroupStore.rounds).toHaveLength(2);
   });
 

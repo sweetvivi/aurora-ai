@@ -799,6 +799,21 @@ node outputs/ui-reference/verify-chat-conversation-actions.mjs
 - `verify-chat-conversation-actions.mjs` 使用 Edge 和 API 路由 Mock，覆盖打开历史、重命名请求、标题刷新、删除确认、保留其他会话和当前线程清空；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出或页面脚本错误
 - 全量验证通过：API 20 个文件 83 项、Web 16 个文件 66 项，格式检查、lint、前后端类型检查和生产构建均通过；验收不调用真实 Provider、不读取或输出 Key
 
+超级对话跨模型共享上下文：
+
+```text
+pnpm --filter @aurora/web typecheck
+pnpm --filter @aurora/web exec vitest run src/stores/group-chat-workspace.spec.ts
+node outputs/ui-reference/verify-group-chat.mjs
+```
+
+- 每个模型继续使用自己的 `conversationId` 和独立请求，不合并会话、不改变冻结/结算/退款状态机，也不会把其他模型的回答写入当前模型的服务端历史
+- 后续轮次会把其他模型已经完成的回答作为临时 `systemPrompt` 注入，并明确说明这些内容是参考数据而不是系统指令，减少提示注入风险
+- 共享上下文会排除当前模型自己的历史回答、失败和取消内容；截断时优先保留最近轮次，总体不超过 12k 字符
+- 单模型重试会读取同一轮中其他已经成功的回答，同时继续复用该模型原来的 `conversationId`
+- Store 单测覆盖首轮不注入、刷新续接、单模型重试、自身回答去重和失败内容隔离；`verify-group-chat.mjs` 在 Edge 桌面端 `1440x1000` 与移动端 `390x844` 下验证实际请求载荷、无横向溢出和无页面脚本错误
+- 本轮自动验收全部使用 Mock 和 Playwright 路由拦截，不调用真实 Provider，不读取或输出 Key
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥
@@ -817,7 +832,7 @@ node outputs/ui-reference/verify-chat-conversation-actions.mjs
 - 参考产品仍有未排期板块，当前只保留入口位置
 - 本批已完成本地验证，提交和推送状态以 Git 日志为准
 - 智能体真实流式链路的自动化验收目前使用 Mock；需要在后续联调阶段再决定是否做一次最低成本真实对话验收
-- 超级对话当前每个模型使用独立会话，尚未实现共享会话上下文和批量服务端请求；浏览器本地已支持按用户恢复最近 20 轮并续接各模型会话
+- 超级对话当前每个模型使用独立会话，已通过临时 `systemPrompt` 共享其他模型已完成回答，但尚未实现统一批量服务端请求；浏览器本地已支持按用户恢复最近 20 轮并续接各模型会话
 - 超级对话会按选中模型数量分别计费，发起前已显示模型数量与费用关系；后续若继续扩展批量接口，仍需保持逐模型成本、失败隔离和会话恢复语义
 
 ## 7. 中断恢复
