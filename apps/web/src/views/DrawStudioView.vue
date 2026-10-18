@@ -2528,7 +2528,7 @@ onBeforeUnmount(() => {
 .draw-studio {
   display: grid;
   min-height: calc(100vh - 56px);
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 214px minmax(0, 1fr);
   background: #fff;
 }
 

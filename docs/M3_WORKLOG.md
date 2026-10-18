@@ -431,3 +431,12 @@
 - `verify-agent-detail-actions.mjs` 的历史抽屉宽度断言同步更新为 `246px`；桌面端 `1440x1000` 与移动端 `390x844` 复跑通过，侧栏 `320px`、消息列/输入区 `768px` 和移动端 `366px` 输入区保持不变，无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
+
+## 37. 2026-10-19 AI 绘画次级导航栏宽度对齐
+
+- 重新检查用户目录：`本地密钥目录\说明文件.txt` 仍是 `2026-10-17 18:51`、`ActionsNEW*.png` 最新仍是 `ActionsNEW5.png`、`当前页面截图` 最新仍是 `2026-10-15`、`outputs/ui-reference/live-reference` 最新仍是 `2026-10-18 20:07`；没有更新的说明、截图或 Actions 反馈，因此按既定顺序继续推进
+- 对参考截图 `outputs/ui-reference/live-reference/draw.png` 做像素扫描：内容起点约为 `x=240`、侧栏右边界约为 `x=453`，侧栏实际宽度约 `214px`；本地旧截图的边界约为 `x=479`，宽度约 `240px`
+- `DrawStudioView.vue` 将 `.draw-studio` 的网格首列由 `240px` 收紧为 `214px`，保留折叠态 `64px` 和其余工作区逻辑不变
+- `verify-draw-navigation.mjs` 增加展开状态 `214px` 宽度断言；复跑桌面端 `1440x1000` 与移动端 `390x844` 均通过，`clientWidth === scrollWidth`，无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
