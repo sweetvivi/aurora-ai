@@ -115,8 +115,9 @@ const fallbackModels: ModelCatalogItem[] = [
       video: {
         maxDuration: 12,
         resolutions: ['480P', '720P', '1080P'],
-        supportsAudio: true,
+        supportsAudio: false,
         supportsLastFrame: true,
+        supportsVideoInput: false,
       },
     },
   },

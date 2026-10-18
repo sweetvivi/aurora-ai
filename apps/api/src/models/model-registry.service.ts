@@ -159,8 +159,9 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
       video: {
         maxDuration: 12,
         resolutions: ['480P', '720P', '1080P'],
-        supportsAudio: true,
+        supportsAudio: false,
         supportsLastFrame: true,
+        supportsVideoInput: false,
       },
     },
     providerCode: 'volcengine',
@@ -266,15 +267,17 @@ function resolveVideoCapabilityProfile(identity: string): VideoCapabilityProfile
     return {
       maxDuration: 30,
       resolutions: ['480P', '720P', '1080P'],
+      supportsAudio: false,
       supportsLastFrame: true,
       supportsVideoInput: true,
     };
   }
 
-  if (/seedance[-_\s]?2[-_\s]?(fast|mini)/.test(identity)) {
+  if (/seedance[-_\s]?2(?:[-_\s]?0)?[-_\s]?(fast|mini)/.test(identity)) {
     return {
       maxDuration: 15,
       resolutions: ['480P', '720P'],
+      supportsAudio: false,
       supportsLastFrame: true,
       supportsVideoInput: true,
     };
@@ -284,6 +287,7 @@ function resolveVideoCapabilityProfile(identity: string): VideoCapabilityProfile
     return {
       maxDuration: 15,
       resolutions: ['480P', '720P', '1080P', '4K'],
+      supportsAudio: false,
       supportsLastFrame: true,
       supportsVideoInput: true,
     };
@@ -295,14 +299,26 @@ function resolveVideoCapabilityProfile(identity: string): VideoCapabilityProfile
       resolutions: ['480P', '720P', '1080P'],
       supportsAudio: true,
       supportsLastFrame: true,
+      supportsVideoInput: false,
+    };
+  }
+
+  if (identity.includes('seedance-1-0') || identity.includes('seedance-1.0')) {
+    return {
+      maxDuration: 12,
+      resolutions: ['480P', '720P', '1080P'],
+      supportsAudio: false,
+      supportsLastFrame: true,
+      supportsVideoInput: false,
     };
   }
 
   return {
-    maxDuration: 12,
-    resolutions: ['480P', '720P', '1080P'],
-    supportsAudio: true,
+    maxDuration: 30,
+    resolutions: ['480P', '720P', '1080P', '4K'],
+    supportsAudio: false,
     supportsLastFrame: true,
+    supportsVideoInput: true,
   };
 }
 

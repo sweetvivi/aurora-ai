@@ -89,6 +89,23 @@ describe('model registry', () => {
 
     expect(
       resolveModelCapabilityProfile({
+        alias: 'seedance-1-0-pro',
+        capabilities: ['video'],
+        providerCode: 'volcengine',
+        providerModel: 'doubao-seedance-1-0-pro-250528',
+      }),
+    ).toMatchObject({
+      video: {
+        maxDuration: 12,
+        resolutions: ['480P', '720P', '1080P'],
+        supportsAudio: false,
+        supportsLastFrame: true,
+        supportsVideoInput: false,
+      },
+    });
+
+    expect(
+      resolveModelCapabilityProfile({
         alias: 'seedance-1-5-pro',
         capabilities: ['video'],
         providerCode: 'volcengine',
@@ -100,6 +117,94 @@ describe('model registry', () => {
         resolutions: ['480P', '720P', '1080P'],
         supportsAudio: true,
         supportsLastFrame: true,
+        supportsVideoInput: false,
+      },
+    });
+
+    expect(
+      resolveModelCapabilityProfile({
+        alias: 'seedance-2-0',
+        capabilities: ['video'],
+        providerCode: 'volcengine',
+        providerModel: 'doubao-seedance-2-0-260128',
+      }),
+    ).toMatchObject({
+      video: {
+        maxDuration: 15,
+        resolutions: ['480P', '720P', '1080P', '4K'],
+        supportsAudio: false,
+        supportsLastFrame: true,
+        supportsVideoInput: true,
+      },
+    });
+
+    expect(
+      resolveModelCapabilityProfile({
+        alias: 'seedance-2-0-fast',
+        capabilities: ['video'],
+        providerCode: 'volcengine',
+        providerModel: 'doubao-seedance-2-0-fast-260128',
+      }),
+    ).toMatchObject({
+      video: {
+        maxDuration: 15,
+        resolutions: ['480P', '720P'],
+        supportsAudio: false,
+        supportsLastFrame: true,
+        supportsVideoInput: true,
+      },
+    });
+
+    expect(
+      resolveModelCapabilityProfile({
+        alias: 'seedance-2-0-mini',
+        capabilities: ['video'],
+        providerCode: 'volcengine',
+        providerModel: 'doubao-seedance-2-0-mini-260615',
+      }),
+    ).toMatchObject({
+      video: {
+        maxDuration: 15,
+        resolutions: ['480P', '720P'],
+        supportsAudio: false,
+        supportsLastFrame: true,
+        supportsVideoInput: true,
+      },
+    });
+
+    expect(
+      resolveModelCapabilityProfile({
+        alias: 'seedance-2-5',
+        capabilities: ['video'],
+        providerCode: 'volcengine',
+        providerModel: 'doubao-seedance-2-5-260628',
+      }),
+    ).toMatchObject({
+      video: {
+        maxDuration: 30,
+        resolutions: ['480P', '720P', '1080P'],
+        supportsAudio: false,
+        supportsLastFrame: true,
+        supportsVideoInput: true,
+      },
+    });
+  });
+
+  it('uses the documented broad Seedance fallback for unknown endpoint mappings', () => {
+    expect(
+      resolveModelCapabilityProfile({
+        alias: 'seedance-custom-endpoint',
+        capabilities: ['video'],
+        providerCode: 'volcengine',
+        providerModel: 'ep-custom-seedance',
+      }),
+    ).toMatchObject({
+      video: {
+        maxDuration: 30,
+        resolutions: ['480P', '720P', '1080P', '4K'],
+        supportsAudio: false,
+        supportsLastFrame: true,
+        supportsVideoInput: true,
       },
     });
   });

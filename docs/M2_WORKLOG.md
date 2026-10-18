@@ -53,13 +53,21 @@
 
 ### 视频首尾帧与 AI 音效能力闭环
 
-- Seedance 模型能力 profile 补充 `supportsAudio: true`；视频工作台现在按当前模型动态启用或禁用首帧、尾帧和 AI 音效，Grok 显示“模型不支持”，未知能力显示“能力待确认”，不再把未声明能力误当作可用
+- Seedance 模型能力 profile 改为逐模型声明；视频工作台按当前模型动态启用或禁用首帧、尾帧、参考视频和 AI 音效，Grok 显示“模型不支持”，未知能力显示“能力待确认”，不再把未声明能力误当作可用
 - 创建视频任务时仅在 AI 音效开启时发送 `parameters.generate_audio: true`，关闭时省略该字段；从任务参数恢复或重试时继续保留音效设置
 - 模型目录的布尔能力合并改为三态：任一记录为 `true` 则结果为 `true`，没有 `true` 但存在 `false` 则为 `false`，两侧都未知时保持 `undefined`；已应用于音效、尾帧、视频输入、图层拆分和连续生成
 - 新增 `video-workspace.spec.ts` 与模型目录断言，覆盖请求参数、重试恢复、显式 `false` 保留和未知能力
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；全量结果为 Web 18 个文件 76 项、API 25 个文件 97 项
 - 浏览器验收通过：`verify-video-capabilities.mjs`、`verify-video-studio.mjs`、`verify-video-tasks.mjs`、`verify-model-capability-options.mjs`、`verify-m2-routes.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出或页面脚本错误
 - 本批仍使用 Mock 与 Playwright 路由拦截，不调用真实视频接口，不读取、输出或提交任何 Key
+
+### Seedance 能力元数据校准
+
+- 依据 `上游插件配置` 区分 Seedance 1.0 Pro/Lite、1.5 Pro、2.0、2.0 Fast/Mini、2.5 和未知 endpoint 的时长、分辨率、音频与参考视频能力
+- 默认 `doubao-seedance-1-0-pro` 从“支持音频”修正为不支持音频；2.0 Fast/Mini 的模型族匹配顺序也已修正，避免被 2.0 基础规则提前截获
+- 未知 Seedance endpoint 使用最高 4K、30 秒、支持参考视频且无音频的宽能力回退；该回退只用于补全注册表默认值，不代表真实额度或上游模型已验收
+- 验证通过：`pnpm --filter @aurora/api exec vitest run src/models/model-registry.service.spec.ts`、`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；全量结果为 API 25 个文件 98 项、Web 18 个文件 77 项
+- 本批不调用真实 Provider，不读取、输出或提交任何 Key；参考视频上传任务仍是下一批实现项
 
 ### 智能体首页推荐卡密度对齐
 
