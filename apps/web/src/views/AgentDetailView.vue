@@ -115,13 +115,6 @@ function formatHistoryDate(timestamp: number): string {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
-function formatHistoryTimestamp(timestamp: number): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(timestamp);
-}
-
 async function scrollToLatest(): Promise<void> {
   await nextTick();
   conversationArea.value?.scrollTo({
@@ -564,6 +557,9 @@ watch(
       >
         <aside class="agent-history-panel" aria-label="历史记录">
           <header>
+            <button type="button" aria-label="关闭历史记录" @click="historyOpen = false">
+              <CloseOutlined />
+            </button>
             <div>
               <span class="agent-history-panel__agent" :style="{ background: agent.color }">
                 {{ agent.glyph }}
@@ -571,9 +567,6 @@ watch(
               <strong>{{ agent.name }}</strong>
               <small>{{ sessions.length }} 个对话</small>
             </div>
-            <button type="button" aria-label="关闭历史记录" @click="historyOpen = false">
-              <CloseOutlined />
-            </button>
           </header>
 
           <div v-if="historyGroups.length > 0" class="agent-history-panel__groups">
@@ -586,13 +579,7 @@ watch(
                 :class="{ active: activeSessionId === session.id }"
                 @click="selectHistorySession(session.id)"
               >
-                <span>
-                  <strong>{{ session.title }}</strong>
-                  <small
-                    >{{ session.messages.length }} 条消息 ·
-                    {{ formatHistoryTimestamp(session.updatedAt) }}</small
-                  >
-                </span>
+                <strong>{{ session.title }}</strong>
               </button>
             </section>
           </div>
@@ -1290,28 +1277,28 @@ watch(
 
 .agent-history-panel > header {
   display: flex;
-  min-height: 68px;
+  min-height: 76px;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 18px;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 0 16px;
   border-bottom: 1px solid #eef1f5;
 }
 
 .agent-history-panel > header > div {
   display: grid;
   align-items: center;
-  gap: 1px 10px;
-  grid-template-columns: 34px auto;
+  gap: 1px 9px;
+  grid-template-columns: 32px auto;
 }
 
 .agent-history-panel > header > div > span {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   grid-row: 1 / span 2;
   place-items: center;
-  border-radius: 10px;
+  border-radius: 9px;
   background: #eef4ff;
   color: #4c84ff;
 }
@@ -1330,47 +1317,48 @@ watch(
   display: grid;
   width: 32px;
   height: 32px;
+  flex: 0 0 32px;
   place-items: center;
-  border: 1px solid #e3e7ed;
+  border: 0;
   border-radius: 8px;
-  background: #fff;
-  color: #6d7583;
+  background: transparent;
+  color: #303640;
   cursor: pointer;
 }
 
 .agent-history-panel > header > button:hover {
-  border-color: #bdcff4;
+  background: #f4f6f9;
   color: #3979ed;
 }
 
 .agent-history-panel__groups {
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 18px 28px;
+  padding: 12px 14px 24px;
 }
 
 .agent-history-panel__groups section + section {
-  margin-top: 20px;
+  margin-top: 18px;
 }
 
 .agent-history-panel__groups h3 {
-  margin: 0 0 7px;
+  margin: 0 0 6px;
   padding: 0;
-  color: #8c94a1;
-  font-size: 11px;
+  color: #757d8a;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .agent-history-panel__groups section > button {
-  display: grid;
+  display: flex;
   width: 100%;
   min-width: 0;
   align-items: center;
-  grid-template-columns: minmax(0, 1fr);
-  padding: 8px 10px;
-  border: 1px solid transparent;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #e9ebef;
   border-radius: 6px;
-  background: transparent;
+  background: #f8f9fb;
   color: #556071;
   text-align: left;
   cursor: pointer;
@@ -1378,28 +1366,17 @@ watch(
 
 .agent-history-panel__groups section > button:hover,
 .agent-history-panel__groups section > button.active {
-  border-color: #e3e6eb;
-  background: #f7f8fa;
-}
-
-.agent-history-panel__groups section > button > span:last-child {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
+  border-color: #cfe0ff;
+  background: #f4f8ff;
 }
 
 .agent-history-panel__groups strong {
+  display: block;
+  min-width: 0;
   overflow: hidden;
   color: #424a57;
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-history-panel__groups small {
-  overflow: hidden;
-  color: #969eaa;
-  font-size: 8px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
