@@ -362,3 +362,14 @@
 - 浏览器验收：`node outputs/ui-reference/verify-canvas-studio.mjs` 桌面端 `1440x1000`、移动端 `390x844` 与云端失败回退场景全部通过，无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或调用任何真实 Key，未消耗参考产品积分
+
+## 30. 2026-10-19 电商工具四栏比例与效果区对齐
+
+- 对照 `C:\Users\Administrator\Desktop\参考网站截图合集\参考网站中点击电商工具的主界面.png`，用像素扫描测出参考产品主内容区在 `1440` 视口下约 `1160px`，四栏实际宽度约 `235 / 216 / 458 / 221px`；本地为 `245 / 215 / 385 / 285px`，预览栏偏窄、介绍栏偏宽
+- 将 `CommerceWorkbenchView.vue` 的 `.commerce-workbench__body` 由 `0.95 / 0.78 / 1.62 / 1.08` 权重改为 `245 / 228 / 462 / 242` 权重，实测本地四栏回到 `235 / 219 / 444 / 232px`；`1180px` 断点后移到 `1100px`，`1440` 视口不再提前退回三栏
+- 效果展示区空态此前渲染 `GalleryArtwork` 抽象插画，与参考产品的真实商品示例图不符；现改为默认显示 `/showcase/product-v1.png`，并抽出 `resolvePreviewImage` 统一处理“已上传素材 / 示例图”的回退顺序，避免替换类工具在 before/after 之间显示错误素材
+- 预览画布高度由 `470px` 提到 `535px`、`BEFORE/AFTER` 字号提到 `18px`；台账搜索框高度提到 `34px`、分组与条目字号提到 `12px`、面板标题提到 `14px`，分组图标统一成参考产品的灰阶样式
+- 新增调试脚本 `outputs/ui-reference/measure-commerce.mjs`（ignored 目录），用于输出四栏 `getBoundingClientRect` 与当前截图，方便后续继续用像素对照而不是凭感觉调样式
+- 浏览器验收：`node outputs/ui-reference/verify-commerce-studio.mjs` 桌面端 `1440x1000` 与移动端 `390x844` 全部通过，空态、目录展开、搜索、上传、替换/材质/部件任务体、历史记录、帮助抽屉和建议箱断言保持一致，无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或调用任何真实 Key，未消耗参考产品积分

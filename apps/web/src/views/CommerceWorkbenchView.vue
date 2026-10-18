@@ -1397,9 +1397,17 @@ const latestCompletedWork = computed(() =>
       work.status === 'done' && work.artworkUrl && work.parameters.mode === displayTool.value.value,
   ),
 );
+const emptyStatePreviewImage = '/showcase/product-v1.png';
+
+function resolvePreviewImage(role: UploadRole, example?: PreviewExample): string | undefined {
+  const uploaded = previewSide.value === 'before' ? imageUploads.value[role]?.url : undefined;
+
+  return uploaded ?? (previewSide.value === 'before' ? example?.before : example?.after);
+}
+
 const previewImage = computed(() => {
   if (!isAvailableTool.value) {
-    return undefined;
+    return emptyStatePreviewImage;
   }
 
   const example = commercePreviewExamples[displayTool.value.value];
@@ -1409,36 +1417,26 @@ const previewImage = computed(() => {
   }
 
   if (isBackgroundTool.value) {
-    return previewSide.value === 'before'
-      ? (imageUploads.value.product?.url ?? example?.before)
-      : example?.after;
+    return resolvePreviewImage('product', example);
   }
 
   if (isPatternTool.value) {
-    return previewSide.value === 'before'
-      ? (imageUploads.value.clothing?.url ?? example?.before)
-      : example?.after;
+    return resolvePreviewImage('clothing', example);
   }
 
   if (isReplaceTool.value) {
-    return previewSide.value === 'before'
-      ? (imageUploads.value.product?.url ?? example?.before)
-      : example?.after;
+    return resolvePreviewImage('product', example);
   }
 
   if (isRetouchTool.value) {
-    return previewSide.value === 'before'
-      ? (imageUploads.value.product?.url ?? example?.before)
-      : example?.after;
+    return resolvePreviewImage('product', example);
   }
 
   if (isTryOnTool.value) {
-    return previewSide.value === 'before'
-      ? (imageUploads.value.clothing?.url ?? example?.before)
-      : example?.after;
+    return resolvePreviewImage('clothing', example);
   }
 
-  return undefined;
+  return previewSide.value === 'before' ? example?.before : example?.after;
 });
 const previewVariant = computed(() =>
   previewSide.value === 'before'
@@ -3227,9 +3225,10 @@ onBeforeUnmount(() => {
   display: grid;
   align-items: start;
   gap: 10px;
-  grid-template-columns:
-    minmax(245px, 0.95fr) minmax(215px, 0.78fr) minmax(385px, 1.62fr)
-    minmax(285px, 1.08fr);
+  grid-template-columns: minmax(196px, 245fr) minmax(186px, 228fr) minmax(276px, 462fr) minmax(
+      206px,
+      242fr
+    );
 }
 
 .commerce-panel {
@@ -3265,12 +3264,12 @@ onBeforeUnmount(() => {
 }
 
 .commerce-panel__header strong {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .commerce-panel__header > span {
   color: #9aa4af;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .commerce-catalog {
@@ -3300,12 +3299,12 @@ onBeforeUnmount(() => {
 
 .commerce-catalog__search input {
   min-width: 0;
-  height: 30px;
+  height: 34px;
   border: 0;
   outline: 0;
   background: transparent;
   color: #4d5967;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .commerce-catalog__search input::placeholder {
@@ -3361,7 +3360,7 @@ onBeforeUnmount(() => {
 
 .commerce-catalog__all small {
   color: #9aa5b1;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .commerce-catalog__all :deep(svg:last-child),
@@ -3385,7 +3384,7 @@ onBeforeUnmount(() => {
 
 .commerce-catalog__group-toggle {
   display: grid;
-  height: 28px;
+  height: 31px;
   align-items: center;
   gap: 5px;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -3395,7 +3394,7 @@ onBeforeUnmount(() => {
   border-radius: 5px;
   background: transparent;
   color: #768291;
-  font-size: 10px;
+  font-size: 12px;
   text-align: left;
   cursor: pointer;
 }
@@ -3411,6 +3410,12 @@ onBeforeUnmount(() => {
   font-weight: 750;
 }
 
+.commerce-catalog__group-toggle > span :deep(svg) {
+  color: #a9b2bd;
+  font-size: 11px;
+  font-weight: 400;
+}
+
 .commerce-catalog__group-toggle > small {
   display: grid;
   min-width: 16px;
@@ -3423,13 +3428,13 @@ onBeforeUnmount(() => {
   font-size: 8px;
 }
 
-.commerce-catalog__group-toggle :deep(svg) {
+.commerce-catalog__group-toggle > :deep(svg) {
   color: #8e9aa7;
   font-size: 8px;
   transition: transform 160ms ease;
 }
 
-.commerce-catalog__group-toggle.expanded :deep(svg:last-child) {
+.commerce-catalog__group-toggle.expanded > :deep(svg:last-child) {
   transform: rotate(90deg);
 }
 
@@ -3449,7 +3454,7 @@ onBeforeUnmount(() => {
 
 .commerce-catalog__item {
   position: relative;
-  min-height: 35px;
+  min-height: 34px;
   gap: 7px;
   grid-template-columns: 23px minmax(0, 1fr) auto auto;
   padding: 4px 7px;
@@ -3487,14 +3492,14 @@ onBeforeUnmount(() => {
   height: 23px;
   place-items: center;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--tool-accent) 11%, white);
-  color: var(--tool-accent);
+  background: #f5f7f9;
+  color: #5f6b78;
   font-size: 9px;
 }
 
 .commerce-catalog__item > span {
   overflow: hidden;
-  font-size: 10px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3971,19 +3976,19 @@ onBeforeUnmount(() => {
 
 .commerce-preview {
   display: grid;
-  min-height: 720px;
+  min-height: 828px;
   align-content: start;
 }
 
 .commerce-preview__canvas {
   position: relative;
-  min-height: 520px;
-  padding: 25px 42px 20px;
+  min-height: 578px;
+  padding: 25px 42px 18px;
 }
 
 .commerce-preview__visual {
   position: relative;
-  height: 470px;
+  height: 535px;
   overflow: hidden;
   border-radius: 8px;
   background: #edf1f5;
@@ -4015,10 +4020,10 @@ onBeforeUnmount(() => {
 .commerce-preview__before-label,
 .commerce-preview__after-label {
   position: absolute;
-  bottom: 86px;
+  bottom: 92px;
   z-index: 2;
   color: #fff;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
   letter-spacing: 0.03em;
 }
@@ -4906,21 +4911,24 @@ onBeforeUnmount(() => {
     padding-left: 14px;
   }
 
-  .commerce-workbench__body {
-    grid-template-columns:
-      minmax(185px, 0.78fr) minmax(275px, 1.14fr) minmax(350px, 1.62fr)
-      minmax(180px, 0.74fr);
+  .commerce-preview__canvas {
+    min-height: 500px;
+    padding-right: 30px;
+    padding-left: 30px;
   }
 
-  .commerce-preview__canvas {
-    padding-right: 34px;
-    padding-left: 34px;
+  .commerce-preview__visual {
+    height: 462px;
+  }
+
+  .commerce-preview {
+    min-height: 756px;
   }
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1100px) {
   .commerce-workbench__body {
-    grid-template-columns: 205px 290px minmax(0, 1fr);
+    grid-template-columns: minmax(180px, 0.62fr) minmax(190px, 0.66fr) minmax(0, 1.72fr);
   }
 
   .commerce-info {
