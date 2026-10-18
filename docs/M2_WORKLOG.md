@@ -32,6 +32,16 @@
 
 ## 3. 已实现内容
 
+### AI 画布浮动导航与节点剪贴板
+
+- 页面：`apps/web/src/views/CanvasStudioView.vue`
+- 左侧浮动导航顺序收敛为参考产品式“添加、工作流、素材、历史、批量生成、账户”，账户入口继续复用右侧灵感画板开关；移除顶栏重复的“画布帮助”按钮，保留保存、新建和网格切换
+- “添加”菜单末项改为“粘贴”，新增项目内节点剪贴板，不读取或写入系统敏感剪贴板；支持 `Ctrl/Cmd+C` 复制选中节点和 `Ctrl/Cmd+V` 粘贴
+- 复制会保留选中节点之间的连线与有效分组，粘贴时创建新节点、连线和分组 ID，按粘贴次数递增偏移并写入撤销栈；随机粘贴不会覆盖原节点
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`node outputs/ui-reference/verify-canvas-studio.mjs`、`node outputs/ui-reference/verify-canvas-workflow-library.mjs`
+- 浏览器验收覆盖粘贴按钮初始禁用、`Ctrl+C`、`Ctrl+V`、新节点计数、工作流库和桌面 `1440x1000`、移动端 `390x844` 无横向溢出与无页面脚本错误
+- 本批只修改前端画布与本地验收脚本，不调用真实 Provider，不读取、输出或提交 Key
+
 ### 模型能力约束与动态工作台
 
 - 后端模型注册表新增公开的 `profile` 元数据，按 `gpt-image`、`seedream`、`seedance` 和 `grok` 模型族推导产品级能力，只向前端返回尺寸预设、参考图上限、最大时长、分辨率、首尾帧、音频和视频输入等约束；`baseUrl`、`keyRef`、厂商代码和上游模型 ID 继续保持服务端字段

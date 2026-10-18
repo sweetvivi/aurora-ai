@@ -21,7 +21,6 @@ import {
   PaperClipOutlined,
   PictureOutlined,
   PlusOutlined,
-  QuestionCircleOutlined,
   RedoOutlined,
   SaveOutlined,
   SendOutlined,
@@ -144,7 +143,7 @@ interface Point {
 interface RailAction {
   icon: Component;
   label: string;
-  value: 'add' | 'assets' | 'batch' | 'history' | 'inspiration' | 'workflow';
+  value: 'account' | 'add' | 'assets' | 'batch' | 'history' | 'inspiration' | 'workflow';
 }
 
 interface GenerationModel {
@@ -159,12 +158,11 @@ const WORLD_HEIGHT = 2200;
 
 const railActions: RailAction[] = [
   { icon: PlusOutlined, label: '添加', value: 'add' },
+  { icon: NodeIndexOutlined, label: '工作流', value: 'workflow' },
   { icon: AppstoreOutlined, label: '素材', value: 'assets' },
   { icon: HistoryOutlined, label: '历史', value: 'history' },
   { icon: ThunderboltFilled, label: '批量生成', value: 'batch' },
-  { icon: BulbOutlined, label: '灵感', value: 'inspiration' },
-  { icon: NodeIndexOutlined, label: '工作流', value: 'workflow' },
-  { icon: UserOutlined, label: '账户', value: 'inspiration' },
+  { icon: UserOutlined, label: '账户', value: 'account' },
 ];
 
 const assetCategories: { label: string; value: CanvasAssetCategory }[] = [
@@ -370,6 +368,8 @@ const selectedBatchNodes = computed(() =>
 const batchCost = computed(() => selectedBatchNodes.value.length * IMAGE_TASK_POINTS_COST);
 const composerCost = IMAGE_TASK_POINTS_COST;
 const submitting = computed(() => workspace.submitting);
+const canvasClipboard = ref<CanvasSnapshot | null>(null);
+const canvasClipboardPasteCount = ref(0);
 const canvasTransform = computed(
   () =>
     `translate3d(${viewport.value.x}px, ${viewport.value.y}px, 0) scale(${viewport.value.scale})`,
@@ -810,7 +810,7 @@ function openRail(action: RailAction['value']): void {
   nodeToolbarMenuNodeId.value = '';
   contextMenu.value = null;
 
-  if (action === 'inspiration') {
+  if (action === 'account' || action === 'inspiration') {
     activeRailMenu.value = null;
     inspirationOpen.value = !inspirationOpen.value;
     return;
@@ -1020,6 +1020,84 @@ function duplicateSelectedNode(): void {
   );
   contextMenu.value = null;
   nodeToolbarMenuNodeId.value = '';
+}
+
+function copySelectedNode(): void {
+  const sourceNodes = nodes.value.filter((node) => isNodeSelected(node.id));
+
+  if (sourceNodes.length === 0) {
+    return;
+  }
+
+  const selectedIds = new Set(sourceNodes.map((node) => node.id));
+  const clipboardGroups = groups.value
+    .map((group) => ({
+      ...group,
+      nodeIds: group.nodeIds.filter((nodeId) => selectedIds.has(nodeId)),
+    }))
+    .filter((group) => group.nodeIds.length >= 2);
+
+  canvasClipboard.value = {
+    edges: edges.value
+      .filter((edge) => selectedIds.has(edge.from) && selectedIds.has(edge.to))
+      .map((edge) => ({ ...edge })),
+    groups: clipboardGroups,
+    nodes: sourceNodes.map((node) => ({ ...node })),
+  };
+  canvasClipboardPasteCount.value = 0;
+  contextMenu.value = null;
+  nodeToolbarMenuNodeId.value = '';
+  showCanvasNotice(`已复制 ${sourceNodes.length} 个节点`);
+}
+
+function pasteCanvasClipboard(): void {
+  const clipboard = canvasClipboard.value;
+
+  if (!clipboard || clipboard.nodes.length === 0) {
+    return;
+  }
+
+  canvasClipboardPasteCount.value += 1;
+  const offset = canvasClipboardPasteCount.value * 36;
+  const idMap = new Map<string, string>();
+  const pastedNodes = clipboard.nodes.map((node) => {
+    const id = createId(node.kind);
+
+    idMap.set(node.id, id);
+
+    return {
+      ...node,
+      createdAt: Date.now(),
+      id,
+      x: node.x + offset,
+      y: node.y + offset,
+    };
+  });
+  const pastedEdges = clipboard.edges
+    .filter((edge) => idMap.has(edge.from) && idMap.has(edge.to))
+    .map((edge) => ({
+      from: idMap.get(edge.from) ?? edge.from,
+      id: createId('edge'),
+      to: idMap.get(edge.to) ?? edge.to,
+    }));
+  const pastedGroups = clipboard.groups
+    .map((group) => ({
+      ...group,
+      id: createId('group'),
+      nodeIds: group.nodeIds.map((nodeId) => idMap.get(nodeId) ?? nodeId),
+    }))
+    .filter((group) => group.nodeIds.length >= 2);
+
+  commitHistory();
+  nodes.value = [...nodes.value, ...pastedNodes];
+  edges.value = [...edges.value, ...pastedEdges];
+  groups.value = [...groups.value, ...pastedGroups];
+  setSelection(
+    pastedNodes.map((node) => node.id),
+    pastedNodes.at(-1)?.id,
+  );
+  closeRailMenu();
+  showCanvasNotice(`已粘贴 ${pastedNodes.length} 个节点`);
 }
 
 function startConnection(nodeId: string): void {
@@ -2374,6 +2452,20 @@ function handleKeyboard(event: KeyboardEvent): void {
     duplicateSelectedNode();
   }
 
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
+    if (selectedNodeCount.value > 0) {
+      event.preventDefault();
+      copySelectedNode();
+    }
+  }
+
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') {
+    if (canvasClipboard.value) {
+      event.preventDefault();
+      pasteCanvasClipboard();
+    }
+  }
+
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
     event.preventDefault();
     setSelection(
@@ -2534,14 +2626,6 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="canvas-topbar__icon-button"
-            aria-label="画布帮助"
-            @click="activeRailMenu = activeRailMenu === 'workflow' ? null : 'workflow'"
-          >
-            <QuestionCircleOutlined />
-          </button>
-          <button
-            type="button"
-            class="canvas-topbar__icon-button"
             aria-label="切换网格"
             :class="{ active: canvasGridVisible }"
             @click="toggleCanvasGrid"
@@ -2568,7 +2652,7 @@ onBeforeUnmount(() => {
         <div v-if="activeRailMenu === 'add'" class="canvas-rail-menu" @pointerdown.stop>
           <button type="button" @click="nodeUploadInput?.click()">
             <UploadOutlined />
-            <span>上传图片节点</span>
+            <span>上传</span>
           </button>
           <button
             type="button"
@@ -2598,20 +2682,10 @@ onBeforeUnmount(() => {
             <small>Shift Ctrl Z</small>
           </button>
           <i />
-          <button type="button" :disabled="!selectedNode" @click="duplicateSelectedNode">
+          <button type="button" :disabled="!canvasClipboard" @click="pasteCanvasClipboard">
             <CopyOutlined />
-            <span>复制节点</span>
-            <small>Ctrl D</small>
-          </button>
-          <button type="button" :disabled="selectedNodeCount < 2" @click="createGroupFromSelection">
-            <AppstoreOutlined />
-            <span>组合选中</span>
-            <small>Ctrl G</small>
-          </button>
-          <button type="button" :disabled="selectedNodeCount === 0" @click="ungroupSelection">
-            <CloseOutlined />
-            <span>解散分组</span>
-            <small>Shift Ctrl G</small>
+            <span>粘贴</span>
+            <small>Ctrl V</small>
           </button>
         </div>
       </Transition>
@@ -5416,7 +5490,7 @@ onBeforeUnmount(() => {
   left: calc(100% + 29px);
   z-index: 18;
   display: grid;
-  width: 240px;
+  width: 224px;
   max-height: min(520px, calc(100vh - 150px));
   gap: 8px;
   padding: 10px;
@@ -6641,7 +6715,7 @@ onBeforeUnmount(() => {
     top: calc(50% + 46px);
     right: -14px;
     left: auto;
-    width: min(240px, calc(100vw - 82px));
+    width: min(224px, calc(100vw - 82px));
     max-height: min(470px, calc(100vh - 150px));
     transform: none;
   }
