@@ -1568,7 +1568,7 @@ onBeforeUnmount(() => {
         <div v-else class="retouch-empty-guide">
           <div class="retouch-empty-guide__title">
             <span>修图示例</span>
-            <small>动动嘴，一部 P 图</small>
+            <small>动动嘴，一键 P 图</small>
           </div>
           <div class="retouch-empty-guide__examples" aria-label="智能修图能力示例">
             <button
@@ -3819,7 +3819,7 @@ onBeforeUnmount(() => {
 
 .retouch-empty-guide {
   display: grid;
-  width: min(100%, 420px);
+  width: min(100%, 440px);
   justify-items: center;
   gap: 22px;
 }
@@ -3848,52 +3848,68 @@ onBeforeUnmount(() => {
   display: grid;
   width: 100%;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
+  gap: 3px;
+  padding: 5px;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgb(196 118 255 / 85%),
+    0 0 26px rgb(170 102 255 / 32%);
 }
 
 .retouch-empty-guide__example {
   position: relative;
   display: grid;
   min-width: 0;
-  gap: 4px;
-  padding: 5px;
-  border: 1px solid #2a3046;
-  background: #0a0e1a;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: inherit;
   cursor: pointer;
   transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
+    filter 180ms ease,
     transform 180ms ease;
 }
 
 .retouch-empty-guide__example:hover,
 .retouch-empty-guide__example.active {
-  border-color: #8a62d6;
-  box-shadow: 0 0 0 1px rgb(138 98 214 / 32%);
+  filter: brightness(1.06) saturate(1.08);
   transform: translateY(-2px);
 }
 
 .retouch-empty-guide__example strong {
   position: absolute;
-  top: -1px;
+  top: 0;
   left: 50%;
   z-index: 2;
-  padding: 3px 8px;
-  background: #0b0f1c;
-  color: #f3f5ff;
-  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #c857f5;
+  color: #fff;
+  font-size: 9px;
   font-weight: 780;
   text-align: center;
   white-space: nowrap;
   transform: translate(-50%, -50%);
 }
 
+.retouch-empty-guide__example:nth-child(2) strong {
+  background: #3f97f5;
+}
+
+.retouch-empty-guide__example:nth-child(3) strong {
+  background: #f0824a;
+}
+
+.retouch-empty-guide__example:nth-child(4) strong {
+  background: #8b5cf6;
+}
+
 .example-portrait {
   position: relative;
   display: block;
   width: 100%;
-  height: 172px;
+  height: 132px;
   overflow: hidden;
   background: #151a25;
   object-fit: cover;
