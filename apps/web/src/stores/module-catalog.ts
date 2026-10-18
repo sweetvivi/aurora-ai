@@ -66,7 +66,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
     icon: 'chat',
     key: 'chat',
     name: '模型对话',
-    route: '/chat',
+    route: '/newchat',
     sortOrder: 20,
     visible: true,
   },

@@ -48,7 +48,7 @@ const campaigns = [
     description: '长任务推理，复杂项目一次说清',
     eyebrow: '旗舰模型',
     title: 'Aurora Chat 2.6',
-    to: '/chat',
+    to: '/newchat',
     tone: 'indigo',
     variant: 7,
   },

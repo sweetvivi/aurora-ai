@@ -22,7 +22,7 @@ interface NavigationItem {
 const route = useRoute();
 const navItems: NavigationItem[] = [
   { icon: HomeOutlined, label: '首页', to: '/' },
-  { icon: CommentOutlined, label: '模型对话', to: '/chat' },
+  { icon: CommentOutlined, label: '模型对话', to: '/newchat' },
   { icon: PictureOutlined, label: 'AI 绘画', to: '/draw' },
   { icon: RobotOutlined, label: '超级智能体', to: '/agents' },
   { icon: VideoCameraOutlined, label: 'AI 视频', to: '/video' },
@@ -30,7 +30,11 @@ const navItems: NavigationItem[] = [
   { icon: AppstoreOutlined, label: '工具地图', to: '/map' },
 ];
 
-const activePath = computed(() => route.path);
+const activePath = computed(() => canonicalNavigationPath(route.path));
+
+function canonicalNavigationPath(path: string): string {
+  return path.replace(/^\/chat(?=\/|$)/, '/newchat');
+}
 </script>
 
 <template>
@@ -42,7 +46,9 @@ const activePath = computed(() => route.path);
       :rel="item.to === '/video' ? 'noopener noreferrer' : undefined"
       :target="item.to === '/video' ? '_blank' : undefined"
       class="top-navigation__link"
-      :class="{ 'top-navigation__link--active': activePath === item.to }"
+      :class="{
+        'top-navigation__link--active': activePath === canonicalNavigationPath(item.to),
+      }"
     >
       <component :is="item.icon" />
       <span>{{ item.label }}</span>

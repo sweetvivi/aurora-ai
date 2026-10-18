@@ -1275,7 +1275,7 @@ onBeforeUnmount(() => {
 
         <div class="admin-form-grid">
           <a-form-item label="路由">
-            <a-input v-model:value="moduleForm.route" :maxlength="120" placeholder="/chat" />
+            <a-input v-model:value="moduleForm.route" :maxlength="120" placeholder="/newchat" />
           </a-form-item>
           <a-form-item label="角标">
             <a-input

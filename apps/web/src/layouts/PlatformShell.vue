@@ -64,9 +64,9 @@ const mobileNavigation = computed<NavigationItem[]>(() => {
 
 const currentTitle = computed(() => String(route.meta.title ?? '工作台'));
 const isAdmin = computed(() => user.value?.role === 'ADMIN');
-const showCampaign = computed(() => ['/', '/draw', '/agents'].includes(route.path));
+const showCampaign = computed(() => ['/', '/draw', '/newdraw', '/agents'].includes(route.path));
 const pageTheme = computed(() => {
-  if (route.path.startsWith('/chat')) {
+  if (route.path.startsWith('/newchat') || route.path.startsWith('/chat')) {
     return 'theme-blue';
   }
 
@@ -78,11 +78,18 @@ const pageTheme = computed(() => {
 });
 
 function isActivePath(path: string, target: string): boolean {
-  if (target === '/') {
-    return path === '/';
+  const canonicalPath = canonicalNavigationPath(path);
+  const canonicalTarget = canonicalNavigationPath(target);
+
+  if (canonicalTarget === '/') {
+    return canonicalPath === '/';
   }
 
-  return path === target || path.startsWith(`${target}/`);
+  return canonicalPath === canonicalTarget || canonicalPath.startsWith(`${canonicalTarget}/`);
+}
+
+function canonicalNavigationPath(path: string): string {
+  return path.replace(/^\/chat(?=\/|$)/, '/newchat');
 }
 
 function toNavigationItem(item: ModuleCatalogItem): NavigationItem {
@@ -204,7 +211,7 @@ onMounted(() => {
 .platform-campaign {
   position: relative;
   display: flex;
-  min-height: 52px;
+  min-height: 74px;
   align-items: center;
   justify-content: center;
   gap: 13px;

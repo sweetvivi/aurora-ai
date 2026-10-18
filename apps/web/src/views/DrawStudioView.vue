@@ -2819,7 +2819,7 @@ onBeforeUnmount(() => {
 .draw-template-studio {
   position: relative;
   min-height: calc(100vh - 56px);
-  padding-bottom: 144px;
+  padding-bottom: 214px;
   background: #fbfcfd;
 }
 
@@ -2896,9 +2896,9 @@ onBeforeUnmount(() => {
 }
 
 .draw-template-studio__content {
-  width: min(100%, 1220px);
+  width: 100%;
   margin: 0 auto;
-  padding: 34px 32px 0;
+  padding: 60px 26px 0;
 }
 
 .draw-template-hero {
@@ -2921,14 +2921,14 @@ onBeforeUnmount(() => {
 .draw-template-hero h1 {
   margin: 20px 0 0;
   color: #1e252e;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 850;
 }
 
 .draw-template-hero p {
   margin: 9px 0 0;
   color: #818a97;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .draw-template-hero > div {
@@ -2941,14 +2941,14 @@ onBeforeUnmount(() => {
 
 .draw-template-hero em {
   display: inline-flex;
-  min-height: 30px;
+  min-height: 32px;
   align-items: center;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid #d6f1e7;
   border-radius: 999px;
   background: #edf9f5;
   color: #299271;
-  font-size: 8px;
+  font-size: 10px;
   font-style: normal;
   font-weight: 720;
 }
@@ -2965,18 +2965,18 @@ onBeforeUnmount(() => {
 
 .draw-template-categories button {
   display: inline-flex;
-  min-width: 104px;
-  height: 34px;
+  min-width: 120px;
+  height: 40px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 0 13px;
+  padding: 0 15px;
   border: 1px solid #e1e5ea;
-  border-radius: 8px;
+  border-radius: 9px;
   background: #fff;
   color: #495360;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 720;
   cursor: pointer;
 }
@@ -3016,7 +3016,7 @@ onBeforeUnmount(() => {
   --effect-a: #d8d6dd;
   --effect-b: #f2c5d5;
   position: relative;
-  aspect-ratio: 1.75 / 1;
+  aspect-ratio: 1.2 / 1;
   overflow: hidden;
   background:
     radial-gradient(circle at 20% 22%, rgb(255 255 255 / 78%), transparent 19%),
@@ -3078,11 +3078,11 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 9px;
   z-index: 2;
-  padding: 3px 6px;
-  border-radius: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
   background: rgb(32 37 47 / 78%);
   color: #fff;
-  font-size: 7px;
+  font-size: 10px;
   font-style: normal;
   font-weight: 780;
 }
@@ -3099,7 +3099,7 @@ onBeforeUnmount(() => {
 .draw-effect-card__copy {
   display: grid;
   align-content: start;
-  padding: 14px 15px 10px;
+  padding: 18px 18px 12px;
 }
 
 .draw-effect-card__copy > header {
@@ -3112,7 +3112,7 @@ onBeforeUnmount(() => {
 .draw-effect-card__copy h2 {
   margin: 0;
   color: #252c35;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 820;
 }
 
@@ -3124,28 +3124,28 @@ onBeforeUnmount(() => {
 }
 
 .draw-effect-card__copy > header em {
-  padding: 2px 5px;
-  border-radius: 5px;
+  padding: 3px 6px;
+  border-radius: 6px;
   background: #f3e9fc;
   color: #9c4fd2;
-  font-size: 7px;
+  font-size: 10px;
   font-style: normal;
 }
 
 .draw-effect-card__copy > p {
-  min-height: 34px;
-  margin: 9px 0 0;
+  min-height: 52px;
+  margin: 11px 0 0;
   color: #79828f;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.65;
 }
 
 .draw-effect-card__steps {
   display: grid;
-  gap: 4px;
-  margin-top: 11px;
+  gap: 6px;
+  margin-top: 13px;
   color: #7a8491;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .draw-effect-card__steps strong {
@@ -3155,30 +3155,30 @@ onBeforeUnmount(() => {
 .draw-effect-card__steps span {
   display: grid;
   align-items: start;
-  gap: 6px;
-  grid-template-columns: 15px minmax(0, 1fr);
+  gap: 7px;
+  grid-template-columns: 18px minmax(0, 1fr);
 }
 
 .draw-effect-card__steps i {
   display: grid;
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   place-items: center;
   border-radius: 999px;
   background: #eff1f4;
   color: #7a8490;
-  font-size: 7px;
+  font-size: 9px;
   font-style: normal;
 }
 
 .draw-effect-card > button {
-  height: 38px;
-  margin: 0 14px 14px;
+  height: 44px;
+  margin: 0 18px 18px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   background: linear-gradient(90deg, #a854e2, #dd48d6);
   color: #fff;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 780;
   cursor: pointer;
 }
@@ -3189,7 +3189,7 @@ onBeforeUnmount(() => {
 
 .draw-template-composer {
   position: fixed;
-  right: 26px;
+  right: 0;
   bottom: 16px;
   left: 266px;
   z-index: 9;
@@ -3197,11 +3197,10 @@ onBeforeUnmount(() => {
   min-height: 126px;
   grid-template-columns: 82px minmax(0, 1fr);
   gap: 0 12px;
-  width: min(calc(100% - 532px), 1180px);
-  margin: 0 auto;
+  width: auto;
   padding: 13px 15px 12px;
   border: 1px solid #d9dfe6;
-  border-radius: 12px;
+  border-radius: 12px 0 0 12px;
   background: rgb(255 255 255 / 98%);
   box-shadow: 0 16px 45px rgb(31 43 60 / 15%);
   backdrop-filter: blur(12px);

@@ -96,7 +96,7 @@ const tools = [
     description: '理解上下文与行业术语，处理长文档和多语言内容。',
     glyph: '译',
     metric: '支持 90 多种语言',
-    route: '/chat',
+    route: '/newchat',
     title: '上下文翻译',
   },
   {
@@ -122,7 +122,7 @@ const tools = [
 const primaryNavigation: SideNavigationItem[] = [
   { icon: HomeOutlined, label: '首页', to: '/' },
   { accent: true, icon: HeartFilled, label: '我的工具' },
-  { icon: AppstoreOutlined, label: 'AI 大模型', to: '/chat' },
+  { icon: AppstoreOutlined, label: 'AI 大模型', to: '/newchat' },
   { icon: RobotOutlined, label: 'AI 智能体', to: '/agents' },
 ];
 
@@ -232,7 +232,7 @@ function openTool(tool: ToolItem): void {
     <nav class="discovery-mobile-navigation" aria-label="发现页移动导航">
       <RouterLink to="/">首页</RouterLink>
       <button type="button" class="active">我的工具</button>
-      <RouterLink to="/chat">AI 大模型</RouterLink>
+      <RouterLink to="/newchat">AI 大模型</RouterLink>
       <RouterLink to="/agents">AI 智能体</RouterLink>
       <RouterLink to="/draw">绘画工具</RouterLink>
     </nav>
