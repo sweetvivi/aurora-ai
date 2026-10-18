@@ -4,11 +4,13 @@ import {
   ArrowRightOutlined,
   BarChartOutlined,
   BulbOutlined,
+  CloseOutlined,
   CodeOutlined,
   CoffeeOutlined,
   EditOutlined,
   FileTextOutlined,
   HighlightOutlined,
+  HistoryOutlined,
   LayoutOutlined,
   LeftOutlined,
   MessageOutlined,
@@ -31,7 +33,7 @@ import type { Component } from 'vue';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { agentCatalog, type AgentCatalogItem } from '@/data/agents';
-import { useAgentWorkspaceStore } from '@/stores/agent-workspace';
+import { useAgentWorkspaceStore, type AgentSession } from '@/stores/agent-workspace';
 
 type CatalogTab = 'created' | 'favorites' | 'official';
 
@@ -47,10 +49,147 @@ const activeTab = ref<CatalogTab>('official');
 const selectedCategory = ref('全部');
 const search = ref('');
 const currentPage = ref(1);
+const catalogOpen = ref(false);
+const historyOpen = ref(false);
+const historyQuery = ref('');
+const landingPrompt = ref('');
+const landingCategory = ref('探索');
 const resultsHeading = ref<HTMLElement | null>(null);
 const pageSize = 24;
 
 const hotSearches = ['AI写作助手', '代码生成器', '数据分析', '图像处理', '翻译助手'];
+const landingTabs = [
+  '探索',
+  '做报告',
+  '写文档',
+  '简历制作',
+  '自媒体创作',
+  '市场调研',
+  '教学设计',
+  '学习研究',
+  '营销策划',
+  '做播客',
+];
+
+const landingTaskTypes: { icon: Component; label: string; prompt: string; targetId: string }[] = [
+  {
+    icon: EditOutlined,
+    label: '写作',
+    prompt: '帮我完成一份结构清晰、可以直接使用的写作任务。',
+    targetId: 'document-editor',
+  },
+  {
+    icon: LayoutOutlined,
+    label: 'PPT',
+    prompt: '帮我规划一份演示文稿的大纲、每页要点和讲述顺序。',
+    targetId: 'official-05-0001',
+  },
+  {
+    icon: HighlightOutlined,
+    label: '设计',
+    prompt: '帮我梳理视觉方向，并生成一套可执行的创意方案。',
+    targetId: 'brand-designer',
+  },
+  {
+    icon: BarChartOutlined,
+    label: 'Excel',
+    prompt: '帮我设计数据指标、表格结构、公式和分析步骤。',
+    targetId: 'data-analyst',
+  },
+  {
+    icon: SearchOutlined,
+    label: '网页',
+    prompt: '帮我规划一个网页或轻量应用的信息架构和交互流程。',
+    targetId: 'product-designer',
+  },
+];
+
+const landingAgentMap: Record<string, string[]> = {
+  探索: [
+    'code-mentor',
+    'document-editor',
+    'study-planner',
+    'visual-prompt',
+    'growth-copywriter',
+    'meeting-notes',
+  ],
+  做报告: [
+    'research-scout',
+    'data-analyst',
+    'document-editor',
+    'official-05-0001',
+    'official-06-0001',
+    'official-10-0001',
+  ],
+  写文档: [
+    'document-editor',
+    'meeting-notes',
+    'professional-translator',
+    'growth-copywriter',
+    'official-05-0001',
+    'official-11-0001',
+  ],
+  简历制作: [
+    'career-copywriter',
+    'document-editor',
+    'professional-translator',
+    'official-12-0001',
+    'official-14-0001',
+    'official-05-0001',
+  ],
+  自媒体创作: [
+    'growth-copywriter',
+    'social-media-editor',
+    'visual-prompt',
+    'official-15-0001',
+    'official-09-0001',
+    'official-03-0001',
+  ],
+  市场调研: [
+    'research-scout',
+    'data-analyst',
+    'product-reviewer',
+    'product-designer',
+    'official-07-0001',
+    'official-17-0001',
+  ],
+  教学设计: [
+    'classroom-designer',
+    'study-planner',
+    'research-mentor',
+    'official-01-0001',
+    'official-02-0001',
+    'official-10-0001',
+  ],
+  学习研究: [
+    'study-planner',
+    'research-mentor',
+    'code-mentor',
+    'research-scout',
+    'official-10-0001',
+    'official-01-0001',
+  ],
+  营销策划: [
+    'growth-copywriter',
+    'brand-designer',
+    'data-analyst',
+    'social-media-editor',
+    'official-09-0001',
+    'official-17-0001',
+  ],
+  做播客: [
+    'social-media-editor',
+    'growth-copywriter',
+    'research-scout',
+    'document-editor',
+    'official-15-0001',
+    'official-09-0001',
+  ],
+};
+
+const catalogById = new Map(
+  [...agentCatalog, ...workspace.customAgents].map((agent) => [agent.id, agent]),
+);
 
 const categoryDefinitions: { icon: Component; label: string }[] = [
   { icon: ReadOutlined, label: 'AI教育' },
@@ -138,6 +277,40 @@ const visibleAgents = computed(() => {
   return filteredAgents.value.slice(start, start + pageSize);
 });
 
+const landingAgents = computed(() =>
+  (landingAgentMap[landingCategory.value] ?? landingAgentMap['探索'] ?? [])
+    .map((id) => catalogById.get(id))
+    .filter((agent): agent is AgentCatalogItem => Boolean(agent)),
+);
+
+const visibleHistorySessions = computed(() => {
+  const query = historyQuery.value.trim().toLowerCase();
+
+  return workspace.sessions
+    .filter((session) => {
+      const agent = catalogById.get(session.agentId);
+      const searchable = [session.title, agent?.name ?? '', agent?.category ?? '']
+        .join(' ')
+        .toLowerCase();
+
+      return !query || searchable.includes(query);
+    })
+    .sort((left, right) => right.updatedAt - left.updatedAt);
+});
+
+const historyGroups = computed(() => {
+  const groups = new Map<string, AgentSession[]>();
+
+  for (const session of visibleHistorySessions.value) {
+    const label = historyGroupLabel(session.updatedAt);
+    const items = groups.get(label) ?? [];
+    items.push(session);
+    groups.set(label, items);
+  }
+
+  return [...groups.entries()].map(([label, items]) => ({ items, label }));
+});
+
 const paginationItems = computed<Array<number | 'left-ellipsis' | 'right-ellipsis'>>(() => {
   const pages = totalPages.value;
 
@@ -211,6 +384,133 @@ function openAgent(agentId: string): void {
   void router.push(`/agents/${agentId}`);
 }
 
+function resolveLandingTarget(prompt: string): AgentCatalogItem | undefined {
+  const normalized = prompt.toLowerCase();
+  const keywordTargets: Array<{ keywords: string[]; targetId: string }> = [
+    { keywords: ['代码', '编程', '开发', 'bug', '接口'], targetId: 'code-mentor' },
+    { keywords: ['ppt', '演示', '汇报', '幻灯片'], targetId: 'official-05-0001' },
+    { keywords: ['excel', '表格', '公式', '数据', '指标'], targetId: 'data-analyst' },
+    { keywords: ['简历', '求职', '面试', '竞聘'], targetId: 'career-copywriter' },
+    { keywords: ['网页', '网站', 'app', '应用', '产品'], targetId: 'product-designer' },
+    { keywords: ['海报', '设计', '视觉', '图片', '插画'], targetId: 'visual-prompt' },
+    { keywords: ['视频', '脚本', '自媒体', '播客', '直播'], targetId: 'social-media-editor' },
+    { keywords: ['学习', '课程', '教学', '考试'], targetId: 'study-planner' },
+    { keywords: ['调研', '研究', '资料', '文献'], targetId: 'research-scout' },
+    { keywords: ['营销', '文案', '推广', '品牌'], targetId: 'growth-copywriter' },
+    { keywords: ['文档', '报告', '纪要', '总结'], targetId: 'document-editor' },
+  ];
+  const matchedTarget = keywordTargets.find((item) =>
+    item.keywords.some((keyword) => normalized.includes(keyword)),
+  )?.targetId;
+
+  if (matchedTarget) {
+    const catalogTarget = agentCatalog.find((agent) => agent.id === matchedTarget);
+
+    if (catalogTarget) {
+      return catalogTarget;
+    }
+  }
+
+  return landingAgents.value[0] ?? agentCatalog[0];
+}
+
+function startLandingPrompt(): void {
+  const prompt = landingPrompt.value.trim();
+  const target = resolveLandingTarget(prompt);
+
+  if (!target) {
+    return;
+  }
+
+  void router.push({
+    path: `/agents/${target.id}`,
+    query: prompt
+      ? {
+          prompt,
+        }
+      : undefined,
+  });
+}
+
+function openLandingTask(targetId: string, prompt: string): void {
+  openLandingAgent(targetId, prompt);
+}
+
+function openLandingAgent(agentId: string, prompt?: string): void {
+  void router.push({
+    path: `/agents/${agentId}`,
+    query: prompt
+      ? {
+          prompt,
+        }
+      : undefined,
+  });
+}
+
+function openAgentSession(session: AgentSession): void {
+  historyOpen.value = false;
+  void router.push({
+    path: `/agents/${session.agentId}`,
+    query: {
+      session: session.id,
+    },
+  });
+}
+
+function agentForSession(session: AgentSession): AgentCatalogItem | undefined {
+  return [...agentCatalog, ...workspace.customAgents].find((agent) => agent.id === session.agentId);
+}
+
+function historyGroupLabel(timestamp: number): string {
+  const target = new Date(timestamp);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+
+  if (timestamp >= startOfToday) {
+    return '今天';
+  }
+
+  if (timestamp >= startOfYesterday) {
+    return '昨天';
+  }
+
+  return `${target.getMonth() + 1} 月 ${target.getDate()} 日`;
+}
+
+function formatHistoryTimestamp(timestamp: number): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(timestamp);
+}
+
+function sessionPreview(session: AgentSession): string {
+  const lastMessage = session.messages[session.messages.length - 1];
+
+  if (!lastMessage?.content.trim()) {
+    return '尚未开始对话';
+  }
+
+  return lastMessage.content.replace(/\s+/g, ' ').trim();
+}
+
+function openHistory(): void {
+  historyOpen.value = true;
+  void workspace.initialize();
+}
+
+function openCatalog(): void {
+  catalogOpen.value = true;
+  activeTab.value = 'official';
+  void nextTick(() => {
+    resultsHeading.value?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  });
+}
+
 function editAgent(agentId: string): void {
   void router.push({
     path: '/agents/create',
@@ -240,70 +540,109 @@ function goToPage(page: number): void {
 
 <template>
   <div class="agents-catalog-page">
-    <section class="agents-hero">
-      <header class="agents-hero__heading">
-        <span>
-          <RobotOutlined />
-          SUPER AGENTS
-        </span>
-        <h1>超级智能体，创建你的 APP 或助手</h1>
-        <p>释放 AI 的潜能，通过自定义模型、提示词和界面，打造属于你的智能应用。</p>
+    <section class="agent-home">
+      <button class="agent-home__history" type="button" @click="openHistory">
+        <HistoryOutlined />
+        <span>历史记录</span>
+      </button>
+
+      <header class="agent-home__heading">
+        <h1>HI，我是Agent助手</h1>
+        <p>选择一个专业助手，描述你的目标，它会帮你完成复杂任务。</p>
       </header>
 
-      <div class="agents-hero__cards">
-        <article class="agents-builder-card agents-builder-card--active">
-          <div class="agents-builder-card__visual agents-builder-card__visual--chat">
-            <div class="agent-window">
-              <header>
-                <i />
-                <span>智能体创建助手 (Prompt)</span>
-              </header>
-              <p />
-              <p />
-              <p />
-              <p />
-              <button type="button">AI 帮我完善</button>
-            </div>
-          </div>
-          <div class="agents-builder-card__content">
-            <span class="agents-builder-card__tag">单智能体</span>
-            <h2>创建智能体</h2>
-            <p>适用于轻量灵活、自然语言驱动的场景。</p>
-            <ul>
-              <li>支持自定义界面</li>
-              <li>多模型选择</li>
-            </ul>
-            <button type="button" @click="router.push('/agents/create')">
-              <PlusOutlined />
-              立即创建
-            </button>
-          </div>
-        </article>
+      <nav class="agent-home__tasks" aria-label="智能体任务类型">
+        <button
+          v-for="item in landingTaskTypes"
+          :key="item.label"
+          type="button"
+          @click="openLandingTask(item.targetId, item.prompt)"
+        >
+          <component :is="item.icon" />
+          {{ item.label }}
+        </button>
+      </nav>
 
-        <article class="agents-builder-card agents-builder-card--disabled">
-          <div class="agents-builder-card__visual agents-builder-card__visual--flow">
-            <span class="flow-node flow-node--one">开始</span>
-            <span class="flow-node flow-node--two">信息检索</span>
-            <span class="flow-node flow-node--three">内容生成</span>
-            <span class="flow-node flow-node--four">结果复核</span>
-            <i class="flow-line flow-line--one" />
-            <i class="flow-line flow-line--two" />
-            <i class="flow-line flow-line--three" />
-          </div>
-          <div class="agents-builder-card__content">
-            <span class="agents-builder-card__tag">多智能体</span>
-            <h2>创建多智能体蜂群</h2>
-            <p>适用于真实业务链路和多个专业角色协作的场景。</p>
-            <span class="agents-builder-card__soon">
-              <i />
-              即将上线
+      <form class="agent-home__composer" @submit.prevent="startLandingPrompt">
+        <textarea
+          v-model="landingPrompt"
+          aria-label="描述你希望智能体完成的任务"
+          placeholder="输入你的需求（如研究一个主题、制作旅行攻略、PPT 等），生成可视化网页、APP、数据报告。"
+        />
+        <footer>
+          <span class="agent-home__tools" aria-hidden="true">
+            <i />
+            <i />
+          </span>
+          <button type="submit" aria-label="开始任务">
+            <ArrowRightOutlined />
+          </button>
+        </footer>
+      </form>
+
+      <nav class="agent-home__tabs" aria-label="智能体场景">
+        <button
+          v-for="tab in landingTabs"
+          :key="tab"
+          type="button"
+          :class="{ active: landingCategory === tab }"
+          @click="landingCategory = tab"
+        >
+          {{ tab }}
+        </button>
+      </nav>
+    </section>
+
+    <section class="agent-showcase">
+      <header class="agent-showcase__heading">
+        <div>
+          <strong>
+            {{ landingCategory === '探索' ? '选择一个助手开始' : `${landingCategory} · 推荐助手` }}
+          </strong>
+          <p>常用任务已经整理成可直接运行的智能体模板。</p>
+        </div>
+        <button type="button" @click="openCatalog">
+          全部智能体
+          <ArrowRightOutlined />
+        </button>
+      </header>
+
+      <div class="agent-showcase__grid">
+        <article
+          v-for="(agent, index) in landingAgents"
+          :key="agent.id"
+          class="agent-showcase-card"
+          tabindex="0"
+          @click="openAgent(agent.id)"
+          @keydown.enter="openAgent(agent.id)"
+        >
+          <div class="agent-showcase-card__copy">
+            <span class="agent-showcase-card__icon" :style="{ '--agent-accent': agent.color }">
+              {{ agent.glyph }}
             </span>
+            <div>
+              <strong>{{ agent.name }}</strong>
+              <p>{{ agent.description }}</p>
+            </div>
+            <footer>
+              <span v-for="tag in agent.tags.slice(0, 3)" :key="tag">{{ tag }}</span>
+            </footer>
+          </div>
+          <div
+            class="agent-showcase-card__preview"
+            :class="`agent-showcase-card__preview--${index % 6}`"
+            aria-hidden="true"
+          >
+            <span />
+            <span />
+            <span />
+            <i />
           </div>
         </article>
       </div>
     </section>
 
-    <section class="agents-catalog">
+    <section v-if="catalogOpen" class="agents-catalog agents-catalog--expanded">
       <header class="agents-catalog__toolbar">
         <nav class="agents-tabs" aria-label="智能体资源库">
           <button
@@ -515,7 +854,7 @@ function goToPage(page: number): void {
       </div>
     </section>
 
-    <section v-if="activeTab === 'official'" class="agents-callout">
+    <section v-if="catalogOpen" class="agents-callout">
       <span>
         <ThunderboltFilled />
       </span>
@@ -529,6 +868,88 @@ function goToPage(page: number): void {
       </button>
     </section>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="historyOpen"
+      class="agent-home-history-layer"
+      role="presentation"
+      @click.self="historyOpen = false"
+    >
+      <aside class="agent-home-history" role="dialog" aria-modal="true" aria-label="智能体历史记录">
+        <header class="agent-home-history__header">
+          <div>
+            <span>
+              <HistoryOutlined />
+            </span>
+            <div>
+              <strong>历史记录</strong>
+              <p>继续最近与智能体的对话</p>
+            </div>
+          </div>
+          <button type="button" aria-label="关闭历史记录" @click="historyOpen = false">
+            <CloseOutlined />
+          </button>
+        </header>
+
+        <label class="agent-home-history__search">
+          <SearchOutlined />
+          <input v-model="historyQuery" type="search" placeholder="搜索会话或智能体" />
+          <span>{{ visibleHistorySessions.length }}</span>
+        </label>
+
+        <div
+          v-if="historyGroups.length > 0"
+          class="agent-home-history__groups"
+          aria-label="历史会话"
+        >
+          <section v-for="group in historyGroups" :key="group.label">
+            <h3>{{ group.label }}</h3>
+            <button
+              v-for="session in group.items"
+              :key="session.id"
+              type="button"
+              class="agent-home-history__item"
+              @click="openAgentSession(session)"
+            >
+              <span
+                class="agent-home-history__avatar"
+                :style="{ background: agentForSession(session)?.color || '#5b7cfa' }"
+              >
+                {{ agentForSession(session)?.glyph || '智' }}
+              </span>
+              <span class="agent-home-history__copy">
+                <strong>{{ session.title }}</strong>
+                <em>{{ agentForSession(session)?.name || '智能体' }}</em>
+                <p>{{ sessionPreview(session) }}</p>
+              </span>
+              <span class="agent-home-history__meta">
+                <time>{{ formatHistoryTimestamp(session.updatedAt) }}</time>
+                <ArrowRightOutlined />
+              </span>
+            </button>
+          </section>
+        </div>
+
+        <div v-else class="agent-home-history__empty">
+          <span>
+            <MessageOutlined />
+          </span>
+          <strong>{{ historyQuery.trim() ? '没有匹配的历史会话' : '还没有历史记录' }}</strong>
+          <p>
+            {{
+              historyQuery.trim()
+                ? '换一个智能体名称或会话关键词再试。'
+                : '开始一次智能体对话后，会话会保存在这里。'
+            }}
+          </p>
+          <button v-if="historyQuery.trim()" type="button" @click="historyQuery = ''">
+            清除搜索
+          </button>
+        </div>
+      </aside>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -1597,6 +2018,878 @@ function goToPage(page: number): void {
   .agent-card {
     min-height: 150px;
     padding: 13px;
+  }
+}
+
+.agent-home {
+  position: relative;
+  width: min(100%, 1040px);
+  margin: 0 auto;
+  padding-top: 16px;
+}
+
+.agent-home__history {
+  position: absolute;
+  top: 18px;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  color: #66736d;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.agent-home__history :deep(svg) {
+  color: #95b8ff;
+  font-size: 18px;
+}
+
+.agent-home__heading {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.agent-home__heading h1 {
+  margin: 38px 0 0;
+  color: #1f2925;
+  font-size: clamp(28px, 2.8vw, 40px);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+}
+
+.agent-home__heading p {
+  margin: 10px 0 0;
+  color: #79847f;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.agent-home__tasks {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+
+.agent-home__tasks button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  border: 1px solid #e5e9e7;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 78%);
+  color: #59655f;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.agent-home__tasks button:hover,
+.agent-home__tasks button:focus-visible {
+  border-color: #a9d9c4;
+  color: #168d5f;
+  transform: translateY(-1px);
+}
+
+.agent-home__tasks :deep(svg) {
+  color: #1ea46d;
+}
+
+.agent-home__composer {
+  display: grid;
+  width: min(100%, 900px);
+  min-height: 168px;
+  box-sizing: border-box;
+  grid-template-rows: minmax(96px, 1fr) auto;
+  margin: 18px auto 0;
+  padding: 18px 20px 14px;
+  border: 1px solid #e5ebe8;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow:
+    0 16px 42px rgb(36 71 55 / 7%),
+    0 2px 8px rgb(36 71 55 / 4%);
+}
+
+.agent-home__composer textarea {
+  width: 100%;
+  min-height: 96px;
+  box-sizing: border-box;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #27312d;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.agent-home__composer textarea::placeholder {
+  color: #a0aaa5;
+}
+
+.agent-home__composer footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.agent-home__tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.agent-home__tools i {
+  position: relative;
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #ecefed;
+  border-radius: 7px;
+  background: #fbfcfc;
+}
+
+.agent-home__tools i::before,
+.agent-home__tools i::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9px;
+  height: 1px;
+  background: #69756f;
+  content: '';
+  transform: translate(-50%, -50%);
+}
+
+.agent-home__tools i::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.agent-home__composer footer > button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #e8ecea;
+  color: #fff;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.agent-home__composer footer > button:hover,
+.agent-home__composer footer > button:focus-visible {
+  background: #1ca96d;
+  transform: translateX(2px);
+}
+
+.agent-home__tabs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 24px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #edf1ef;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.agent-home__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.agent-home__tabs button {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 8px 13px 11px;
+  border: 0;
+  background: transparent;
+  color: #53605a;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.agent-home__tabs button::after {
+  position: absolute;
+  right: 10px;
+  bottom: -1px;
+  left: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+  content: '';
+}
+
+.agent-home__tabs button.active {
+  color: #168d5f;
+  font-weight: 800;
+}
+
+.agent-home__tabs button.active::after {
+  background: #19a96e;
+}
+
+.agent-home-history-layer {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(22 30 26 / 28%);
+  backdrop-filter: blur(2px);
+  animation: agent-history-fade-in 160ms ease-out both;
+}
+
+.agent-home-history {
+  display: grid;
+  width: min(430px, 100vw);
+  height: 100dvh;
+  box-sizing: border-box;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  border-left: 1px solid #e3ebe7;
+  background: #fbfdfc;
+  box-shadow: -20px 0 48px rgb(24 48 37 / 14%);
+  animation: agent-history-slide-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.agent-home-history__header {
+  display: flex;
+  min-height: 78px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #edf2ef;
+  background: rgb(255 255 255 / 92%);
+}
+
+.agent-home-history__header > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+}
+
+.agent-home-history__header > div > span {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 10px;
+  background: #edf4ff;
+  color: #6f96e8;
+  font-size: 17px;
+}
+
+.agent-home-history__header strong {
+  display: block;
+  color: #27322d;
+  font-size: 14px;
+}
+
+.agent-home-history__header p {
+  margin: 4px 0 0;
+  color: #8b9691;
+  font-size: 9px;
+}
+
+.agent-home-history__header > button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #e5ebe8;
+  border-radius: 8px;
+  background: #fff;
+  color: #68756f;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.agent-home-history__header > button:hover,
+.agent-home-history__header > button:focus-visible {
+  border-color: #c8ddd3;
+  color: #159c66;
+  outline: 0;
+}
+
+.agent-home-history__search {
+  display: flex;
+  height: 42px;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 18px 4px;
+  padding: 0 11px;
+  border: 1px solid #e0e8e4;
+  border-radius: 9px;
+  background: #fff;
+  color: #94a09a;
+}
+
+.agent-home-history__search:focus-within {
+  border-color: #8ecbb0;
+  box-shadow: 0 0 0 3px rgb(24 169 109 / 8%);
+}
+
+.agent-home-history__search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #344039;
+  font: inherit;
+  font-size: 10px;
+}
+
+.agent-home-history__search input::placeholder {
+  color: #a4ada9;
+}
+
+.agent-home-history__search > span {
+  min-width: 20px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #f0f4f2;
+  color: #87928c;
+  font-size: 8px;
+  text-align: center;
+}
+
+.agent-home-history__groups {
+  overflow-y: auto;
+  padding: 8px 18px 28px;
+  scrollbar-color: #d8e2dc transparent;
+  scrollbar-width: thin;
+}
+
+.agent-home-history__groups section + section {
+  margin-top: 16px;
+}
+
+.agent-home-history__groups h3 {
+  margin: 10px 0 7px;
+  color: #909b95;
+  font-size: 9px;
+  font-weight: 760;
+}
+
+.agent-home-history__item {
+  display: grid;
+  width: 100%;
+  min-height: 78px;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 10px;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  padding: 11px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.agent-home-history__item:hover,
+.agent-home-history__item:focus-visible {
+  border-color: #dbe9e2;
+  outline: 0;
+  background: #fff;
+  transform: translateX(-2px);
+}
+
+.agent-home-history__avatar {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 850;
+  box-shadow: 0 7px 16px rgb(43 70 57 / 12%);
+}
+
+.agent-home-history__copy {
+  display: block;
+  min-width: 0;
+}
+
+.agent-home-history__copy strong,
+.agent-home-history__copy em,
+.agent-home-history__copy p {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-home-history__copy strong {
+  color: #303a35;
+  font-size: 11px;
+}
+
+.agent-home-history__copy em {
+  margin-top: 3px;
+  color: #168d5f;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.agent-home-history__copy p {
+  margin: 4px 0 0;
+  color: #8c9691;
+  font-size: 9px;
+}
+
+.agent-home-history__meta {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  color: #a2aba6;
+}
+
+.agent-home-history__meta time {
+  font-size: 8px;
+}
+
+.agent-home-history__meta :deep(svg) {
+  color: #b4bdb8;
+  font-size: 9px;
+}
+
+.agent-home-history__empty {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: 44px 28px;
+  text-align: center;
+}
+
+.agent-home-history__empty > span {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 14px;
+  background: #eef7f2;
+  color: #28aa73;
+  font-size: 21px;
+}
+
+.agent-home-history__empty strong {
+  margin-top: 14px;
+  color: #35413b;
+  font-size: 12px;
+}
+
+.agent-home-history__empty p {
+  max-width: 260px;
+  margin: 7px 0 0;
+  color: #8d9892;
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+.agent-home-history__empty button {
+  height: 30px;
+  margin-top: 12px;
+  padding: 0 12px;
+  border: 1px solid #dce8e2;
+  border-radius: 7px;
+  background: #fff;
+  color: #168d5f;
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+@keyframes agent-history-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes agent-history-slide-in {
+  from {
+    transform: translateX(34px);
+  }
+}
+
+.agent-showcase {
+  width: min(100%, 1380px);
+  margin: 24px auto 0;
+}
+
+.agent-showcase__heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+
+.agent-showcase__heading strong {
+  display: block;
+  color: #26312c;
+  font-size: 14px;
+}
+
+.agent-showcase__heading p {
+  margin: 5px 0 0;
+  color: #89938e;
+  font-size: 10px;
+}
+
+.agent-showcase__heading > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: #168d5f;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 780;
+  cursor: pointer;
+}
+
+.agent-showcase__grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.agent-showcase-card {
+  display: grid;
+  min-height: 176px;
+  overflow: hidden;
+  grid-template-columns: minmax(0, 1.18fr) minmax(110px, 0.82fr);
+  border: 1px solid #e5ebe8;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(33 78 59 / 4%);
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.agent-showcase-card:hover,
+.agent-showcase-card:focus-visible {
+  border-color: #bfe2d2;
+  box-shadow: 0 14px 32px rgb(33 78 59 / 9%);
+  outline: 0;
+  transform: translateY(-2px);
+}
+
+.agent-showcase-card__copy {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 11px;
+  padding: 16px;
+}
+
+.agent-showcase-card__icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--agent-accent) 13%, white);
+  color: var(--agent-accent);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.agent-showcase-card__copy strong {
+  display: block;
+  overflow: hidden;
+  color: #29332f;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-showcase-card__copy p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 6px 0 0;
+  color: #7c8781;
+  font-size: 9px;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.agent-showcase-card__copy footer {
+  display: flex;
+  gap: 5px;
+  margin-top: auto;
+  flex-wrap: wrap;
+}
+
+.agent-showcase-card__copy footer span {
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #f4f7f5;
+  color: #77837d;
+  font-size: 7px;
+  white-space: nowrap;
+}
+
+.agent-showcase-card__preview {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
+    linear-gradient(160deg, #eef8f3, #e5f1eb);
+}
+
+.agent-showcase-card__preview::before {
+  position: absolute;
+  inset: 14px 11px 12px;
+  border: 1px solid rgb(105 171 143 / 18%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 74%);
+  box-shadow: 0 9px 20px rgb(49 102 79 / 8%);
+  content: '';
+}
+
+.agent-showcase-card__preview span {
+  position: absolute;
+  z-index: 1;
+  left: 22px;
+  height: 5px;
+  border-radius: 999px;
+  background: #d4e6de;
+}
+
+.agent-showcase-card__preview span:nth-child(1) {
+  top: 36px;
+  width: 48%;
+}
+
+.agent-showcase-card__preview span:nth-child(2) {
+  top: 50px;
+  width: 38%;
+}
+
+.agent-showcase-card__preview span:nth-child(3) {
+  top: 72px;
+  width: 58%;
+  height: 30px;
+  border-radius: 5px;
+  background: #e8f4ef;
+}
+
+.agent-showcase-card__preview i {
+  position: absolute;
+  z-index: 1;
+  right: 20px;
+  bottom: 24px;
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  background: #9dd1bb;
+}
+
+.agent-showcase-card__preview--1 {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
+    linear-gradient(160deg, #eff5fc, #e5eef9);
+}
+
+.agent-showcase-card__preview--1 i {
+  background: #9ebbe3;
+}
+
+.agent-showcase-card__preview--2 {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
+    linear-gradient(160deg, #f8f2ff, #eee7fa);
+}
+
+.agent-showcase-card__preview--2 i {
+  background: #bba6e5;
+}
+
+.agent-showcase-card__preview--3 {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
+    linear-gradient(160deg, #fff5ed, #f8e9da);
+}
+
+.agent-showcase-card__preview--3 i {
+  background: #e2b284;
+}
+
+.agent-showcase-card__preview--4 {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
+    linear-gradient(160deg, #fff1f4, #f9e4e9);
+}
+
+.agent-showcase-card__preview--4 i {
+  background: #dfa0af;
+}
+
+.agent-showcase-card__preview--5 {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
+    linear-gradient(160deg, #eef9f8, #e0f0ef);
+}
+
+.agent-showcase-card__preview--5 i {
+  background: #8ecac6;
+}
+
+.agents-catalog--expanded {
+  scroll-margin-top: 72px;
+}
+
+@media (max-width: 1100px) {
+  .agent-showcase__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .agent-home-history {
+    width: 100%;
+  }
+
+  .agent-home-history__header {
+    min-height: 68px;
+    padding: 11px 14px;
+  }
+
+  .agent-home-history__search {
+    margin: 11px 14px 2px;
+  }
+
+  .agent-home-history__groups {
+    padding: 7px 14px calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .agent-home-history__item {
+    min-height: 74px;
+    padding: 10px 8px;
+  }
+
+  .agent-home {
+    padding-top: 6px;
+  }
+
+  .agent-home__history {
+    top: 4px;
+    right: 2px;
+  }
+
+  .agent-home__heading h1 {
+    margin-top: 28px;
+    font-size: 25px;
+  }
+
+  .agent-home__heading p {
+    max-width: 300px;
+    margin-top: 7px;
+    font-size: 10px;
+  }
+
+  .agent-home__tasks {
+    justify-content: flex-start;
+    margin-top: 17px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .agent-home__tasks::-webkit-scrollbar {
+    display: none;
+  }
+
+  .agent-home__tasks button {
+    min-width: max-content;
+    min-height: 31px;
+    padding: 0 11px;
+    font-size: 10px;
+  }
+
+  .agent-home__composer {
+    min-height: 142px;
+    margin-top: 13px;
+    padding: 14px 14px 11px;
+    border-radius: 12px;
+  }
+
+  .agent-home__composer textarea {
+    min-height: 78px;
+    font-size: 11px;
+  }
+
+  .agent-home__tabs {
+    justify-content: flex-start;
+    gap: 1px;
+    margin-top: 16px;
+    padding-bottom: 7px;
+  }
+
+  .agent-home__tabs button {
+    padding: 7px 10px 10px;
+    font-size: 9px;
+  }
+
+  .agent-showcase {
+    margin-top: 18px;
+  }
+
+  .agent-showcase__heading {
+    align-items: center;
+  }
+
+  .agent-showcase__heading p {
+    display: none;
+  }
+
+  .agent-showcase__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-showcase-card {
+    min-height: 154px;
   }
 }
 </style>

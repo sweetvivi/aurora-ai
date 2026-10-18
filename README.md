@@ -59,6 +59,7 @@
 - `node outputs/ui-reference/verify-group-chat.mjs` 通过，超级对话的 3 模型并发、10 模型上限、停止生成、跨模型共享上下文、自回答去重、单模型重试、桌面端与移动端响应式布局均正常；验收使用 Playwright 路由拦截，不调用真实 Provider
 - `node outputs/ui-reference/verify-catalog-charts.mjs` 通过，6358 条智能体目录、分页/空态、29 类图表、无错误状态和无横向溢出在桌面端与移动端均正常
 - `node outputs/ui-reference/verify-agent-create.mjs` 和 `verify-agent-edit.mjs` 通过，智能体创建、服务端持久化数据回填、编辑保存和桌面/移动端布局均正常
+- `node outputs/ui-reference/verify-agent-home.mjs` 通过，智能体首页的跨会话历史恢复、场景化推荐、PPT 任务直达、关键词路由和桌面/移动端布局均正常
 - `node outputs/ui-reference/verify-newdraw-templates.mjs` 通过，`/newdraw` 的 7 分类、17 模板、筛选、回填、示例弹窗、高级设置和顶部跳转在桌面端与移动端均正常；390px 移动端固定创作栏与底部导航保持至少 8px 间距
 - `node outputs/ui-reference/verify-showcase-assets.mjs` 通过，`/newdraw` 的 34 张预览图和图片生成页的 12 张示例图全部加载，无横向溢出
 - `node outputs/ui-reference/verify-commerce-studio.mjs` 通过，电商工具的空状态、必填参数、素材上传、替换/试穿任务和桌面/移动端布局均正常

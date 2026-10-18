@@ -876,6 +876,24 @@ node outputs/ui-reference/verify-m2-routes.mjs
 - Key 解析顺序保持为后台 `providerKeyRef`、专用 Seedream/Seedance Key、通用图片/视频 Key；本轮未调用真实付费接口，也未读取、输出或提交任何真实 Key
 - 新增 Provider 路由、协议和两个适配器单测；本轮图片、视频工作台及八个主路由的桌面端/移动端 Mock 浏览器验收全部通过
 
+超级智能体首页任务分流与历史抽屉：
+
+```text
+pnpm --filter @aurora/web typecheck
+node outputs/ui-reference/verify-agent-home.mjs
+node outputs/ui-reference/verify-agent-create.mjs
+node outputs/ui-reference/verify-agent-edit.mjs
+node outputs/ui-reference/verify-agent-detail-actions.mjs
+node outputs/ui-reference/verify-m2-interactions.mjs
+```
+
+- 首页“历史记录”不再打开资源库，而是从右侧打开跨智能体会话抽屉；按今天、昨天和具体日期分组，支持搜索会话标题、智能体名称和分类，点击后恢复对应智能体的指定会话
+- 首页“写作 / PPT / 设计 / Excel / 网页”任务标签改为按意图进入对应智能体，并携带可直接执行的首轮提示词
+- 场景标签会切换推荐助手集合；“做报告、写文档、简历制作、自媒体创作、市场调研、教学设计、学习研究、营销策划、做播客”不再复用同一组推荐卡
+- 首页输入框新增关键词意图识别，PPT、Excel、简历、网页、图片、视频、学习、调研、营销和文档等任务会进入对应智能体；无法识别时沿用当前场景的第一推荐助手
+- 新增 `verify-agent-home.mjs`，覆盖桌面端 `1440x1000` 与移动端 `390x844` 的历史抽屉宽度和内容、两组推荐卡切换、PPT 任务直达、关键词路由、无横向溢出和无页面脚本错误
+- 智能体创建、编辑、详情消息操作和绘画到修图的既有验收同步复跑通过；本批仅使用本地持久化和 Playwright 路由拦截，不调用真实 Provider，不读取或输出 Key
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥
