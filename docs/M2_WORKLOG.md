@@ -49,6 +49,22 @@
 - 浏览器验收通过：`verify-m2-routes.mjs`、`verify-m2-interactions.mjs`、`verify-chat-message-layout.mjs`、`verify-draw-editor.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出和页面脚本错误
 - 本批仅调整前端样式和文档，不调用真实 Provider，不读取、输出或提交 Key
 
+### AI 画布移动端底部避让
+
+- 页面：`apps/web/src/views/CanvasStudioView.vue`
+- 移动端画布高度扣除平台顶栏、面包屑和 `62px` 移动导航后改为 `calc(100dvh - 164px)`，避免底部创作条和缩放控件被固定导航遮挡
+- `verify-canvas-studio.mjs` 新增几何断言，要求创作条、缩放控件与移动导航之间至少保留 `8px` 间距
+- 验证通过：`pnpm exec prettier --write apps/web/src/views/CanvasStudioView.vue`、`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`、`node outputs/ui-reference/verify-canvas-studio.mjs`、`node outputs/ui-reference/verify-canvas-workflow-library.mjs`
+- 实测创作条与导航间距约 `60px`，缩放控件与导航间距约 `18px`；桌面端和移动端均无横向溢出或页面脚本错误
+- 本批仅修改前端样式和本地验收脚本，不调用真实 Provider，不读取、输出或提交 Key
+
+### 电商工具移动端底部避让
+
+- 验收脚本：`outputs/ui-reference/verify-commerce-studio.mjs`
+- 滚动到移动端页面末尾后新增 `.commerce-info__support` 与固定移动导航的几何断言，要求至少保留 `8px` 间距，防止后续参数或卡片增高再次造成遮挡
+- 验证通过：`node outputs/ui-reference/verify-commerce-studio.mjs`；实测末尾内容底边约 `671px`、移动导航顶边约 `782px`，间距约 `111px`
+- 本批仅修改本地验收脚本，不调用真实 Provider，不读取、输出或提交 Key
+
 ### 首页发现工作台
 
 - 页面：`apps/web/src/views/HomeView.vue`、`apps/web/src/views/ChatView.vue`

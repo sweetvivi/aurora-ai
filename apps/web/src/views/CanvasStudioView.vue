@@ -6179,13 +6179,15 @@ onBeforeUnmount(() => {
 @media (max-width: 980px) {
   .canvas-studio {
     height: auto;
-    min-height: calc(100vh - 56px);
+    min-height: calc(100vh - 164px);
+    min-height: calc(100dvh - 164px);
     grid-template-columns: 1fr;
     overflow: visible;
   }
 
   .canvas-workspace {
-    min-height: calc(100vh - 118px);
+    min-height: calc(100vh - 164px);
+    min-height: calc(100dvh - 164px);
   }
 
   .canvas-inspiration {
