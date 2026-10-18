@@ -221,7 +221,7 @@ onMounted(() => {
 .platform-campaign {
   position: relative;
   display: flex;
-  min-height: 74px;
+  min-height: 56px;
   align-items: center;
   justify-content: center;
   gap: 13px;

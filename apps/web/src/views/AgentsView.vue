@@ -1388,7 +1388,7 @@ function goToPage(page: number): void {
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 56px);
-  padding: 30px 28px 58px;
+  padding: 30px 32px 58px;
   background:
     radial-gradient(circle at 50% 0, rgb(61 202 136 / 8%), transparent 440px),
     linear-gradient(180deg, #f7fcf9 0, #fff 430px);
@@ -1418,7 +1418,7 @@ function goToPage(page: number): void {
 .agents-hero,
 .agents-catalog,
 .agents-callout {
-  width: min(100%, 1380px);
+  width: min(100%, 1136px);
   margin: 0 auto;
 }
 
@@ -1839,9 +1839,9 @@ function goToPage(page: number): void {
 .agents-catalog__body {
   display: grid;
   align-items: start;
-  gap: 18px;
-  grid-template-columns: 250px minmax(0, 1fr);
-  padding: 18px;
+  gap: 14px;
+  grid-template-columns: 270px minmax(0, 1fr);
+  padding: 14px;
 }
 
 .agents-categories {
@@ -1963,14 +1963,14 @@ function goToPage(page: number): void {
 
 .agents-grid {
   display: grid;
-  gap: 10px;
+  gap: 12px 10px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .agent-card {
   display: grid;
   min-width: 0;
-  min-height: 164px;
+  min-height: 190px;
   align-content: start;
   padding: 14px;
   border: 1px solid #e3e9e6;
@@ -2477,14 +2477,14 @@ function goToPage(page: number): void {
 
 .agent-home {
   position: relative;
-  width: min(100%, 1240px);
+  width: min(100%, 1136px);
   margin: 0 auto;
   padding-top: 16px;
 }
 
 .agent-home__history {
   position: absolute;
-  top: 18px;
+  top: 48px;
   right: 0;
   display: inline-flex;
   align-items: center;
@@ -2510,9 +2510,9 @@ function goToPage(page: number): void {
 }
 
 .agent-home__heading h1 {
-  margin: 34px 0 0;
+  margin: 0;
   color: #1f2925;
-  font-size: clamp(32px, 3vw, 46px);
+  font-size: clamp(30px, 2.5vw, 36px);
   font-weight: 900;
   letter-spacing: 0;
 }
@@ -2535,12 +2535,12 @@ function goToPage(page: number): void {
   display: grid;
   gap: 20px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 28px;
+  margin-top: 42px;
 }
 
 .agent-builder-card {
   display: grid;
-  min-height: 232px;
+  min-height: 244px;
   overflow: hidden;
   grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
   border: 1px solid #e3ebe7;
@@ -2552,7 +2552,7 @@ function goToPage(page: number): void {
 .agent-builder-preview {
   position: relative;
   display: grid;
-  min-height: 232px;
+  min-height: 244px;
   place-items: center;
   overflow: hidden;
   padding: 24px;
