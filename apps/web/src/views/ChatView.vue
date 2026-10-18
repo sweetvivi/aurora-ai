@@ -13,7 +13,6 @@ import {
   EditOutlined,
   FilePptOutlined,
   FileTextOutlined,
-  HistoryOutlined,
   LikeOutlined,
   LoadingOutlined,
   MenuOutlined,
@@ -23,6 +22,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  SettingOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons-vue';
 import { storeToRefs } from 'pinia';
@@ -49,6 +49,12 @@ const search = ref('');
 const conversationArea = ref<HTMLElement | null>(null);
 const composerInput = ref<InstanceType<typeof ChatComposer> | null>(null);
 const historyOpen = ref(false);
+const historyFilterOpen = ref(false);
+const historyModelFilter = ref('');
+const historyRefreshing = ref(false);
+const historyClearing = ref(false);
+const settingsOpen = ref(false);
+const showModelIcons = ref(true);
 const copiedMessageId = ref('');
 const messageFeedback = ref<Record<string, '' | 'dislike' | 'like'>>({});
 const editingConversationId = ref('');
@@ -274,16 +280,41 @@ const modelOptions = computed(() =>
     value: model.alias,
   })),
 );
+const historyModelOptions = computed(() => {
+  const aliases = [...new Set(conversations.value.map((conversation) => conversation.modelAlias))];
+
+  return aliases.filter(Boolean).map((alias) => ({
+    alias,
+    label: models.value.find((model) => model.alias === alias)?.displayName ?? alias,
+  }));
+});
+const modelSeries = computed(() => {
+  const series = [
+    { color: '#6d5dfc', glyph: 'AI', label: 'AI 系列', pattern: /ai|gpt|openai/i },
+    { color: '#7a5cff', glyph: 'D', label: 'DeepSeek 系列', pattern: /deepseek/i },
+    { color: '#e28732', glyph: '通', label: '通义千问系列', pattern: /qwen|通义/i },
+    { color: '#15966e', glyph: 'L', label: 'Llama 系列', pattern: /llama/i },
+  ];
+
+  return series.filter((item) =>
+    models.value.some((model) => item.pattern.test(`${model.alias} ${model.displayName}`)),
+  );
+});
+const selectedModelMark = computed(() => {
+  const modelText = `${selectedModel.value?.alias ?? ''} ${selectedModel.value?.displayName ?? ''}`;
+
+  return modelSeries.value.find((item) => item.pattern.test(modelText))?.glyph ?? '极';
+});
 const filteredConversations = computed(() => {
   const keyword = search.value.trim().toLowerCase();
 
-  if (!keyword) {
-    return conversations.value;
-  }
+  return conversations.value.filter((conversation) => {
+    const matchesKeyword = !keyword || conversation.title.toLowerCase().includes(keyword);
+    const matchesModel =
+      !historyModelFilter.value || conversation.modelAlias === historyModelFilter.value;
 
-  return conversations.value.filter((conversation) =>
-    conversation.title.toLowerCase().includes(keyword),
-  );
+    return matchesKeyword && matchesModel;
+  });
 });
 const serviceLabel = computed(() => {
   if (streaming.value) {
@@ -312,6 +343,12 @@ watch(
 );
 
 onMounted(async () => {
+  try {
+    showModelIcons.value = window.localStorage.getItem('aurora.chat.showModelIcons') !== 'false';
+  } catch {
+    showModelIcons.value = true;
+  }
+
   await sessionStore.bootstrap();
   await chatStore.initialize();
 
@@ -353,6 +390,61 @@ async function openConversation(conversationId: string): Promise<void> {
   await chatStore.openConversation(conversationId);
   historyOpen.value = false;
   await scrollToBottom();
+}
+
+async function refreshHistory(): Promise<void> {
+  if (historyRefreshing.value || streaming.value) {
+    return;
+  }
+
+  historyRefreshing.value = true;
+
+  try {
+    await chatStore.loadConversations();
+  } catch {
+    // The store exposes the server error through the existing composer alert.
+  } finally {
+    historyRefreshing.value = false;
+  }
+}
+
+function toggleHistoryModelFilter(alias: string): void {
+  historyModelFilter.value = historyModelFilter.value === alias ? '' : alias;
+}
+
+async function clearAllConversations(): Promise<void> {
+  if (streaming.value || historyClearing.value || conversations.value.length === 0) {
+    return;
+  }
+
+  historyClearing.value = true;
+
+  try {
+    const conversationIds = conversations.value.map((conversation) => conversation.id);
+
+    for (const conversationId of conversationIds) {
+      await chatStore.deleteConversation(conversationId);
+    }
+
+    chatStore.newConversation();
+    historyModelFilter.value = '';
+    search.value = '';
+    await scrollToBottom(false);
+  } catch {
+    // The first failed deletion leaves the remaining conversations untouched.
+  } finally {
+    historyClearing.value = false;
+  }
+}
+
+function toggleModelIcons(): void {
+  showModelIcons.value = !showModelIcons.value;
+
+  try {
+    window.localStorage.setItem('aurora.chat.showModelIcons', String(showModelIcons.value));
+  } catch {
+    // Storage is optional; the in-memory setting still applies.
+  }
 }
 
 async function startConversationRename(conversation: ConversationSummary): Promise<void> {
@@ -505,27 +597,87 @@ function formatConversationTime(value: string | null): string {
       v-if="historyOpen"
       class="chat-history__backdrop"
       type="button"
-      aria-label="关闭历史会话"
+      aria-label="关闭历史记录"
       @click="historyOpen = false"
     />
 
-    <aside class="chat-history" :class="{ open: historyOpen }">
-      <header>
-        <strong>所有会话</strong>
-        <div>
-          <button type="button" @click="startNewConversation">
-            <PlusOutlined />
-            新对话
+    <aside class="chat-history" :class="{ open: historyOpen }" aria-label="历史记录">
+      <header class="chat-history__header">
+        <strong>历史记录</strong>
+        <div class="chat-history__tools">
+          <button type="button" aria-label="关闭历史记录" @click="historyOpen = false">
+            <CloseOutlined />
           </button>
-          <button type="button" aria-label="会话设置">
-            <HistoryOutlined />
+          <button
+            type="button"
+            aria-label="刷新历史记录"
+            :disabled="historyRefreshing || streaming"
+            @click="refreshHistory"
+          >
+            <ReloadOutlined :spin="historyRefreshing" />
           </button>
+          <a-popconfirm
+            title="清空全部历史记录？"
+            description="所有会话和消息都会删除，此操作无法撤销。"
+            ok-text="清空"
+            cancel-text="取消"
+            :disabled="streaming || historyClearing || conversations.length === 0"
+            @confirm="clearAllConversations"
+          >
+            <button
+              type="button"
+              aria-label="清空历史记录"
+              :disabled="streaming || historyClearing || conversations.length === 0"
+            >
+              <DeleteOutlined />
+              <span>清空</span>
+            </button>
+          </a-popconfirm>
         </div>
       </header>
 
+      <div class="chat-history__filter-bar">
+        <button
+          class="chat-history__filter-toggle"
+          type="button"
+          :class="{ active: historyFilterOpen || Boolean(historyModelFilter) }"
+          aria-label="筛选历史记录"
+          :aria-expanded="historyFilterOpen"
+          @click="historyFilterOpen = !historyFilterOpen"
+        >
+          <SearchOutlined />
+          <span>筛选</span>
+        </button>
+        <span v-if="historyModelFilter" class="chat-history__active-filter">
+          {{
+            historyModelOptions.find((item) => item.alias === historyModelFilter)?.label ??
+            historyModelFilter
+          }}
+          <button type="button" aria-label="清除模型筛选" @click="historyModelFilter = ''">
+            <CloseOutlined />
+          </button>
+        </span>
+        <button class="chat-history__new" type="button" @click="startNewConversation">
+          <PlusOutlined />
+          新对话
+        </button>
+      </div>
+
+      <div v-if="historyFilterOpen" class="chat-history__filters">
+        <button
+          v-for="item in historyModelOptions"
+          :key="item.alias"
+          type="button"
+          :class="{ active: historyModelFilter === item.alias }"
+          @click="toggleHistoryModelFilter(item.alias)"
+        >
+          {{ item.label }}
+        </button>
+      </div>
+
       <label class="chat-history__search">
         <SearchOutlined />
-        <input v-model="search" placeholder="搜索会话" />
+        <input v-model="search" placeholder="搜索历史记录" />
       </label>
 
       <div v-if="filteredConversations.length > 0" class="chat-history__list">
@@ -606,12 +758,10 @@ function formatConversationTime(value: string | null): string {
       </div>
 
       <div v-else class="chat-history__empty">
-        <MessageOutlined />
-        <strong>{{ search ? '没有匹配的会话' : '暂无历史会话' }}</strong>
-        <span>
-          {{ search ? '换一个关键词继续搜索。' : '开始一段对话后，会话会保存在这里。' }}
-        </span>
+        <strong>{{ search || historyModelFilter ? '没有匹配的历史记录' : '暂无历史记录' }}</strong>
       </div>
+
+      <footer class="chat-history__footer">历史记录最长保留六个月，请及时导出记录。</footer>
     </aside>
 
     <main class="chat-main">
@@ -620,7 +770,7 @@ function formatConversationTime(value: string | null): string {
           <button
             class="chat-main__history-toggle"
             type="button"
-            aria-label="打开历史会话"
+            aria-label="打开历史记录"
             @click="historyOpen = true"
           >
             <MenuOutlined />
@@ -637,16 +787,39 @@ function formatConversationTime(value: string | null): string {
             </template>
           </a-select>
         </div>
-        <nav class="chat-mode-switch" aria-label="对话模式">
-          <RouterLink class="active" to="/chat">
-            <MessageOutlined />
-            模型对话
-          </RouterLink>
-          <RouterLink to="/chat/groups">
-            <AppstoreOutlined />
-            超级对话
-          </RouterLink>
-        </nav>
+        <div class="chat-main__center">
+          <nav class="chat-mode-switch" aria-label="对话模式">
+            <RouterLink class="active" to="/chat">
+              <MessageOutlined />
+              模型对话
+            </RouterLink>
+            <RouterLink to="/chat/groups">
+              <AppstoreOutlined />
+              超级对话
+            </RouterLink>
+          </nav>
+          <a-popover
+            v-model:open="settingsOpen"
+            placement="bottom"
+            trigger="click"
+            overlay-class-name="chat-settings-popover"
+          >
+            <template #content>
+              <div class="chat-settings">
+                <strong>显示AI模型图标</strong>
+                <a-switch
+                  size="small"
+                  :checked="showModelIcons"
+                  aria-label="显示AI模型图标"
+                  @change="toggleModelIcons"
+                />
+              </div>
+            </template>
+            <button class="chat-main__settings" type="button" aria-label="对话设置">
+              <SettingOutlined />
+            </button>
+          </a-popover>
+        </div>
         <span class="chat-main__status" :class="{ error: status === 'error' }">
           <i />
           {{ serviceLabel }}
@@ -660,6 +833,13 @@ function formatConversationTime(value: string | null): string {
         </div>
 
         <div v-else-if="!hasMessages" class="chat-welcome">
+          <div v-if="modelSeries.length > 0" class="chat-model-series" aria-label="支持的模型系列">
+            <span v-for="item in modelSeries" :key="item.label">
+              <i :style="{ background: item.color }">{{ item.glyph }}</i>
+              {{ item.label }}
+            </span>
+          </div>
+
           <div class="chat-welcome__heading">
             <h1>
               您好，
@@ -752,7 +932,19 @@ function formatConversationTime(value: string | null): string {
               { 'chat-message--failed': message.status === 'FAILED' },
             ]"
           >
-            <span>{{ message.role === 'assistant' ? '极' : '我' }}</span>
+            <span
+              :class="{
+                'chat-message__avatar--model': message.role === 'assistant' && showModelIcons,
+              }"
+            >
+              {{
+                message.role === 'assistant' && showModelIcons
+                  ? selectedModelMark
+                  : message.role === 'assistant'
+                    ? '极'
+                    : '我'
+              }}
+            </span>
             <MessageAttachments
               v-if="message.role === 'user' && message.attachments.length > 0"
               :attachments="message.attachments"
@@ -850,30 +1042,30 @@ function formatConversationTime(value: string | null): string {
 
 .chat-history {
   position: fixed;
-  z-index: 45;
-  top: 56px;
+  z-index: 60;
+  top: 0;
+  right: 0;
   bottom: 0;
-  left: 0;
   display: flex;
-  width: min(86vw, 320px);
+  width: min(92vw, 390px);
   min-width: 0;
   flex-direction: column;
   overflow: hidden;
-  border-right: 1px solid #e8ebf0;
-  background: rgb(255 255 255 / 98%);
-  box-shadow: 18px 0 44px rgb(31 43 65 / 14%);
-  transform: translateX(-105%);
+  border-left: 1px solid #e8ebf0;
+  background: #fff;
+  box-shadow: -18px 0 44px rgb(31 43 65 / 12%);
+  transform: translateX(105%);
   transition: transform 180ms ease;
 }
 
 .chat-history__backdrop {
   position: fixed;
-  z-index: 40;
-  inset: 56px 0 0;
+  z-index: 55;
+  inset: 0;
   display: block;
   padding: 0;
   border: 0;
-  background: rgb(28 36 50 / 24%);
+  background: rgb(28 36 50 / 20%);
 }
 
 .chat-history.open {
@@ -882,43 +1074,154 @@ function formatConversationTime(value: string | null): string {
 
 .chat-history > header {
   display: flex;
-  min-height: 70px;
+  min-height: 64px;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 0 20px;
+  padding: 0 18px;
+  border-bottom: 1px solid #eef0f4;
 }
 
 .chat-history > header strong {
   font-size: 16px;
+  font-weight: 650;
 }
 
-.chat-history > header div {
+.chat-history__tools {
   display: flex;
-  gap: 7px;
+  align-items: center;
+  gap: 6px;
 }
 
-.chat-history > header button {
+.chat-history__tools button {
   display: inline-flex;
-  height: 29px;
+  min-width: 31px;
+  height: 31px;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: #fff;
+  color: #596273;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.chat-history__tools button:hover,
+.chat-history__tools button:focus-visible {
+  background: #f3f6fb;
+  color: #356fe0;
+}
+
+.chat-history__tools button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.chat-history__filter-bar {
+  display: flex;
+  min-height: 49px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+}
+
+.chat-history__filter-toggle {
+  display: inline-flex;
+  height: 27px;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #596273;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.chat-history__filter-toggle.active {
+  color: #356fe0;
+}
+
+.chat-history__active-filter {
+  display: inline-flex;
+  min-width: 0;
+  height: 26px;
+  align-items: center;
   gap: 5px;
-  padding: 0 9px;
+  overflow: hidden;
+  padding: 0 5px 0 9px;
+  border-radius: 7px;
+  background: #f5f1ff;
+  color: #7a5cff;
+  font-size: 10px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-history__active-filter button {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.chat-history__new {
+  display: inline-flex;
+  height: 27px;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 0 8px;
   border: 1px solid #dce7ff;
   border-radius: 7px;
   background: #fff;
   color: #4c84ff;
   font-size: 10px;
-  font-weight: 750;
+  font-weight: 650;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.chat-history > header button:last-child {
-  width: 30px;
-  padding: 0;
-  border-color: #e8ebf0;
-  color: #697283;
+.chat-history__new:hover {
+  background: #f3f7ff;
+}
+
+.chat-history__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 18px 13px;
+}
+
+.chat-history__filters button {
+  min-width: 0;
+  height: 27px;
+  overflow: hidden;
+  padding: 0 10px;
+  border: 1px solid #e3e7ef;
+  border-radius: 7px;
+  background: #fff;
+  color: #687181;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chat-history__filters button.active {
+  border-color: #c9b8ff;
+  background: #f5f1ff;
+  color: #6f55df;
 }
 
 .chat-history__search {
@@ -926,7 +1229,7 @@ function formatConversationTime(value: string | null): string {
   height: 35px;
   align-items: center;
   gap: 7px;
-  margin: 0 20px;
+  margin: 0 18px 12px;
   padding: 0 10px;
   border-radius: 8px;
   background: #f3f5f8;
@@ -945,7 +1248,8 @@ function formatConversationTime(value: string | null): string {
 .chat-history__list {
   display: grid;
   gap: 3px;
-  margin-top: 12px;
+  min-height: 0;
+  flex: 1;
   overflow-y: auto;
   padding: 0 10px 14px;
 }
@@ -1088,29 +1392,28 @@ function formatConversationTime(value: string | null): string {
 
 .chat-history__empty {
   display: grid;
-  margin: auto 22px;
-  justify-items: center;
+  min-height: 0;
+  flex: 1;
+  margin: 0 22px;
+  place-items: center;
   color: #a0a7b3;
   text-align: center;
 }
 
-.chat-history__empty > svg {
-  width: 37px;
-  height: 37px;
-  margin-bottom: 14px;
-  color: #d0d5dd;
-}
-
 .chat-history__empty strong {
-  color: #737c8a;
+  color: #a2a8b3;
   font-size: 12px;
+  font-weight: 500;
 }
 
-.chat-history__empty span {
-  max-width: 180px;
-  margin-top: 7px;
+.chat-history__footer {
+  margin-top: auto;
+  padding: 14px 18px 17px;
+  border-top: 1px solid #f0f2f5;
+  color: #a2a8b3;
   font-size: 10px;
-  line-height: 1.6;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .chat-main {
@@ -1162,6 +1465,55 @@ function formatConversationTime(value: string | null): string {
 
 .chat-main__model-select :deep(.ant-select-selector) {
   border-color: #e2e6ec !important;
+}
+
+.chat-main__center {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: center;
+}
+
+.chat-main__settings {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #697283;
+  cursor: pointer;
+}
+
+.chat-main__settings:hover,
+.chat-main__settings:focus-visible {
+  background: #f3f6fb;
+  color: #356fe0;
+}
+
+.chat-settings {
+  display: flex;
+  width: 180px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 3px 2px;
+}
+
+.chat-settings strong {
+  color: #313643;
+  font-size: 12px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+:global(.chat-settings-popover .ant-popover-inner) {
+  padding: 13px 14px;
+  border: 1px solid #eef0f4;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(31 43 65 / 12%);
 }
 
 .chat-main__status {
@@ -1252,9 +1604,49 @@ function formatConversationTime(value: string | null): string {
 
 .chat-welcome {
   display: grid;
+  position: relative;
   width: min(100%, 820px);
   justify-items: stretch;
   margin: 58px auto 30px;
+}
+
+.chat-model-series {
+  display: grid;
+  position: absolute;
+  top: 14px;
+  right: 0;
+  gap: 8px;
+  justify-items: end;
+}
+
+.chat-model-series span {
+  display: inline-flex;
+  height: 25px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 5px;
+  border-radius: 6px;
+  background: #fff7f7;
+  color: #9b7272;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.chat-model-series span:nth-child(2n) {
+  background: #f3f7ff;
+  color: #7082a0;
+}
+
+.chat-model-series i {
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .chat-welcome__heading {
@@ -1468,6 +1860,13 @@ function formatConversationTime(value: string | null): string {
   font-weight: 800;
 }
 
+.chat-message > span.chat-message__avatar--model {
+  border: 1px solid #e1e8f7;
+  background: #f7f9ff;
+  color: #6d5dfc;
+  font-size: 10px;
+}
+
 .chat-message--user {
   grid-template-columns: minmax(0, 1fr) 32px;
 }
@@ -1597,6 +1996,10 @@ function formatConversationTime(value: string | null): string {
 }
 
 @media (max-width: 900px) {
+  .chat-model-series {
+    display: none;
+  }
+
   .chat-suggestions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1613,7 +2016,7 @@ function formatConversationTime(value: string | null): string {
   }
 
   .chat-history {
-    border-right: 1px solid #e3e7ec;
+    border-left: 1px solid #e3e7ec;
   }
 
   .chat-history__backdrop {

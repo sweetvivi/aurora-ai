@@ -833,6 +833,20 @@ node outputs/ui-reference/verify-chat-message-layout.mjs
 - `verify-chat-message-layout.mjs` 使用 Edge、SSE Mock 和 API 路由拦截，覆盖桌面端 `1440x1000` 与移动端 `390x844` 的气泡颜色、内容宽度、助手透明背景、五个操作按钮尺寸、继续追问回填、点赞状态、重新生成请求次数和无横向溢出
 - 全量验证通过：API 20 个文件 83 项、Web 16 个文件 66 项，格式检查、lint、前后端类型检查和生产构建均通过；验收不调用真实 Provider、不读取或输出 Key
 
+模型对话历史与设置：
+
+```text
+pnpm exec prettier --write apps/web/src/views/ChatView.vue
+pnpm lint
+pnpm typecheck
+node outputs/ui-reference/verify-chat-conversation-actions.mjs
+```
+
+- 历史面板从左侧“所有会话”改为参考产品式右侧“历史记录”，顶部提供关闭、刷新和清空，清空必须经过二次确认；筛选支持按模型标签过滤，底部显示六个月保留提示，并继续保留搜索、重命名、删除和新建对话能力
+- 对话模式切换右侧新增齿轮设置，使用参考产品式浮层控制“显示AI模型图标”；设置写入 `aurora.chat.showModelIcons`，刷新后恢复，并在有模型时展示参考产品式模型系列标签
+- `verify-chat-conversation-actions.mjs` 同步验证抽屉从右侧展开、设置持久化、模型筛选、清空确认取消、会话重命名与删除；桌面端 `1440x1000` 和移动端 `390x844` 均无横向溢出和页面脚本错误
+- 本批使用 Mock 会话接口，不调用真实 Provider，不读取或输出 Key
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥
