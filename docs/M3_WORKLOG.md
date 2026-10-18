@@ -89,7 +89,7 @@
 - `pnpm format:check` 通过
 - `pnpm lint` 通过
 - `pnpm typecheck` 通过
-- `pnpm test`：API 20 个文件 83 项通过，Web 16 个文件 63 项通过
+- `pnpm test`：API 20 个文件 83 项通过，Web 16 个文件 66 项通过
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-admin-console.mjs` 通过
 - `node outputs/ui-reference/verify-admin-provider-probe.mjs` 通过

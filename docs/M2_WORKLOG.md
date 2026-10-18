@@ -321,7 +321,7 @@ pnpm test
 
 测试规模：
 
-- Web：16 个测试文件，63 项通过
+- Web：16 个测试文件，66 项通过
 - API：20 个测试文件，79 项通过
 
 页面验收脚本：
@@ -331,7 +331,10 @@ outputs/ui-reference/verify-m2-routes.mjs
 outputs/ui-reference/verify-chat-markdown.mjs
 outputs/ui-reference/verify-chat-attachments.mjs
 outputs/ui-reference/verify-group-chat.mjs
+outputs/ui-reference/verify-agent-detail-actions.mjs
 ```
+
+超级智能体会话页完成态已按参考产品截图复核：助手正文不再使用灰色气泡，用户气泡按内容收缩，复制/继续追问/重新生成/反馈操作恢复为可见图标，积分消耗提示和规则展开保持可访问；历史抽屉使用日期分组紧凑列表。`verify-agent-detail-actions.mjs` 同时检查桌面端和移动端用户气泡最大宽度、重新生成请求次数与页面横向溢出。
 
 使用本地开发服务器 `http://127.0.0.1:5173/` 检查了以下路由的 `1440x1000` 桌面端和 `390x844` 移动端：
 

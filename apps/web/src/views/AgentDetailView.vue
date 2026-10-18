@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  ArrowDownOutlined,
   ArrowLeftOutlined,
   ClockCircleOutlined,
   CloseOutlined,
@@ -34,6 +35,7 @@ const sessionSearchInput = ref<HTMLInputElement | null>(null);
 const composerInput = ref<HTMLTextAreaElement | null>(null);
 const historyOpen = ref(false);
 const copiedMessageId = ref('');
+const costRuleMessageId = ref('');
 const messageFeedback = ref<Record<string, '' | 'dislike' | 'like'>>({});
 const streaming = computed(() => workspace.streamingSessionId !== null);
 
@@ -183,6 +185,10 @@ function continueMessage(): void {
 
 function toggleFeedback(messageId: string, value: 'dislike' | 'like'): void {
   messageFeedback.value[messageId] = messageFeedback.value[messageId] === value ? '' : value;
+}
+
+function toggleCostRule(messageId: string): void {
+  costRuleMessageId.value = costRuleMessageId.value === messageId ? '' : messageId;
 }
 
 async function regenerateMessage(messageId: string): Promise<void> {
@@ -373,7 +379,7 @@ watch(
               {{ message.role === 'assistant' ? agent.glyph : '我' }}
             </span>
             <div>
-              <strong>{{ message.role === 'assistant' ? agent.name : '你' }}</strong>
+              <strong v-if="message.role === 'user'">你</strong>
               <MarkdownMessage
                 v-if="message.role === 'assistant' && message.status === 'COMPLETED'"
                 class="agent-detail__markdown"
@@ -390,46 +396,71 @@ watch(
               </p>
               <div
                 v-if="message.role === 'assistant' && message.status === 'COMPLETED'"
-                class="agent-detail__message-actions"
+                class="agent-detail__message-result"
               >
-                <button
-                  type="button"
-                  :class="{ active: copiedMessageId === message.id }"
-                  :title="copiedMessageId === message.id ? '已复制' : '复制回答'"
-                  @click="copyMessage(message.id, message.content)"
-                >
-                  <CopyOutlined />
-                  <span>{{ copiedMessageId === message.id ? '已复制' : '复制' }}</span>
-                </button>
-                <button type="button" title="继续追问" @click="continueMessage">
-                  <EditOutlined />
-                  <span>继续追问</span>
-                </button>
-                <button
-                  type="button"
-                  title="重新生成"
-                  :disabled="streaming"
-                  @click="regenerateMessage(message.id)"
-                >
-                  <ReloadOutlined />
-                  <span>重新生成</span>
-                </button>
-                <button
-                  type="button"
-                  title="有帮助"
-                  :class="{ active: messageFeedback[message.id] === 'like' }"
-                  @click="toggleFeedback(message.id, 'like')"
-                >
-                  <LikeOutlined />
-                </button>
-                <button
-                  type="button"
-                  title="需改进"
-                  :class="{ active: messageFeedback[message.id] === 'dislike' }"
-                  @click="toggleFeedback(message.id, 'dislike')"
-                >
-                  <DislikeOutlined />
-                </button>
+                <div class="agent-detail__cost-note">
+                  <span>
+                    <ThunderboltFilled />
+                    本次任务共消耗 1 积分
+                  </span>
+                  <button type="button" @click="toggleCostRule(message.id)">
+                    查看积分消耗规则
+                  </button>
+                  <p v-if="costRuleMessageId === message.id">
+                    单次消耗与所选模型、任务能力和处理时长有关，本页面当前按 1 积分/次展示。
+                  </p>
+                </div>
+                <div class="agent-detail__message-actions">
+                  <button
+                    type="button"
+                    aria-label="复制回答"
+                    :class="{ active: copiedMessageId === message.id }"
+                    :title="copiedMessageId === message.id ? '已复制' : '复制回答'"
+                    @click="copyMessage(message.id, message.content)"
+                  >
+                    <CopyOutlined />
+                    <span class="agent-detail__action-label">{{
+                      copiedMessageId === message.id ? '已复制' : '复制'
+                    }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="继续追问"
+                    title="继续追问"
+                    @click="continueMessage"
+                  >
+                    <EditOutlined />
+                    <span class="agent-detail__action-label">继续追问</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="重新生成"
+                    title="重新生成"
+                    :disabled="streaming"
+                    @click="regenerateMessage(message.id)"
+                  >
+                    <ReloadOutlined />
+                    <span class="agent-detail__action-label">重新生成</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="有帮助"
+                    title="有帮助"
+                    :class="{ active: messageFeedback[message.id] === 'like' }"
+                    @click="toggleFeedback(message.id, 'like')"
+                  >
+                    <LikeOutlined />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="需改进"
+                    title="需改进"
+                    :class="{ active: messageFeedback[message.id] === 'dislike' }"
+                    @click="toggleFeedback(message.id, 'dislike')"
+                  >
+                    <DislikeOutlined />
+                  </button>
+                </div>
               </div>
             </div>
           </article>
@@ -449,6 +480,15 @@ watch(
             <HistoryOutlined />
             历史记录
           </button>
+          <button
+            type="button"
+            class="agent-detail__scroll-latest"
+            aria-label="回到最新消息"
+            title="回到最新消息"
+            @click="scrollToLatest"
+          >
+            <ArrowDownOutlined />
+          </button>
         </div>
         <div class="agent-detail__input">
           <textarea
@@ -460,7 +500,7 @@ watch(
             @keydown.enter.exact.prevent="sendMessage"
           />
           <div class="agent-detail__input-footer">
-            <div class="agent-detail__starter-list">
+            <div v-if="messages.length === 0" class="agent-detail__starter-list">
               <button
                 v-for="starter in agent.starterPrompts.slice(0, 2)"
                 :key="starter"
@@ -515,15 +555,12 @@ watch(
                 :class="{ active: activeSessionId === session.id }"
                 @click="selectHistorySession(session.id)"
               >
-                <span class="agent-history-panel__avatar">
-                  {{ session.title.slice(0, 1) }}
-                </span>
                 <span>
                   <strong>{{ session.title }}</strong>
-                  <small>
-                    {{ session.messages.length }} 条消息 ·
-                    {{ formatHistoryTimestamp(session.updatedAt) }}
-                  </small>
+                  <small
+                    >{{ session.messages.length }} 条消息 ·
+                    {{ formatHistoryTimestamp(session.updatedAt) }}</small
+                  >
                 </span>
               </button>
             </section>
@@ -771,7 +808,11 @@ watch(
 }
 
 .agent-detail__heading strong {
+  min-width: 0;
+  overflow: hidden;
   font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-detail__heading em {
@@ -843,6 +884,14 @@ watch(
   grid-template-columns: 34px minmax(0, 1fr);
 }
 
+.agent-detail__message--assistant {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.agent-detail__message--assistant .agent-detail__message-avatar {
+  display: none;
+}
+
 .agent-detail__message--user {
   grid-template-columns: minmax(0, 1fr) 34px;
 }
@@ -872,10 +921,13 @@ watch(
 }
 
 .agent-detail__message > div {
-  max-width: min(720px, 82%);
+  width: 100%;
+  max-width: min(920px, 100%);
 }
 
 .agent-detail__message--user > div {
+  width: fit-content;
+  max-width: min(720px, 100%);
   text-align: right;
 }
 
@@ -891,43 +943,108 @@ watch(
   border-radius: 4px 12px 12px;
   background: #f5f7fa;
   color: #363d48;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.75;
   text-align: left;
   white-space: pre-wrap;
 }
 
 .agent-detail__markdown {
-  margin-top: 5px;
-  padding: 12px 14px;
-  border-radius: 4px 12px 12px;
-  background: #f5f7fa;
-  color: #363d48;
-  font-size: 12px;
-  line-height: 1.75;
+  margin-top: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #303640;
+  font-size: 13px;
+  line-height: 1.82;
+  text-align: left;
+}
+
+.agent-detail__message-result {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 9px;
+}
+
+.agent-detail__cost-note {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  color: #8b929c;
+  font-size: 10px;
+}
+
+.agent-detail__cost-note > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #e2a027;
+  font-weight: 700;
+}
+
+.agent-detail__cost-note > span > svg {
+  font-size: 11px;
+}
+
+.agent-detail__cost-note > button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #db8b1b;
+  font-size: 10px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.agent-detail__cost-note > p {
+  position: absolute;
+  z-index: 8;
+  bottom: calc(100% + 7px);
+  left: 0;
+  width: min(310px, calc(100vw - 32px));
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid #e7e9ee;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgb(24 31 50 / 10%);
+  color: #626b79;
+  font-size: 10px;
+  line-height: 1.6;
   text-align: left;
 }
 
 .agent-detail__message-actions {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 4px;
-  margin-top: 7px;
 }
 
 .agent-detail__message-actions button {
   display: inline-flex;
+  width: 27px;
   height: 27px;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 0 8px;
+  padding: 0;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
   color: #89919e;
-  font-size: 9px;
   cursor: pointer;
+}
+
+.agent-detail__message-actions .agent-detail__action-label {
+  display: none;
 }
 
 .agent-detail__message-actions button:hover,
@@ -950,7 +1067,8 @@ watch(
 
 .agent-detail__message--user p {
   border-radius: 12px 4px 12px 12px;
-  background: #edf3ff;
+  background: #4c84ff;
+  color: #fff;
 }
 
 .agent-detail__composer {
@@ -991,6 +1109,20 @@ watch(
 .agent-detail__composer-actions button:hover {
   border-color: #b9cef7;
   color: #3979ed;
+}
+
+.agent-detail__composer-actions .agent-detail__scroll-latest {
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.agent-detail__scroll-latest > svg {
+  font-size: 17px;
 }
 
 .agent-detail__input {
@@ -1068,7 +1200,7 @@ watch(
 
 .agent-history-panel {
   display: flex;
-  width: min(380px, 100%);
+  width: min(320px, 100%);
   height: 100%;
   flex-direction: column;
   border-left: 1px solid #e9edf2;
@@ -1079,11 +1211,11 @@ watch(
 
 .agent-history-panel > header {
   display: flex;
-  min-height: 74px;
+  min-height: 68px;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 0 20px;
+  padding: 0 18px;
   border-bottom: 1px solid #eef1f5;
 }
 
@@ -1091,13 +1223,13 @@ watch(
   display: grid;
   align-items: center;
   gap: 1px 10px;
-  grid-template-columns: 36px auto;
+  grid-template-columns: 34px auto;
 }
 
 .agent-history-panel > header > div > span {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   grid-row: 1 / span 2;
   place-items: center;
   border-radius: 10px;
@@ -1107,7 +1239,7 @@ watch(
 
 .agent-history-panel > header strong {
   color: #343c48;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .agent-history-panel > header small {
@@ -1135,18 +1267,18 @@ watch(
 .agent-history-panel__groups {
   min-height: 0;
   overflow-y: auto;
-  padding: 17px 14px 28px;
+  padding: 16px 18px 28px;
 }
 
 .agent-history-panel__groups section + section {
-  margin-top: 22px;
+  margin-top: 20px;
 }
 
 .agent-history-panel__groups h3 {
-  margin: 0 0 8px;
-  padding: 0 7px;
+  margin: 0 0 7px;
+  padding: 0;
   color: #8c94a1;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -1155,11 +1287,10 @@ watch(
   width: 100%;
   min-width: 0;
   align-items: center;
-  gap: 10px;
-  grid-template-columns: 34px minmax(0, 1fr);
-  padding: 10px 9px;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 8px 10px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 6px;
   background: transparent;
   color: #556071;
   text-align: left;
@@ -1168,39 +1299,30 @@ watch(
 
 .agent-history-panel__groups section > button:hover,
 .agent-history-panel__groups section > button.active {
-  border-color: #d8e4ff;
-  background: #f4f8ff;
-}
-
-.agent-history-panel__avatar {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: 9px;
-  background: #edf3ff;
-  color: #3979ed;
-  font-size: 11px;
-  font-weight: 800;
+  border-color: #e3e6eb;
+  background: #f7f8fa;
 }
 
 .agent-history-panel__groups section > button > span:last-child {
   display: grid;
   min-width: 0;
-  gap: 4px;
+  gap: 3px;
 }
 
 .agent-history-panel__groups strong {
   overflow: hidden;
   color: #424a57;
-  font-size: 11px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .agent-history-panel__groups small {
+  overflow: hidden;
   color: #969eaa;
-  font-size: 9px;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-history-panel__empty {
@@ -1268,7 +1390,33 @@ watch(
 
   .agent-detail__heading {
     height: 58px;
-    padding: 0 14px;
+    gap: 7px;
+    padding: 0 12px;
+  }
+
+  .agent-detail__heading > button {
+    margin-right: 0;
+  }
+
+  .agent-detail__heading em,
+  .agent-detail__status {
+    display: none;
+  }
+
+  .agent-detail__heading strong {
+    flex: 1;
+    font-size: 14px;
+  }
+
+  .agent-detail__avatar {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+  }
+
+  .agent-detail__cost {
+    flex: 0 0 auto;
+    padding: 0 8px;
   }
 
   .agent-detail__conversation {
