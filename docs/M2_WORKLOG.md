@@ -31,6 +31,15 @@
 
 ## 3. 已实现内容
 
+### 智能体首页推荐卡密度对齐
+
+- 页面：`apps/web/src/views/AgentsView.vue`
+- 桌面端推荐区从 3 列改为参考产品式 4 列，`1100px` 以下回落为 3 列、`860px` 以下回落为 2 列；每个场景由 6 张推荐卡扩展到 8 张，并补充品牌设计、数据分析、产品评审、文档编辑、翻译、写作和社媒等场景助手
+- 卡片高度、预览区比例、图标、标题、描述和标签字号重新收紧；四个全局标题组件与工具地图中的负字距统一改为 0
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm --filter @aurora/web typecheck`
+- 浏览器验收通过：`verify-agent-home.mjs`、`verify-m2-routes.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 均为 8 张推荐卡，8 个主路由无横向溢出和页面脚本错误
+- 本批只调整前端视觉和文档，不调用真实 Provider，不读取、输出或提交 Key
+
 ### 对话与绘画视觉密度收口
 
 - 页面：`apps/web/src/views/ChatView.vue`、`apps/web/src/views/DrawStudioView.vue`

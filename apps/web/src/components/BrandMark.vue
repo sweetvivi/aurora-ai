@@ -97,7 +97,7 @@ withDefaults(
   color: var(--ink);
   font-size: 15px;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

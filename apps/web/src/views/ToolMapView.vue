@@ -543,7 +543,7 @@ function openTool(tool: ToolItem): void {
   color: #1d242e;
   font-size: 26px;
   font-weight: 860;
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
 }
 
 .discovery-intro p {
@@ -683,7 +683,7 @@ function openTool(tool: ToolItem): void {
   color: #fff;
   font-size: 30px;
   font-weight: 900;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 
 .discovery-feature__copy p {

@@ -36,7 +36,7 @@ defineProps<{
   color: var(--ink);
   font-size: clamp(24px, 3vw, 34px);
   font-weight: 780;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.16;
 }
 

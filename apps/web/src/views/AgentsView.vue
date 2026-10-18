@@ -112,6 +112,8 @@ const landingAgentMap: Record<string, string[]> = {
     'visual-prompt',
     'growth-copywriter',
     'meeting-notes',
+    'brand-designer',
+    'data-analyst',
   ],
   做报告: [
     'research-scout',
@@ -120,6 +122,8 @@ const landingAgentMap: Record<string, string[]> = {
     'official-05-0001',
     'official-06-0001',
     'official-10-0001',
+    'product-reviewer',
+    'product-designer',
   ],
   写文档: [
     'document-editor',
@@ -128,6 +132,8 @@ const landingAgentMap: Record<string, string[]> = {
     'growth-copywriter',
     'official-05-0001',
     'official-11-0001',
+    'general-assistant',
+    'legal-writing-coach',
   ],
   简历制作: [
     'career-copywriter',
@@ -136,6 +142,8 @@ const landingAgentMap: Record<string, string[]> = {
     'official-12-0001',
     'official-14-0001',
     'official-05-0001',
+    'general-assistant',
+    'social-media-editor',
   ],
   自媒体创作: [
     'growth-copywriter',
@@ -144,6 +152,8 @@ const landingAgentMap: Record<string, string[]> = {
     'official-15-0001',
     'official-09-0001',
     'official-03-0001',
+    'story-world-builder',
+    'brand-designer',
   ],
   市场调研: [
     'research-scout',
@@ -152,6 +162,8 @@ const landingAgentMap: Record<string, string[]> = {
     'product-designer',
     'official-07-0001',
     'official-17-0001',
+    'research-mentor',
+    'legal-writing-coach',
   ],
   教学设计: [
     'classroom-designer',
@@ -160,6 +172,8 @@ const landingAgentMap: Record<string, string[]> = {
     'official-01-0001',
     'official-02-0001',
     'official-10-0001',
+    'professional-translator',
+    'document-editor',
   ],
   学习研究: [
     'study-planner',
@@ -168,6 +182,8 @@ const landingAgentMap: Record<string, string[]> = {
     'research-scout',
     'official-10-0001',
     'official-01-0001',
+    'professional-translator',
+    'icpc-coach',
   ],
   营销策划: [
     'growth-copywriter',
@@ -176,6 +192,8 @@ const landingAgentMap: Record<string, string[]> = {
     'social-media-editor',
     'official-09-0001',
     'official-17-0001',
+    'story-world-builder',
+    'product-designer',
   ],
   做播客: [
     'social-media-editor',
@@ -184,6 +202,8 @@ const landingAgentMap: Record<string, string[]> = {
     'document-editor',
     'official-15-0001',
     'official-09-0001',
+    'story-world-builder',
+    'professional-translator',
   ],
 };
 
@@ -989,7 +1009,7 @@ function goToPage(page: number): void {
   color: #169f67;
   font-size: clamp(25px, 2.2vw, 34px);
   font-weight: 900;
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
 }
 
 .agents-hero__heading p {
@@ -2060,7 +2080,7 @@ function goToPage(page: number): void {
   color: #1f2925;
   font-size: clamp(28px, 2.8vw, 40px);
   font-weight: 900;
-  letter-spacing: -0.035em;
+  letter-spacing: 0;
 }
 
 .agent-home__heading p {
@@ -2586,14 +2606,14 @@ function goToPage(page: number): void {
 .agent-showcase__grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .agent-showcase-card {
   display: grid;
-  min-height: 176px;
+  min-height: 182px;
   overflow: hidden;
-  grid-template-columns: minmax(0, 1.18fr) minmax(110px, 0.82fr);
+  grid-template-columns: minmax(0, 1.16fr) minmax(96px, 0.84fr);
   border: 1px solid #e5ebe8;
   border-radius: 9px;
   background: #fff;
@@ -2617,19 +2637,19 @@ function goToPage(page: number): void {
   display: grid;
   min-width: 0;
   align-content: start;
-  gap: 11px;
-  padding: 16px;
+  gap: 10px;
+  padding: 15px 14px;
 }
 
 .agent-showcase-card__icon {
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   place-items: center;
   border-radius: 8px;
   background: color-mix(in srgb, var(--agent-accent) 13%, white);
   color: var(--agent-accent);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -2637,7 +2657,7 @@ function goToPage(page: number): void {
   display: block;
   overflow: hidden;
   color: #29332f;
-  font-size: 12px;
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2647,7 +2667,7 @@ function goToPage(page: number): void {
   overflow: hidden;
   margin: 6px 0 0;
   color: #7c8781;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.65;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -2665,7 +2685,7 @@ function goToPage(page: number): void {
   border-radius: 4px;
   background: #f4f7f5;
   color: #77837d;
-  font-size: 7px;
+  font-size: 8px;
   white-space: nowrap;
 }
 
@@ -2780,6 +2800,12 @@ function goToPage(page: number): void {
 }
 
 @media (max-width: 1100px) {
+  .agent-showcase__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
   .agent-showcase__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
