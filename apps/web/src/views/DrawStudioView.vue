@@ -23,6 +23,7 @@ import {
   ShopOutlined,
   StarOutlined,
   ThunderboltFilled,
+  UploadOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
@@ -2191,7 +2192,7 @@ onBeforeUnmount(() => {
                   @click="composerReferenceInput?.click()"
                 >
                   <LoadingOutlined v-if="uploadingReference" />
-                  <PlusOutlined v-else />
+                  <UploadOutlined v-else />
                   <span>{{ uploadingReference ? '上传中' : '上传' }}</span>
                   <small>{{ referenceImages.length }} / {{ maxReferenceImages }}</small>
                 </button>
@@ -5349,28 +5350,28 @@ onBeforeUnmount(() => {
 
 .draw-composer__upload {
   display: grid;
-  width: 54px;
-  height: 62px;
+  width: 66px;
+  height: 84px;
   place-items: center;
   align-content: center;
-  gap: 5px;
+  gap: 6px;
   border: 1px dashed #d4d9e0;
-  border-radius: 7px;
+  border-radius: 9px;
   background: #fafbfc;
   color: #7f8997;
-  font-size: 8px;
+  font-size: 9px;
   cursor: pointer;
 }
 
 .draw-composer__reference {
   position: relative;
   display: block;
-  width: 54px;
-  height: 62px;
-  flex: 0 0 54px;
+  width: 66px;
+  height: 84px;
+  flex: 0 0 66px;
   overflow: hidden;
   border: 1px solid #dfe4e9;
-  border-radius: 7px;
+  border-radius: 9px;
   background: #f7f8fa;
 }
 
@@ -5399,7 +5400,7 @@ onBeforeUnmount(() => {
 
 .draw-composer__upload :deep(svg) {
   color: #308b74;
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .draw-composer__input textarea {
@@ -6153,26 +6154,26 @@ onBeforeUnmount(() => {
   }
 
   .draw-composer__input {
-    grid-template-columns: 46px minmax(0, 1fr);
+    grid-template-columns: 54px minmax(0, 1fr);
   }
 
   .draw-composer__attachments {
-    max-width: 46px;
+    max-width: 54px;
   }
 
   .draw-composer__upload {
-    width: 46px;
-    height: 56px;
+    width: 54px;
+    height: 68px;
   }
 
   .draw-composer__reference {
-    width: 46px;
-    height: 56px;
-    flex-basis: 46px;
+    width: 54px;
+    height: 68px;
+    flex-basis: 54px;
   }
 
   .draw-composer__field-error {
-    margin-left: 56px;
+    margin-left: 64px;
   }
 
   .draw-composer__toolbar {

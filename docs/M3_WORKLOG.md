@@ -287,3 +287,16 @@
 - 模型对话首页按参考产品首屏补细节：欢迎标题加入招手表情与句末闪烁光标（`prefers-reduced-motion` 下停用动画），`模型对话` 标签右上角补红色 `New` 徽标，`GroupChatView` 的模式切换器同步对齐
 - 新增 `verify-chat-home-polish.mjs`，断言问候语、招手表情、光标尺寸与动画、`New` 徽标文本与位置、横向溢出和页面脚本错误；桌面端与移动端全部通过
 - 本轮只使用本地服务与 Mock，不读取、输出或调用任何真实 Key
+
+## 23. 2026-10-19 智能体真实流式对话浏览器验收与绘画上传位对齐
+
+- 智能体流式链路此前只有 Store 单测覆盖（真实流、错误、中断、异常断流、重放、重新生成共 7 项），缺少页面级端到端验证；本轮补上 `outputs/ui-reference/verify-agent-streaming.mjs`
+- 脚本用 `page.route` 拦截 `POST /api/v1/chat/stream`，按 `meta` → `delta` × N → `done` 的事件序列构造 SSE 响应，首帧前故意延迟 600ms，用于观察乐观更新
+- 正常链路断言：用户消息与助手占位消息立即出现、“正在生成”状态生效、输入框在流式期间禁用；`delta` 累积成完整正文；`done` 后状态回到“服务就绪”、输入框恢复、积分提示为“本次任务共消耗 1 积分”；请求体带上智能体 `systemPrompt`（含智能体名）
+- 错误链路断言：服务端 `error`（`refunded: true`）写入助手消息正文与页面错误条，状态回到“服务就绪”
+- 停止链路断言：生成中点击停止按钮，`AbortController` 中断请求，助手消息落为“生成已中断”，页面提示“生成已中断，本次积分已退回”
+- 会话切换断言：新建对话后从历史记录切回原会话，完整回答仍在；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误
+- 参考产品 AI 绘画首页的上传位比本地更大（约 `68×87px` 对 `54×62px`）；把 `.draw-composer__upload` 与 `.draw-composer__reference` 调整为 `66×84px`、圆角 `9px`，图标换成 `UploadOutlined` 并放大到 `18px`，移动端断点同步为 `54×68px`
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
+- 绘画相关浏览器验收复跑通过：`verify-draw-modes.mjs`、`verify-draw-navigation.mjs`、`verify-draw.mjs`
+- 本轮只使用 Mock SSE 与本地服务，未读取、输出或调用任何真实 Key，未消耗参考产品积分，未调用真实视频生成
