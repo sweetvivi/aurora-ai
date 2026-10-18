@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   AppstoreOutlined,
+  ArrowUpOutlined,
   BarChartOutlined,
   BulbOutlined,
   CheckOutlined,
@@ -65,28 +66,28 @@ const renameConversationInput = ref<HTMLInputElement | null>(null);
 
 const suggestions = [
   {
-    description: '拆解目标并生成可执行步骤',
-    icon: BulbOutlined,
-    label: '制定工作计划',
-    prompt: '帮我拆解本周的工作目标，并整理成可执行的优先级清单。',
-  },
-  {
-    description: '分析需求、风险和验收标准',
+    description: '对比主要功能、覆盖范围与差异',
     icon: AppstoreOutlined,
-    label: '分析产品需求',
-    prompt: '请帮我分析这份产品需求中的目标、用户场景、风险和验收标准。',
+    label: '创建产品功能对比矩阵',
+    prompt: '请帮我创建一份产品功能对比矩阵，对比主要功能、覆盖范围和差异。',
   },
   {
-    description: '优化结构、语气和表达',
+    description: '用树形图梳理预算结构和层级',
+    icon: BulbOutlined,
+    label: '使用树形图可视化公司预算',
+    prompt: '请使用树形图可视化公司预算，梳理预算结构和各层级占比。',
+  },
+  {
+    description: '加入目标、结果与跟踪机制',
     icon: FileTextOutlined,
-    label: '润色一段文字',
-    prompt: '请把下面的文字改写得更加清晰、专业，并保留原意。',
+    label: '撰写带有 OKR 跟踪的团队生产力报告',
+    prompt: '请撰写一份带有 OKR 跟踪的团队生产力报告，包含目标、结果和改进建议。',
   },
   {
-    description: '解释、调试或生成代码',
+    description: '分析市场机会、风险和优先级',
     icon: CodeOutlined,
-    label: '解决代码问题',
-    prompt: '我有一个代码问题，需要你帮助定位原因并给出修复方案。',
+    label: '为产品发布呈现市场机会分析',
+    prompt: '请为产品发布呈现市场机会分析，说明目标市场、机会、风险和优先级。',
   },
 ];
 
@@ -806,11 +807,11 @@ function formatConversationTime(value: string | null): string {
         </div>
         <div class="chat-main__center">
           <nav class="chat-mode-switch" aria-label="对话模式">
-            <RouterLink class="active" :to="isHome ? '/' : '/chat'">
+            <RouterLink class="active" :to="isHome ? '/' : '/newchat'">
               <MessageOutlined />
               模型对话
             </RouterLink>
-            <RouterLink to="/chat/groups">
+            <RouterLink to="/newchat/groups">
               <AppstoreOutlined />
               超级对话
             </RouterLink>
@@ -906,11 +907,9 @@ function formatConversationTime(value: string | null): string {
               type="button"
               @click="useSuggestion(item.prompt)"
             >
-              <span>
-                <component :is="item.icon" />
-              </span>
               <strong>{{ item.label }}</strong>
               <p>{{ item.description }}</p>
+              <ArrowUpOutlined class="chat-suggestions__arrow" aria-hidden="true" />
             </button>
           </div>
 
@@ -1757,10 +1756,11 @@ function formatConversationTime(value: string | null): string {
 
 .chat-suggestions button {
   display: grid;
-  min-height: 102px;
-  align-content: start;
+  position: relative;
+  min-height: 104px;
+  align-content: space-between;
   justify-items: start;
-  padding: 12px;
+  padding: 14px 15px 13px;
   border: 1px solid #e5e8ee;
   border-radius: 10px;
   background: rgb(255 255 255 / 88%);
@@ -1779,26 +1779,27 @@ function formatConversationTime(value: string | null): string {
   transform: translateY(-2px);
 }
 
-.chat-suggestions button > span {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border-radius: 8px;
-  background: #edf3ff;
-  color: #4c84ff;
-}
-
 .chat-suggestions strong {
-  margin-top: 10px;
-  font-size: 11px;
+  padding-right: 20px;
+  color: #414958;
+  font-size: 12px;
+  line-height: 1.65;
 }
 
 .chat-suggestions p {
-  margin: 5px 0 0;
+  margin: 8px 22px 0 0;
   color: #8992a0;
   font-size: 9px;
   line-height: 1.55;
+}
+
+.chat-suggestions__arrow {
+  position: absolute;
+  right: 12px;
+  bottom: 11px;
+  color: #9aa4b2;
+  font-size: 11px;
+  transform: rotate(45deg);
 }
 
 .chat-chart-types {

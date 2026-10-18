@@ -23,7 +23,8 @@ export const appRoutes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'chat',
+        path: 'newchat',
+        alias: ['/chat'],
         name: 'chat',
         component: () => import('@/views/ChatView.vue'),
         meta: {
@@ -31,7 +32,8 @@ export const appRoutes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'chat/groups',
+        path: 'newchat/groups',
+        alias: ['/chat/groups'],
         name: 'group-chat',
         component: () => import('@/views/GroupChatView.vue'),
         meta: {

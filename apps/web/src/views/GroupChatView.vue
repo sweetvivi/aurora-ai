@@ -303,11 +303,11 @@ function openCapability(item: ChatCapabilityPreset): void {
         </div>
 
         <nav class="chat-mode-switch" aria-label="对话模式">
-          <RouterLink to="/chat">
+          <RouterLink to="/newchat">
             <MessageOutlined />
             模型对话
           </RouterLink>
-          <RouterLink class="active" to="/chat/groups">
+          <RouterLink class="active" to="/newchat/groups">
             <AppstoreOutlined />
             超级对话
           </RouterLink>

@@ -35,7 +35,7 @@ const supplementalEntries: GlobalSearchEntry[] = [
     description: '让多个模型分别回答同一轮问题',
     iconKey: 'chat',
     id: 'supplement-group-chat',
-    route: '/chat/groups',
+    route: '/newchat/groups',
     searchOrder: 21,
     standalone: false,
     title: '超级对话',

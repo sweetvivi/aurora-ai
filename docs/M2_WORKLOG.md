@@ -32,6 +32,14 @@
 
 ## 3. 已实现内容
 
+### 模型对话参考路由与示例卡收口
+
+- 对照参考产品窗口内跳转语义，将模型对话主路径调整为 `/newchat`，超级对话调整为 `/newchat/groups`；保留 `/chat` 和 `/chat/groups` 作为兼容别名，现有书签、验收脚本和站内旧链接不会被破坏
+- 模型对话、超级对话、视频工作台和全局搜索的站内入口同步改用参考产品主路径；路由单元测试补覆盖主路径与兼容路径解析
+- “示例提示词”改为四张参考产品式长提示词卡：主标题承载完整任务语义，下方保留简短辅助说明，右下角增加引导图标；桌面四列、移动端两列布局保持不变
+- 验证通过：`pnpm --filter @aurora/web typecheck`、`pnpm --filter @aurora/web test -- src/router/routes.spec.ts`、`pnpm exec prettier --check`、`node outputs/ui-reference/verify-home-discovery.mjs`、`node outputs/ui-reference/verify-chat-conversation-actions.mjs`、`node outputs/ui-reference/verify-chat-message-layout.mjs`、`node outputs/ui-reference/verify-group-chat.mjs`、`node outputs/ui-reference/verify-m2-routes.mjs`
+- 桌面端 `1440x1000` 和移动端 `390x844` 均通过，无横向溢出或页面脚本错误；本批只使用本地 Mock 与路由拦截，不读取、输出或调用真实 Key
+
 ### AI 画布浮动导航与节点剪贴板
 
 - 页面：`apps/web/src/views/CanvasStudioView.vue`
