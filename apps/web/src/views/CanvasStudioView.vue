@@ -239,7 +239,7 @@ const nodeToolbarMenuNodeId = ref('');
 const connectionFromId = ref('');
 const contextMenu = ref<CanvasContextMenu | null>(null);
 const canvasNotice = ref('');
-const inspirationOpen = ref(true);
+const inspirationOpen = ref(false);
 const composerExpanded = ref(false);
 const canvasGridVisible = ref(true);
 const workflowPanelExpanded = ref(false);
@@ -3210,7 +3210,12 @@ onBeforeUnmount(() => {
             <span v-if="selectedNodeCount > 1" class="canvas-node__selection-count">
               已选 {{ selectedNodeCount }} 项
             </span>
-            <button type="button" aria-label="调整视角" @click="resetViewport">
+            <button
+              v-if="node.kind === 'image' || node.kind === 'output'"
+              type="button"
+              aria-label="调整视角"
+              @click="openAngleDialog(node)"
+            >
               <ExpandOutlined />
               <span>调整视角</span>
             </button>

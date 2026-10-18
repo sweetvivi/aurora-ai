@@ -351,3 +351,14 @@
 - Mock 浏览器验收通过：`verify-video-preview.mjs`、`verify-video-tasks.mjs`、`verify-video-capabilities.mjs`、`verify-video-studio.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
 - 本轮未读取、输出或调用任何真实 Key，未消耗参考产品积分，未调用真实视频生成
+
+## 29. 2026-10-19 AI 画布默认状态与节点调整视角对齐
+
+- 对照参考产品 AI 画布截图，右侧灵感画板不是默认展开区域，画布首屏应保留完整黑色工作区；本地此前默认展开，首屏可用宽度明显不足
+- 将 `inspirationOpen` 默认值改为 `false`，保留右下角灯泡按钮「打开灵感画板」，点击后再进入现有的灵感对话、最近创作和素材入口
+- 节点工具栏的「调整视角」此前调用 `resetViewport()`，与参考产品点击后弹出「3D 视角控制」的行为不符；现改为调用 `openAngleDialog(node)`，并只在 `image` / `output` 节点显示
+- 原有从节点生成菜单中的「调整角度」入口继续保留，两条路径共用现有旋转、俯仰、3D 预览和生成新视角逻辑
+- `verify-canvas-studio.mjs` 更新为：先断言首屏默认关闭并截图，再点击灯泡打开检查灵感画板；选中图片节点后点击工具栏「调整视角」，断言 3D 窗口打开并可用 `Escape` 关闭；后续节点生成菜单、文本生成、批量面板、右键菜单、云端恢复和移动端流程继续通过
+- 浏览器验收：`node outputs/ui-reference/verify-canvas-studio.mjs` 桌面端 `1440x1000`、移动端 `390x844` 与云端失败回退场景全部通过，无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或调用任何真实 Key，未消耗参考产品积分
