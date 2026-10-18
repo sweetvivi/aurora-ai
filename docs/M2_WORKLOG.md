@@ -31,6 +31,16 @@
 
 ## 3. 已实现内容
 
+### 首页发现工作台
+
+- 页面：`apps/web/src/views/HomeView.vue`、`apps/web/src/views/ChatView.vue`
+- 组件：`apps/web/src/components/HomeDiscovery.vue`
+- 首页不再使用独立营销落地页，改为参考产品式“发现区 + 模型对话”组合首屏；保留原有对话工具栏、模型选择、空态提示词和图表模板
+- 发现区包含四张横排推荐卡、可横向滚动并支持左右按钮的模型卡，以及模型对话、图片生成、AI 绘画、智能修图、超级智能体、视频生成、电商工具、AI 画布和 AI 音乐九个带图标分类入口
+- 首页模型卡可直接切换当前对话模型；发送第一条消息后自动收起发现区，避免挤压真实对话内容
+- `/video` 保持新标签页打开，其余分类入口使用站内路由；首页、`/chat` 和顶部“模型对话”模式切换地址保持一致
+- `verify-home-discovery.mjs` 使用 Playwright 路由拦截，在桌面端 `1440x1000` 与移动端 `390x844` 覆盖推荐卡、模型卡、九个分类入口、Mock 对话请求、无横向溢出和无页面脚本错误
+
 ### 真实图片 Provider
 
 - 后端模块：`apps/api/src/providers/openai-image/`
@@ -867,6 +877,19 @@ node outputs/ui-reference/verify-chat-conversation-actions.mjs
 - 智能体真实流式链路的自动化验收目前使用 Mock；需要在后续联调阶段再决定是否做一次最低成本真实对话验收
 - 超级对话当前每个模型使用独立会话，已通过临时 `systemPrompt` 共享其他模型已完成回答，但尚未实现统一批量服务端请求；浏览器本地已支持按用户恢复最近 20 轮并续接各模型会话
 - 超级对话会按选中模型数量分别计费，发起前已显示模型数量与费用关系；后续若继续扩展批量接口，仍需保持逐模型成本、失败隔离和会话恢复语义
+
+首页发现工作台本批验证：
+
+```text
+pnpm lint
+pnpm typecheck
+pnpm --filter @aurora/web test
+node outputs/ui-reference/verify-home-discovery.mjs
+node outputs/ui-reference/verify-chat-conversation-actions.mjs
+```
+
+- 桌面端 `1440x1000` 与移动端 `390x844` 均通过：4 张推荐卡、3 张模型卡、9 个分类入口、1 次 Mock 对话请求、无页面脚本错误、无横向溢出
+- 验收只使用 Mock 和 Playwright 路由拦截，不调用真实 Provider，不读取或输出 Key
 
 ## 7. 中断恢复
 

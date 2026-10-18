@@ -30,6 +30,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import ChartThumbnail from '@/components/ChartThumbnail.vue';
 import ChatComposer from '@/components/ChatComposer.vue';
+import HomeDiscovery from '@/components/HomeDiscovery.vue';
 import MarkdownMessage from '@/components/MarkdownMessage.vue';
 import MessageAttachments from '@/components/MessageAttachments.vue';
 import { useChatWorkspaceStore } from '@/stores/chat-workspace';
@@ -271,6 +272,7 @@ const chartTemplates = [
 ];
 
 const hasMessages = computed(() => messages.value.length > 0);
+const isHome = computed(() => route.name === 'home');
 const selectedModel = computed(() =>
   models.value.find((model) => model.alias === selectedModelAlias.value),
 );
@@ -334,6 +336,14 @@ const serviceLabel = computed(() => {
 const canSend = computed(
   () => Boolean(prompt.value.trim()) && !streaming.value && sessionStore.authenticated,
 );
+
+function selectHomeModel(alias: string) {
+  if (hasMessages.value || streaming.value) {
+    return;
+  }
+
+  selectedModelAlias.value = alias;
+}
 
 watch(
   () => messages.value.at(-1)?.content,
@@ -764,6 +774,13 @@ function formatConversationTime(value: string | null): string {
       <footer class="chat-history__footer">历史记录最长保留六个月，请及时导出记录。</footer>
     </aside>
 
+    <HomeDiscovery
+      v-if="isHome && !hasMessages"
+      :active-alias="selectedModelAlias"
+      :models="models"
+      @select="selectHomeModel"
+    />
+
     <main class="chat-main">
       <header class="chat-main__toolbar">
         <div class="chat-main__identity">
@@ -789,7 +806,7 @@ function formatConversationTime(value: string | null): string {
         </div>
         <div class="chat-main__center">
           <nav class="chat-mode-switch" aria-label="对话模式">
-            <RouterLink class="active" to="/chat">
+            <RouterLink class="active" :to="isHome ? '/' : '/chat'">
               <MessageOutlined />
               模型对话
             </RouterLink>
