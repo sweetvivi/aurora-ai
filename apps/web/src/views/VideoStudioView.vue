@@ -747,190 +747,196 @@ onBeforeUnmount(() => {
       </aside>
 
       <aside class="video-control-panel">
-        <div class="video-control-panel__model">
-          <div>
-            <i :style="{ '--model-accent': activeModel?.accent }">
-              {{ activeModel?.short }}
-            </i>
-            <span>
-              <strong>{{ activeModel?.label }}</strong>
-              <small>{{ activeModel?.badge ?? '视频模型' }}</small>
-            </span>
-          </div>
-          <p>{{ activeModel?.description }}</p>
-        </div>
-
-        <section class="video-section video-section--modes">
-          <header>
-            <strong>生成方式</strong>
-            <span>{{ modeLabel(mode) }}</span>
-          </header>
-          <div class="video-mode-grid">
-            <button
-              v-for="item in availableModes"
-              :key="item.value"
-              type="button"
-              :class="{ active: mode === item.value }"
-              :disabled="item.available === false"
-              :title="item.available === false ? item.availabilityLabel : item.description"
-              @click="changeMode(item.value)"
-            >
-              <PlayCircleOutlined />
+        <div class="video-control-panel__scroll">
+          <div class="video-control-panel__model">
+            <div>
+              <i :style="{ '--model-accent': activeModel?.accent }">
+                {{ activeModel?.short }}
+              </i>
               <span>
-                <strong>{{ item.label }}</strong>
-                <small>{{
-                  item.available === false ? item.availabilityLabel : item.description
-                }}</small>
+                <strong>{{ activeModel?.label }}</strong>
+                <small>{{ activeModel?.badge ?? '视频模型' }}</small>
               </span>
-              <CheckOutlined v-if="mode === item.value" />
-            </button>
+            </div>
+            <p>{{ activeModel?.description }}</p>
           </div>
-        </section>
 
-        <section v-if="needsSource" class="video-section">
-          <header>
-            <strong>{{ mode === 'first-last-frame' ? '首帧与尾帧' : '参考画面' }}</strong>
-            <span>{{ sourceFrames.length }} / {{ requiredFrameCount }}</span>
-          </header>
-          <input
-            ref="sourceInput"
-            type="file"
-            accept="image/*"
-            multiple
-            hidden
-            @change="handleSourceUpload"
-          />
-          <div class="video-source-grid">
-            <div v-for="(frame, index) in sourceFrames" :key="frame.url" class="video-source-frame">
-              <img :src="frame.url" :alt="frame.name" />
-              <span>{{ index === 0 ? '首帧' : '尾帧' }}</span>
-              <button type="button" aria-label="移除画面" @click="removeSourceFrame(index)">
-                <CloseOutlined />
+          <section class="video-section video-section--modes">
+            <header>
+              <strong>生成方式</strong>
+              <span>{{ modeLabel(mode) }}</span>
+            </header>
+            <div class="video-mode-grid">
+              <button
+                v-for="item in availableModes"
+                :key="item.value"
+                type="button"
+                :class="{ active: mode === item.value }"
+                :disabled="item.available === false"
+                :title="item.available === false ? item.availabilityLabel : item.description"
+                @click="changeMode(item.value)"
+              >
+                <PlayCircleOutlined />
+                <span>
+                  <strong>{{ item.label }}</strong>
+                  <small>{{
+                    item.available === false ? item.availabilityLabel : item.description
+                  }}</small>
+                </span>
+                <CheckOutlined v-if="mode === item.value" />
               </button>
             </div>
-            <button
-              v-if="sourceFrames.length < requiredFrameCount"
-              type="button"
-              class="video-source-empty"
-              @click="sourceInput?.click()"
-            >
-              <UploadOutlined />
-              <strong>{{ sourceFrames.length === 0 ? '上传参考画面' : '补充尾帧' }}</strong>
-              <small>当前支持图片，视频/音频待接入</small>
-            </button>
-          </div>
-        </section>
+          </section>
 
-        <label class="video-prompt">
-          <strong>镜头描述</strong>
-          <span>
-            <textarea
-              v-model="prompt"
-              maxlength="4000"
-              placeholder="一句话描述你的视频主题，场景、风格等（新手推荐点击下方使用AI智能创作提示词）"
+          <section v-if="needsSource" class="video-section">
+            <header>
+              <strong>{{ mode === 'first-last-frame' ? '首帧与尾帧' : '参考画面' }}</strong>
+              <span>{{ sourceFrames.length }} / {{ requiredFrameCount }}</span>
+            </header>
+            <input
+              ref="sourceInput"
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              @change="handleSourceUpload"
             />
-            <small>{{ prompt.length }} / 4000</small>
-          </span>
-        </label>
+            <div class="video-source-grid">
+              <div
+                v-for="(frame, index) in sourceFrames"
+                :key="frame.url"
+                class="video-source-frame"
+              >
+                <img :src="frame.url" :alt="frame.name" />
+                <span>{{ index === 0 ? '首帧' : '尾帧' }}</span>
+                <button type="button" aria-label="移除画面" @click="removeSourceFrame(index)">
+                  <CloseOutlined />
+                </button>
+              </div>
+              <button
+                v-if="sourceFrames.length < requiredFrameCount"
+                type="button"
+                class="video-source-empty"
+                @click="sourceInput?.click()"
+              >
+                <UploadOutlined />
+                <strong>{{ sourceFrames.length === 0 ? '上传参考画面' : '补充尾帧' }}</strong>
+                <small>当前支持图片，视频/音频待接入</small>
+              </button>
+            </div>
+          </section>
 
-        <div class="video-presets">
-          <button
-            v-for="preset in promptPresets"
-            :key="preset"
-            type="button"
-            @click="prompt = preset"
-          >
-            {{ preset }}
-          </button>
+          <label class="video-prompt">
+            <strong>镜头描述</strong>
+            <span>
+              <textarea
+                v-model="prompt"
+                maxlength="4000"
+                placeholder="一句话描述你的视频主题，场景、风格等（新手推荐点击下方使用AI智能创作提示词）"
+              />
+              <small>{{ prompt.length }} / 4000</small>
+            </span>
+          </label>
+
+          <div class="video-presets">
+            <button
+              v-for="preset in promptPresets"
+              :key="preset"
+              type="button"
+              @click="prompt = preset"
+            >
+              {{ preset }}
+            </button>
+          </div>
+
+          <section class="video-enhancements" aria-label="创作增强">
+            <button
+              type="button"
+              :class="{ active: audioEnabled }"
+              :disabled="audioAvailability !== 'supported'"
+              :title="
+                audioAvailability === 'supported'
+                  ? '根据画面自动匹配声音'
+                  : audioAvailability === 'unsupported'
+                    ? '当前模型不支持音频生成'
+                    : '当前模型音频能力待确认'
+              "
+              @click="audioEnabled = !audioEnabled"
+            >
+              <span>
+                <strong>AI 音效</strong>
+                <small>根据画面自动匹配声音</small>
+              </span>
+              <em v-if="audioEnabled">已开启</em>
+              <em v-else-if="audioAvailability === 'unsupported'">模型不支持</em>
+              <em v-else-if="audioAvailability === 'unknown'">能力待确认</em>
+              <em v-else>关闭</em>
+            </button>
+            <div>
+              <span>
+                <strong>极速模式</strong>
+                <small>优先返回生成结果</small>
+              </span>
+              <em>待接入</em>
+            </div>
+            <div>
+              <span>
+                <strong>自适应</strong>
+                <small>按当前规格自动匹配</small>
+              </span>
+              <em>本地生效</em>
+            </div>
+          </section>
+
+          <section class="video-section video-section--options">
+            <header>
+              <strong>视频规格</strong>
+              <span>{{ selectedDuration }} 秒 · {{ selectedResolution }}</span>
+            </header>
+            <div class="video-option-row">
+              <span>比例</span>
+              <div>
+                <button
+                  v-for="ratio in ratios"
+                  :key="ratio"
+                  type="button"
+                  :class="{ active: selectedRatio === ratio }"
+                  @click="selectedRatio = ratio"
+                >
+                  {{ ratio }}
+                </button>
+              </div>
+            </div>
+            <div class="video-option-row">
+              <span>时长</span>
+              <div>
+                <button
+                  v-for="duration in availableDurations"
+                  :key="duration"
+                  type="button"
+                  :class="{ active: selectedDuration === duration }"
+                  @click="selectedDuration = duration"
+                >
+                  {{ duration }}s
+                </button>
+              </div>
+            </div>
+            <div class="video-option-row">
+              <span>清晰度</span>
+              <div>
+                <button
+                  v-for="resolution in availableResolutions"
+                  :key="resolution"
+                  type="button"
+                  :class="{ active: selectedResolution === resolution }"
+                  @click="selectedResolution = resolution"
+                >
+                  {{ resolution }}
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
-
-        <section class="video-enhancements" aria-label="创作增强">
-          <button
-            type="button"
-            :class="{ active: audioEnabled }"
-            :disabled="audioAvailability !== 'supported'"
-            :title="
-              audioAvailability === 'supported'
-                ? '根据画面自动匹配声音'
-                : audioAvailability === 'unsupported'
-                  ? '当前模型不支持音频生成'
-                  : '当前模型音频能力待确认'
-            "
-            @click="audioEnabled = !audioEnabled"
-          >
-            <span>
-              <strong>AI 音效</strong>
-              <small>根据画面自动匹配声音</small>
-            </span>
-            <em v-if="audioEnabled">已开启</em>
-            <em v-else-if="audioAvailability === 'unsupported'">模型不支持</em>
-            <em v-else-if="audioAvailability === 'unknown'">能力待确认</em>
-            <em v-else>关闭</em>
-          </button>
-          <div>
-            <span>
-              <strong>极速模式</strong>
-              <small>优先返回生成结果</small>
-            </span>
-            <em>待接入</em>
-          </div>
-          <div>
-            <span>
-              <strong>自适应</strong>
-              <small>按当前规格自动匹配</small>
-            </span>
-            <em>本地生效</em>
-          </div>
-        </section>
-
-        <section class="video-section video-section--options">
-          <header>
-            <strong>视频规格</strong>
-            <span>{{ selectedDuration }} 秒 · {{ selectedResolution }}</span>
-          </header>
-          <div class="video-option-row">
-            <span>比例</span>
-            <div>
-              <button
-                v-for="ratio in ratios"
-                :key="ratio"
-                type="button"
-                :class="{ active: selectedRatio === ratio }"
-                @click="selectedRatio = ratio"
-              >
-                {{ ratio }}
-              </button>
-            </div>
-          </div>
-          <div class="video-option-row">
-            <span>时长</span>
-            <div>
-              <button
-                v-for="duration in availableDurations"
-                :key="duration"
-                type="button"
-                :class="{ active: selectedDuration === duration }"
-                @click="selectedDuration = duration"
-              >
-                {{ duration }}s
-              </button>
-            </div>
-          </div>
-          <div class="video-option-row">
-            <span>清晰度</span>
-            <div>
-              <button
-                v-for="resolution in availableResolutions"
-                :key="resolution"
-                type="button"
-                :class="{ active: selectedResolution === resolution }"
-                @click="selectedResolution = resolution"
-              >
-                {{ resolution }}
-              </button>
-            </div>
-          </div>
-        </section>
 
         <div class="video-submit">
           <span>
@@ -1206,9 +1212,10 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .video-studio {
+  height: 100dvh;
   min-height: 100vh;
   overflow: hidden;
-  padding: 0 0 28px;
+  padding: 0;
   background: radial-gradient(circle at 72% -10%, rgb(100 75 240 / 9%), transparent 360px), #08080a;
   color: #f2f2f5;
 }
@@ -1218,11 +1225,11 @@ onBeforeUnmount(() => {
   top: 0;
   z-index: 30;
   display: flex;
-  min-height: 58px;
+  min-height: 60px;
   align-items: center;
   gap: 28px;
   margin: 0;
-  padding: 0 22px;
+  padding: 0 20px;
   border-bottom: 1px solid #202127;
   background: rgb(9 9 12 / 96%);
   backdrop-filter: blur(18px);
@@ -1270,7 +1277,7 @@ onBeforeUnmount(() => {
   padding: 0 12px;
   border-radius: 7px;
   color: #8f8f99;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-decoration: none;
 }
@@ -1311,8 +1318,10 @@ onBeforeUnmount(() => {
 
 .video-workbench {
   display: grid;
-  min-height: calc(100vh - 58px);
-  grid-template-columns: 78px 322px minmax(0, 1fr);
+  height: calc(100dvh - 60px);
+  min-height: 0;
+  grid-template-columns: 80px 400px minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .video-model-rail {
@@ -1320,15 +1329,21 @@ onBeforeUnmount(() => {
   min-width: 0;
   flex-direction: column;
   gap: 5px;
-  padding: 17px 8px;
+  padding: 18px 9px;
+  overflow-y: auto;
   border-right: 1px solid #1d1e23;
   background: #0b0b0e;
+  scrollbar-width: none;
+}
+
+.video-model-rail::-webkit-scrollbar {
+  display: none;
 }
 
 .video-model-rail__label {
   padding: 0 6px 9px;
   color: #64646d;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 760;
   letter-spacing: 0.08em;
 }
@@ -1338,8 +1353,8 @@ onBeforeUnmount(() => {
   display: grid;
   min-width: 0;
   justify-items: center;
-  gap: 4px;
-  padding: 7px 2px;
+  gap: 5px;
+  padding: 8px 2px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -1355,13 +1370,13 @@ onBeforeUnmount(() => {
 
 .video-model-rail button i {
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   place-items: center;
   border-radius: 8px;
   background: color-mix(in srgb, var(--model-accent) 18%, #15151a);
   color: var(--model-accent);
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 850;
 }
@@ -1369,7 +1384,7 @@ onBeforeUnmount(() => {
 .video-model-rail button span {
   width: 100%;
   overflow: hidden;
-  font-size: 7px;
+  font-size: 8px;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1395,20 +1410,41 @@ onBeforeUnmount(() => {
   padding: 11px 2px 4px;
   border-top: 1px solid #1e1f25;
   color: #74747d;
-  font-size: 7px;
+  font-size: 8px;
 }
 
 .video-control-panel {
   display: grid;
-  align-content: start;
   min-width: 0;
-  padding: 17px 15px 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
   border-right: 1px solid #1d1e23;
   background: #0d0d10;
 }
 
+.video-control-panel__scroll {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  grid-auto-rows: max-content;
+  overflow-y: auto;
+  padding: 16px 16px 0;
+  scrollbar-color: #343440 transparent;
+  scrollbar-width: thin;
+}
+
+.video-control-panel__scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.video-control-panel__scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #343440;
+}
+
 .video-control-panel__model {
-  padding: 12px;
+  padding: 14px;
   border: 1px solid #26262d;
   border-radius: 9px;
   background: linear-gradient(145deg, #19191e, #121216);
@@ -1422,13 +1458,13 @@ onBeforeUnmount(() => {
 
 .video-control-panel__model i {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   place-items: center;
   border-radius: 8px;
   background: color-mix(in srgb, var(--model-accent) 17%, #17171b);
   color: var(--model-accent);
-  font-size: 11px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 850;
 }
@@ -1439,25 +1475,25 @@ onBeforeUnmount(() => {
 }
 
 .video-control-panel__model strong {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .video-control-panel__model small {
   color: #777780;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .video-control-panel__model p {
-  margin: 9px 0 0;
+  margin: 10px 0 0;
   color: #8a8a94;
-  font-size: 8px;
-  line-height: 1.6;
+  font-size: 11px;
+  line-height: 1.65;
 }
 
 .video-section {
   display: grid;
-  gap: 9px;
-  padding: 15px 0;
+  gap: 10px;
+  padding: 16px 0;
   border-bottom: 1px solid #1d1e23;
 }
 
@@ -1468,12 +1504,12 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 10px;
   color: #d8d8dd;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .video-section > header span {
   color: #6f6f79;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 500;
 }
 
@@ -1486,11 +1522,11 @@ onBeforeUnmount(() => {
 .video-mode-grid button {
   display: grid;
   min-width: 0;
-  min-height: 52px;
+  min-height: 60px;
   place-items: center;
   align-content: center;
-  gap: 4px;
-  padding: 4px;
+  gap: 5px;
+  padding: 5px;
   border: 1px solid #27272e;
   border-radius: 7px;
   background: #121216;
@@ -1518,7 +1554,7 @@ onBeforeUnmount(() => {
 }
 
 .video-mode-grid button > :deep(svg:first-child) {
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .video-mode-grid button > :deep(svg:last-child) {
@@ -1533,14 +1569,14 @@ onBeforeUnmount(() => {
 }
 
 .video-mode-grid strong {
-  font-size: 7px;
+  font-size: 10px;
 }
 
 .video-mode-grid small {
   overflow: hidden;
   max-width: 100%;
   color: #70707a;
-  font-size: 6px;
+  font-size: 8px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1555,7 +1591,7 @@ onBeforeUnmount(() => {
 .video-source-empty {
   position: relative;
   width: 100%;
-  min-height: 96px;
+  min-height: 104px;
   overflow: hidden;
   border: 1px dashed #373742;
   border-radius: 8px;
@@ -1576,7 +1612,7 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   background: rgb(0 0 0 / 65%);
   color: #fff;
-  font-size: 6px;
+  font-size: 8px;
 }
 
 .video-source-frame button {
@@ -1609,18 +1645,18 @@ onBeforeUnmount(() => {
 }
 
 .video-source-empty strong {
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .video-source-empty small {
   color: #64646e;
-  font-size: 6px;
+  font-size: 8px;
 }
 
 .video-prompt {
   display: grid;
   gap: 8px;
-  padding: 15px 0 9px;
+  padding: 16px 0 9px;
 }
 
 .video-prompt > span {
@@ -1631,14 +1667,14 @@ onBeforeUnmount(() => {
 .video-prompt textarea {
   display: block;
   width: 100%;
-  min-height: 96px;
-  padding: 10px 10px 23px;
+  min-height: 108px;
+  padding: 11px 11px 25px;
   border: 1px solid #2a2a31;
   border-radius: 7px;
   outline: 0;
   background: #121216;
   color: #e7e7eb;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.7;
   resize: vertical;
 }
@@ -1657,7 +1693,7 @@ onBeforeUnmount(() => {
   right: 9px;
   bottom: 7px;
   color: #6f6f79;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .video-presets {
@@ -1674,13 +1710,13 @@ onBeforeUnmount(() => {
 
 .video-presets button {
   min-width: max-content;
-  height: 25px;
-  padding: 0 8px;
+  height: 29px;
+  padding: 0 10px;
   border: 1px solid #292930;
   border-radius: 999px;
   background: #131317;
   color: #85858f;
-  font-size: 7px;
+  font-size: 9px;
   cursor: pointer;
 }
 
@@ -1704,11 +1740,11 @@ onBeforeUnmount(() => {
   display: flex;
   width: 100%;
   min-width: 0;
-  min-height: 40px;
+  min-height: 46px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 7px 9px;
+  padding: 8px 10px;
   border: 0;
   background: #111115;
   color: inherit;
@@ -1739,13 +1775,13 @@ onBeforeUnmount(() => {
 
 .video-enhancements strong {
   color: #d9d9df;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .video-enhancements small {
   overflow: hidden;
   color: #666670;
-  font-size: 6px;
+  font-size: 8px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1756,7 +1792,7 @@ onBeforeUnmount(() => {
   border: 1px solid #383044;
   border-radius: 999px;
   color: #9c83e5;
-  font-size: 6px;
+  font-size: 8px;
   font-style: normal;
 }
 
@@ -1778,12 +1814,12 @@ onBeforeUnmount(() => {
   display: grid;
   align-items: center;
   gap: 8px;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: 44px minmax(0, 1fr);
 }
 
 .video-option-row > span {
   color: #777780;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .video-option-row > div {
@@ -1793,14 +1829,14 @@ onBeforeUnmount(() => {
 
 .video-option-row button {
   min-width: 0;
-  height: 27px;
+  height: 32px;
   flex: 1;
   padding: 0 6px;
   border: 1px solid #292930;
   border-radius: 6px;
   background: #121216;
   color: #7f7f89;
-  font-size: 7px;
+  font-size: 9px;
   cursor: pointer;
 }
 
@@ -1812,12 +1848,10 @@ onBeforeUnmount(() => {
 }
 
 .video-submit {
-  position: sticky;
-  bottom: 0;
   display: grid;
   gap: 7px;
-  margin: 15px -15px 0;
-  padding: 14px 15px 16px;
+  margin: 0;
+  padding: 14px 16px 16px;
   border-top: 1px solid #25252c;
   background: rgb(12 12 15 / 97%);
   backdrop-filter: blur(12px);
@@ -1828,12 +1862,12 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 5px;
   color: #e8b34e;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .video-submit > button {
   display: inline-flex;
-  height: 38px;
+  height: 42px;
   align-items: center;
   justify-content: center;
   gap: 6px;
@@ -1841,7 +1875,7 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: linear-gradient(90deg, #705cf1, #9665f3);
   color: #fff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 780;
   cursor: pointer;
   box-shadow: 0 12px 28px rgb(106 81 230 / 24%);
@@ -1856,7 +1890,7 @@ onBeforeUnmount(() => {
 
 .video-submit > small {
   color: #70707a;
-  font-size: 7px;
+  font-size: 9px;
   text-align: right;
 }
 
@@ -1866,11 +1900,15 @@ onBeforeUnmount(() => {
 
 .video-gallery {
   min-width: 0;
-  padding: 18px 22px 40px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 16px 40px;
   background:
     linear-gradient(90deg, rgb(255 255 255 / 1.7%) 1px, transparent 1px),
-    linear-gradient(rgb(255 255 255 / 1.7%) 1px, transparent 1px), #08080a;
+    linear-gradient(rgb(255 255 255 / 1.7%) 1px, transparent 1px), #11142d;
   background-size: 28px 28px;
+  scrollbar-color: #343440 transparent;
+  scrollbar-width: thin;
 }
 
 .video-gallery__header {
@@ -1897,7 +1935,7 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid transparent;
   background: transparent;
   color: #75757f;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 730;
   cursor: pointer;
 }
@@ -1918,7 +1956,7 @@ onBeforeUnmount(() => {
 .video-gallery__header p {
   margin: 0;
   color: #72727c;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .video-gallery__meta {
@@ -1958,15 +1996,15 @@ onBeforeUnmount(() => {
 
 .video-showcase-grid {
   display: grid;
-  gap: 13px;
-  grid-template-columns: repeat(auto-fill, minmax(218px, 1fr));
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .video-showcase-card {
   min-width: 0;
   overflow: hidden;
   border: 1px solid #25252c;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #111115;
   transition:
     border-color 140ms ease,
@@ -2010,7 +2048,7 @@ onBeforeUnmount(() => {
   border-radius: 5px;
   background: rgb(10 10 13 / 76%);
   color: #e6e6eb;
-  font-size: 7px;
+  font-size: 9px;
   backdrop-filter: blur(8px);
 }
 
@@ -2141,7 +2179,7 @@ onBeforeUnmount(() => {
   flex: 1;
   margin: 0;
   color: #aaaab3;
-  font-size: 7px;
+  font-size: 9px;
   line-height: 1.55;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -2160,7 +2198,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   background: #17171c;
   color: #92929d;
-  font-size: 7px;
+  font-size: 9px;
   cursor: pointer;
 }
 
@@ -2429,17 +2467,37 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
+@media (min-width: 1280px) {
+  .video-showcase-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1600px) {
+  .video-showcase-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1920px) {
+  .video-showcase-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 1180px) {
   .video-workbench {
-    grid-template-columns: 72px 294px minmax(0, 1fr);
-  }
-
-  .video-showcase-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: 72px 360px minmax(0, 1fr);
   }
 }
 
 @media (max-width: 900px) {
+  .video-studio {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
   .video-toolbar {
     flex-wrap: wrap;
     gap: 8px 16px;
@@ -2458,7 +2516,10 @@ onBeforeUnmount(() => {
   }
 
   .video-workbench {
+    height: auto;
+    min-height: calc(100dvh - 60px);
     grid-template-columns: 70px minmax(0, 1fr);
+    overflow: visible;
   }
 
   .video-model-rail {
@@ -2466,8 +2527,15 @@ onBeforeUnmount(() => {
   }
 
   .video-control-panel {
+    grid-template-rows: auto auto;
+    overflow: visible;
     border-right: 0;
     border-bottom: 1px solid #1d1e23;
+  }
+
+  .video-control-panel__scroll,
+  .video-gallery {
+    overflow: visible;
   }
 
   .video-gallery {

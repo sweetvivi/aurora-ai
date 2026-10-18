@@ -1088,6 +1088,28 @@ node outputs/ui-reference/verify-model-capability-options.mjs
 - `verify-model-capability-options.mjs` 使用两个 Mock 图片模型完成桌面端与移动端验收：图片生成、旧版智能修图、AI 画布和电商工具均通过，页面无脚本错误、无静态资源失败、无横向溢出
 - 全量验证通过：Web 17 个文件 70 项、API 25 个文件 97 项，格式、lint、类型检查和生产构建全部成功；未读取、输出或调用真实 Key
 
+视频工作台参考产品布局对齐：
+
+```text
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+node outputs/ui-reference/verify-video-preview.mjs
+node outputs/ui-reference/verify-video-capabilities.mjs
+node outputs/ui-reference/verify-video-tasks.mjs
+node outputs/ui-reference/verify-video-studio.mjs
+node outputs/ui-reference/verify-model-capability-options.mjs
+node outputs/ui-reference/verify-m2-interactions.mjs
+```
+
+- 桌面端保持参考产品式独立视频工作台：顶栏约 `60px`、模型轨道 `80px`、参数面板 `400px`，作品区在自身容器内滚动，提交区固定在参数面板底部
+- 作品网格基础为 2 列，`1280px` 起 3 列、`1600px` 起 4 列、`1920px` 起 5 列；移动端恢复自然文档流，避免固定高度裁切长表单
+- 修复 `.video-control-panel__scroll` 改为 Grid 后压缩 `.video-enhancements` 的真实回归；通过 `grid-auto-rows: max-content` 让增强按钮维持完整高度，不再覆盖后续规格区
+- `verify-model-capability-options.mjs` 已适配当前折叠式电商目录，先展开“商品换背景”再选择“智能背景融合”，不改变产品行为
+- 完整验证通过：Web 18 个文件 77 项、API 25 个文件 97 项，格式、lint、类型检查、生产构建和视频相关桌面/移动端验收均成功；验收使用 Mock 或路由拦截，未读取、输出或调用真实 Key
+
 ## 7. 中断恢复
 
 恢复工作时依次执行：
