@@ -330,6 +330,11 @@ function goToPage(page: number): void {
           <kbd>Ctrl K</kbd>
         </label>
 
+        <button class="agents-mobile-create" type="button" @click="router.push('/agents/create')">
+          <PlusOutlined />
+          创建智能体
+        </button>
+
         <div class="agents-hot-search">
           <span>热门搜索：</span>
           <button
@@ -930,6 +935,10 @@ function goToPage(page: number): void {
   white-space: nowrap;
 }
 
+.agents-mobile-create {
+  display: none;
+}
+
 .agents-hot-search span {
   flex: 0 0 auto;
   color: #929b96;
@@ -1195,6 +1204,15 @@ function goToPage(page: number): void {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-card__metrics span:first-child {
+  min-width: 47px;
+}
+
+.agent-card__metrics span:last-child {
+  min-width: 54px;
 }
 
 .agent-card__metrics :deep(svg:first-child) {
@@ -1362,31 +1380,120 @@ function goToPage(page: number): void {
 
 @media (max-width: 760px) {
   .agents-catalog-page {
-    padding: 20px 12px 40px;
+    padding: 18px 12px 38px;
+  }
+
+  .agents-hero__heading h1 {
+    font-size: 20px;
   }
 
   .agents-hero__cards {
-    margin-top: 19px;
+    margin-top: 18px;
   }
 
   .agents-builder-card {
-    grid-template-columns: 1fr;
+    min-height: 160px;
+    grid-template-columns: 118px minmax(0, 1fr);
   }
 
   .agents-builder-card__visual {
-    min-height: 155px;
+    min-height: 160px;
   }
 
   .agents-builder-card__content {
-    padding: 18px;
+    padding: 15px 14px;
+  }
+
+  .agents-builder-card__content h2 {
+    margin-top: 5px;
+    font-size: 15px;
+  }
+
+  .agents-builder-card__content > p {
+    margin-top: 6px;
+    font-size: 8px;
+    line-height: 1.55;
+  }
+
+  .agents-builder-card__content ul {
+    display: grid;
+    gap: 3px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 8px;
+    font-size: 7px;
+    white-space: nowrap;
+  }
+
+  .agents-builder-card__content li::before {
+    margin-right: 4px;
+  }
+
+  .agents-builder-card__content > button {
+    height: 30px;
+    margin-top: 10px;
+    padding: 0 10px;
+    font-size: 9px;
+  }
+
+  .agent-window {
+    top: 20px;
+    right: 16px;
+    bottom: 20px;
+    left: 16px;
+    padding: 11px;
+  }
+
+  .flow-node {
+    padding: 5px 6px;
+    font-size: 6px;
+  }
+
+  .flow-node--one {
+    top: 34px;
+    left: 12px;
+  }
+
+  .flow-node--two {
+    top: 82px;
+    left: 18px;
+  }
+
+  .flow-node--three {
+    top: 40px;
+    right: 10px;
+  }
+
+  .flow-node--four {
+    right: 8px;
+    bottom: 28px;
+  }
+
+  .flow-line {
+    width: 38px;
+  }
+
+  .flow-line--one {
+    top: 58px;
+    left: 35px;
+  }
+
+  .flow-line--two {
+    top: 72px;
+    left: 56px;
+  }
+
+  .flow-line--three {
+    top: 88px;
+    right: 32px;
   }
 
   .agents-catalog__toolbar {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
     padding: 11px;
   }
 
   .agents-tabs {
+    grid-column: 1 / -1;
     overflow-x: auto;
     scrollbar-width: none;
   }
@@ -1399,6 +1506,26 @@ function goToPage(page: number): void {
     flex: 1 0 auto;
   }
 
+  .agents-search kbd {
+    display: none;
+  }
+
+  .agents-mobile-create {
+    display: inline-flex;
+    height: 38px;
+    align-items: center;
+    gap: 5px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 8px;
+    background: #19a96e;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
   .agents-catalog__body {
     display: block;
     padding: 12px;
@@ -1409,8 +1536,14 @@ function goToPage(page: number): void {
     margin-bottom: 14px;
   }
 
+  .agents-categories > header {
+    display: none;
+  }
+
   .agents-categories nav {
     display: flex;
+    gap: 7px;
+    padding: 0;
     overflow-x: auto;
     scrollbar-width: none;
   }
@@ -1421,11 +1554,24 @@ function goToPage(page: number): void {
 
   .agents-categories nav button {
     min-width: max-content;
-    gap: 12px;
+    min-height: 35px;
+    gap: 7px;
+    padding: 0 11px;
+    border: 1px solid #e4ebe7;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .agents-categories nav button em {
+    display: none;
   }
 
   .agents-results__heading {
     align-items: flex-start;
+  }
+
+  .agents-results__heading p {
+    display: none;
   }
 
   .agents-grid {
@@ -1449,7 +1595,8 @@ function goToPage(page: number): void {
   }
 
   .agent-card {
-    min-height: 158px;
+    min-height: 150px;
+    padding: 13px;
   }
 }
 </style>
