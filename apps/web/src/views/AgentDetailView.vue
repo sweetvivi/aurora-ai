@@ -496,19 +496,31 @@ watch(
             v-model="prompt"
             rows="2"
             :disabled="streaming"
-            :placeholder="`请输入问题，例如：${agent.starterPrompts[0]}`"
+            placeholder="请输入你的需求，例如：研究一个主题、制定旅行攻略、生成可视化网页或数据报告。"
             @keydown.enter.exact.prevent="sendMessage"
           />
           <div class="agent-detail__input-footer">
-            <div v-if="messages.length === 0" class="agent-detail__starter-list">
+            <div class="agent-detail__input-lead">
               <button
-                v-for="starter in agent.starterPrompts.slice(0, 2)"
-                :key="starter"
                 type="button"
-                @click="useStarter(starter)"
+                class="agent-detail__cost-rule"
+                :class="{ active: costRuleMessageId === 'composer' }"
+                :title="'查看积分消耗规则'"
+                @click="toggleCostRule('composer')"
               >
-                {{ starter }}
+                <span class="agent-detail__cost-rule-avatar">{{ agent.glyph }}</span>
+                积分消耗规则
               </button>
+              <div v-if="messages.length === 0" class="agent-detail__starter-list">
+                <button
+                  v-for="starter in agent.starterPrompts.slice(0, 2)"
+                  :key="starter"
+                  type="button"
+                  @click="useStarter(starter)"
+                >
+                  {{ starter }}
+                </button>
+              </div>
             </div>
             <button
               type="button"
@@ -520,6 +532,9 @@ watch(
               <SendOutlined v-else />
             </button>
           </div>
+          <p v-if="costRuleMessageId === 'composer'" class="agent-detail__cost-rule-note">
+            单次消耗与所选模型、任务能力和处理时长有关，本页面当前按 1 积分/次展示。
+          </p>
         </div>
       </footer>
     </main>
@@ -584,7 +599,7 @@ watch(
 .agent-detail {
   display: grid;
   min-height: calc(100vh - 56px);
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 320px minmax(0, 1fr);
   background: #fff;
 }
 
@@ -850,7 +865,7 @@ watch(
 
 .agent-detail__welcome {
   display: grid;
-  max-width: 820px;
+  max-width: 768px;
   width: 100%;
   margin: 6vh auto 0;
   padding-bottom: 27px;
@@ -872,7 +887,7 @@ watch(
 
 .agent-detail__messages {
   display: grid;
-  max-width: 820px;
+  max-width: 768px;
   gap: 24px;
   margin: 0 auto;
 }
@@ -922,12 +937,12 @@ watch(
 
 .agent-detail__message > div {
   width: 100%;
-  max-width: min(920px, 100%);
+  max-width: 768px;
 }
 
 .agent-detail__message--user > div {
   width: fit-content;
-  max-width: min(720px, 100%);
+  max-width: min(640px, 100%);
   text-align: right;
 }
 
@@ -1072,7 +1087,7 @@ watch(
 }
 
 .agent-detail__composer {
-  width: min(820px, calc(100% - 48px));
+  width: min(768px, calc(100% - 48px));
   justify-self: center;
   padding-bottom: 24px;
 }
@@ -1153,6 +1168,54 @@ watch(
   gap: 12px;
 }
 
+.agent-detail__input-lead {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-detail__cost-rule {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 3px;
+  border: 1px solid #e5e9ef;
+  border-radius: 999px;
+  background: #fff;
+  color: #5e6877;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.agent-detail__cost-rule.active,
+.agent-detail__cost-rule:hover {
+  border-color: #cfe0ff;
+  background: #f6f9ff;
+  color: #3979ed;
+}
+
+.agent-detail__cost-rule-avatar {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: #eef4ff;
+  color: #4c84ff;
+  font-size: 10px;
+}
+
+.agent-detail__cost-rule-note {
+  margin: 8px 0 0;
+  color: #8c94a1;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
 .agent-detail__starter-list {
   display: flex;
   min-width: 0;
@@ -1200,7 +1263,7 @@ watch(
 
 .agent-history-panel {
   display: flex;
-  width: min(320px, 100%);
+  width: min(280px, 100%);
   height: 100%;
   flex-direction: column;
   border-left: 1px solid #e9edf2;

@@ -210,3 +210,17 @@
 - 验证通过：`pnpm format:check`、`pnpm lint`、`@aurora/web` 类型检查、`pnpm test`（API 26 个文件 110 项、Web 19 个文件 85 项）、`pnpm build`
 - 绘画相关浏览器验收通过：`verify-draw.mjs`、`verify-draw-completion.mjs`、`verify-draw-editor.mjs`、`verify-draw-navigation.mjs`、`verify-newdraw-templates.mjs`、`verify-draw-modes.mjs`
 - 本轮只使用 Mock 路由验收，未读取、输出或调用任何真实 Key
+
+## 16. 2026-10-19 超级智能体会话页正文列宽与输入区对齐
+
+- 用像素测量重新校准参考产品超级智能体会话页：参考截图宽 `1756px`，左侧主边栏边框在 `x=322`，与本地 `320px` 边栏同一缩放比例，说明此前的 `700px` 正文列宽估计偏窄
+- 参考产品输入框实测跨度为 `x=661..1428`，宽度 `767px`；本地在相同视口宽度下原为 `x=688..1387`，宽度 `700px`，确认正文列应加宽
+- 超级智能体详情页欢迎区、消息列表、单条消息正文和底部输入区的最大宽度由 `700px` 统一调整为 `768px`，用户气泡上限由 `616px` 调整为 `640px`
+- 调整后同视口实测为 `x=654..1421`、宽度 `767px`，与参考产品一致；左右偏移差 `7px` 来自边栏边框像素差，属可接受范围
+- 底部输入区新增参考产品式“积分消耗规则”胶囊按钮，点击展开与消息内一致的规则说明；发送按钮从贴左改为贴右下，与参考产品一致
+- 输入框占位文案改为通用需求描述，不再拼接智能体预置问题
+- 会话历史抽屉宽度保持 `280px`，与参考产品历史截图一致
+- 验收脚本 `verify-agent-detail-actions.mjs` 增加可选 `VERIFY_REFERENCE_VIEWPORT=1`，可在 `1756x859` 参考视口下额外产出 `agent-detail-actions-reference.png` 用于对齐核查
+- 桌面端 `1440x1000`、参考视口 `1756x859` 和移动端 `390x844` 均无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 19 个文件 85 项）、`pnpm build`
+- 本轮只使用 Mock 路由验收，未读取、输出或调用任何真实 Key
