@@ -7,6 +7,17 @@ const MediaStudioShell = () => import('@/layouts/MediaStudioShell.vue');
 const LegacyShell = () => import('@/layouts/LegacyShell.vue');
 
 export const appRoutes: RouteRecordRaw[] = [
+  // The reference platform keeps a few legacy entry points alive by bouncing
+  // them to the model chat. Mirror those jumps so bookmarked reference URLs do
+  // not land on the not-found page.
+  {
+    path: '/draw/text2image',
+    redirect: { name: 'chat' },
+  },
+  {
+    path: '/aiSearch/searchByhome',
+    redirect: { name: 'chat' },
+  },
   {
     path: '/',
     component: PlatformShell,

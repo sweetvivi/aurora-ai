@@ -47,4 +47,19 @@ describe('application routes', () => {
 
     expect(router.resolve('/missing-page').name).toBe('not-found');
   });
+
+  it('bounces legacy reference entry points to the model chat', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: appRoutes,
+    });
+
+    for (const path of ['/draw/text2image', '/aiSearch/searchByhome']) {
+      await router.push(path);
+      await router.isReady();
+
+      expect(router.currentRoute.value.name).toBe('chat');
+      expect(router.currentRoute.value.path).toBe('/newchat');
+    }
+  });
 });

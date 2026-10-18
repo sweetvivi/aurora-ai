@@ -14,6 +14,7 @@
 
 ### Added
 
+- 2026-10-19：补上参考产品的历史路由兼容跳转。参考产品会把 `/draw/text2image` 和 `/aiSearch/searchByhome` 两个历史入口直接弹到模型对话，本地此前没有这两个路径，用户点旧链接会落到“页面不存在”。现在 `apps/web/src/router/routes.ts` 在路由表最前面声明这两条重定向，最终停在 `chat` 路由的 `/newchat`；`apps/web/src/router/routes.spec.ts` 新增用例断言跳转结果。同时把已确认的参考产品↔本地路由对应关系补进 `docs/RESEARCH_BASELINE.md` 的“路由注意”一节，覆盖模型对话、超级对话、智能修图、AI 视频独立窗口和 AI 绘画的双路径。
 - 2026-10-19：新增智能体真实流式对话的浏览器端验收脚本 `outputs/ui-reference/verify-agent-streaming.mjs`，用请求拦截模拟 `POST /api/v1/chat/stream` 的 SSE 事件，覆盖三条链路：正常流式（`meta` → 多次 `delta` → `done`）、服务端 `error`（含积分退回）和用户主动停止（`AbortController` 中断）。脚本断言乐观插入的用户消息、助手占位消息与“正在生成”状态在首个 `delta` 到达前就可见、输入框在流式期间禁用、正文按 `delta` 累积、结算后回到“服务就绪”、积分提示与错误/中断文案正确，并校验请求体带上智能体 `systemPrompt`。同时校验新建会话后通过历史记录切回仍能看到完整回答，以及桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误。本轮只使用 Mock SSE，未读取、输出或调用任何真实 Key。
 
 ### Fixed
