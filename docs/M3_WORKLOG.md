@@ -404,3 +404,12 @@
 - 异常链路覆盖：上游 `401` 映射为 `LLM_AUTH_ERROR`、仅返回 `reasoning_content` 映射为 `LLM_EMPTY_RESPONSE`、上游挂起映射为 `LLM_TIMEOUT`；三种失败均验证 assistant 消息落到失败态且积分退回
 - 专项测试 5 项通过；API 全量 27 个文件 115 项、Web 全量 20 个文件 89 项通过，`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过；构建仅保留既有 Vite 大 chunk 提示
 - 本轮只使用本地 stub 与 Mock，不读取、输出或记录任何 Key/Token/Cookie，不调用真实第三方接口，不消耗参考产品积分，不调用真实视频生成
+
+## 34. 2026-10-19 智能体消息操作顺序与空输入提交态验收
+
+- 对照超级智能体详情页参考截图，把 assistant 消息下方操作栏从“复制 / 继续追问 / 重新生成 / 有帮助 / 需改进”调整为参考产品顺序“复制 / 有帮助 / 需改进 / 重新生成 / 继续追问”
+- `AgentDetailView.vue` 五个操作按钮补充 `data-action`，输入区提交按钮补充 `data-action="submit"`；页面行为未改，继续复用复制、反馈、重新生成、继续追问与流式停止逻辑
+- `verify-agent-detail-actions.mjs` 增加回归断言：操作顺序必须为 `copy,like,dislike,regenerate,continue`，空输入时提交按钮必须禁用
+- 浏览器验收通过：桌面端侧栏 `320px`、消息列与输入区 `768px`，移动端输入区 `366px`、消息列 `362px`，两端均无横向溢出、无页面脚本错误；复制、有帮助、重新生成、继续追问、流式生成与错误/停止链路正常
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成

@@ -423,6 +423,7 @@ watch(
                 <div class="agent-detail__message-actions">
                   <button
                     type="button"
+                    data-action="copy"
                     aria-label="复制回答"
                     :class="{ active: copiedMessageId === message.id }"
                     :title="copiedMessageId === message.id ? '已复制' : '复制回答'"
@@ -435,15 +436,27 @@ watch(
                   </button>
                   <button
                     type="button"
-                    aria-label="继续追问"
-                    title="继续追问"
-                    @click="continueMessage"
+                    data-action="like"
+                    aria-label="有帮助"
+                    title="有帮助"
+                    :class="{ active: messageFeedback[message.id] === 'like' }"
+                    @click="toggleFeedback(message.id, 'like')"
                   >
-                    <EditOutlined />
-                    <span class="agent-detail__action-label">继续追问</span>
+                    <LikeOutlined />
                   </button>
                   <button
                     type="button"
+                    data-action="dislike"
+                    aria-label="需改进"
+                    title="需改进"
+                    :class="{ active: messageFeedback[message.id] === 'dislike' }"
+                    @click="toggleFeedback(message.id, 'dislike')"
+                  >
+                    <DislikeOutlined />
+                  </button>
+                  <button
+                    type="button"
+                    data-action="regenerate"
                     aria-label="重新生成"
                     title="重新生成"
                     :disabled="streaming"
@@ -454,21 +467,13 @@ watch(
                   </button>
                   <button
                     type="button"
-                    aria-label="有帮助"
-                    title="有帮助"
-                    :class="{ active: messageFeedback[message.id] === 'like' }"
-                    @click="toggleFeedback(message.id, 'like')"
+                    data-action="continue"
+                    aria-label="继续追问"
+                    title="继续追问"
+                    @click="continueMessage"
                   >
-                    <LikeOutlined />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="需改进"
-                    title="需改进"
-                    :class="{ active: messageFeedback[message.id] === 'dislike' }"
-                    @click="toggleFeedback(message.id, 'dislike')"
-                  >
-                    <DislikeOutlined />
+                    <EditOutlined />
+                    <span class="agent-detail__action-label">继续追问</span>
                   </button>
                 </div>
               </div>
@@ -534,6 +539,7 @@ watch(
             </div>
             <button
               type="button"
+              data-action="submit"
               :disabled="!streaming && !prompt.trim()"
               :aria-label="streaming ? '停止生成' : '发送消息'"
               @click="streaming ? stopStreaming() : sendMessage()"
