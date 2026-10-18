@@ -499,3 +499,14 @@
 - 回归验收通过：`verify-draw-navigation.mjs`、`verify-draw.mjs`、`verify-draw-modes.mjs`、`verify-draw-completion.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
+
+## 43. 2026-10-19 超级智能体资源库宽度与卡片密度对齐参考产品
+
+- 对照 `live-reference/agents.png`：参考产品资源库从约 `x=256` 开始、宽约 `1150px`，四列卡片约 `254px`；本地此前内容上限 `1136px`、页面左右留白各 `32px`，卡片约 `198px`，明显更窄更矮
+- `AgentsView.vue` 的 `.agents-hero` / `.agents-catalog` / `.agents-callout` / `.agent-home` 内容上限由 `1136px` 调整为 `1158px`，`.agents-catalog-page` 左右内边距由 `32px` 收到 `12px`，释放被父级内容盒压住的宽度
+- 资源库实测从 `x=272 w=1136` 变为 `x=261 w=1158`，四列卡片由 `198px` 拓宽到 `204px`，卡片间距约 `14px`，与参考产品 `x≈256 w≈1150`、卡片 `≈254px` 的密度一致
+- `.agent-card` 最小高度由 `190px` 提高到 `232px`，头像由 `38px` 增至 `40px`，标题字号 `11px → 12.5px`，评分/使用量 `8px → 10px`，说明由两行放宽为三行并加大段间距，卡片内容不再被压扁
+- 移动端断点下的最小高度同步由 `150px` 调整到 `168px`，避免三行说明在窄屏被裁切
+- 回归验收通过：`verify-agent-home.mjs`、`verify-agent-create.mjs`、`measure-agents.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成

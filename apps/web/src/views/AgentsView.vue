@@ -1388,7 +1388,7 @@ function goToPage(page: number): void {
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 56px);
-  padding: 30px 32px 58px;
+  padding: 30px 12px 58px;
   background:
     radial-gradient(circle at 50% 0, rgb(61 202 136 / 8%), transparent 440px),
     linear-gradient(180deg, #f7fcf9 0, #fff 430px);
@@ -1418,7 +1418,7 @@ function goToPage(page: number): void {
 .agents-hero,
 .agents-catalog,
 .agents-callout {
-  width: min(100%, 1136px);
+  width: min(100%, 1158px);
   margin: 0 auto;
 }
 
@@ -1970,9 +1970,9 @@ function goToPage(page: number): void {
 .agent-card {
   display: grid;
   min-width: 0;
-  min-height: 190px;
-  align-content: start;
-  padding: 14px;
+  min-height: 232px;
+  align-content: space-between;
+  padding: 15px 16px 16px;
   border: 1px solid #e3e9e6;
   border-radius: 9px;
   background: #fff;
@@ -2001,12 +2001,12 @@ function goToPage(page: number): void {
 
 .agent-card__avatar {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   place-items: center;
   border-radius: 10px;
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 850;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
 }
@@ -2014,13 +2014,13 @@ function goToPage(page: number): void {
 .agent-card__header > div {
   display: grid;
   min-width: 0;
-  gap: 4px;
+  gap: 6px;
 }
 
 .agent-card__header strong {
   overflow: hidden;
   color: #2e3732;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2069,10 +2069,10 @@ function goToPage(page: number): void {
 .agent-card__metrics {
   display: flex;
   align-items: center;
-  gap: 11px;
-  margin-top: 10px;
+  gap: 14px;
+  margin-top: 14px;
   color: #8b9490;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .agent-card__metrics span {
@@ -2096,21 +2096,21 @@ function goToPage(page: number): void {
 
 .agent-card > p {
   display: -webkit-box;
-  min-height: 35px;
+  min-height: 47px;
   overflow: hidden;
-  margin: 10px 0 0;
+  margin: 14px 0 0;
   color: #77817c;
-  font-size: 9px;
-  line-height: 1.65;
+  font-size: 10px;
+  line-height: 1.6;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 }
 
 .agent-card > footer {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: 11px;
+  margin-top: 14px;
 }
 
 .agent-card > footer span {
@@ -2470,14 +2470,14 @@ function goToPage(page: number): void {
   }
 
   .agent-card {
-    min-height: 150px;
+    min-height: 168px;
     padding: 13px;
   }
 }
 
 .agent-home {
   position: relative;
-  width: min(100%, 1136px);
+  width: min(100%, 1158px);
   margin: 0 auto;
   padding-top: 16px;
 }
