@@ -1005,6 +1005,23 @@ node outputs/ui-reference/capture-draw-generator.mjs
 - 移动端参数区增加固定底栏安全间距，桌面端 `1440x1000` 和移动端 `390x844` 均无横向溢出，作品区搜索和卡片操作可用
 - 类型检查、lint、四组绘画浏览器验收和截图审计全部通过；验收仅使用 Mock 与路由拦截，不调用真实 Provider，不读取或输出 Key
 
+图片尺寸选项与模型能力对齐：
+
+```text
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+node outputs/ui-reference/verify-model-capability-options.mjs
+```
+
+- 图片生成、旧版智能修图、AI 画布和电商工具改为从当前图片模型的公开能力 profile 读取尺寸预设；切换模型时会自动保留受支持尺寸，遇到不支持的旧值则收敛到首个可用尺寸
+- 无能力 profile 或预设为空时继续回退 `1K / 2K / 4K`；旧版智能修图补回模型选择区，避免只能看到尺寸按钮却无法切换模型
+- 新增 `model-capabilities.ts` 单测，覆盖默认值、去重、大小写归一、保留当前值和不支持值收敛
+- `verify-model-capability-options.mjs` 使用两个 Mock 图片模型完成桌面端与移动端验收：图片生成、旧版智能修图、AI 画布和电商工具均通过，页面无脚本错误、无静态资源失败、无横向溢出
+- 全量验证通过：Web 17 个文件 70 项、API 25 个文件 97 项，格式、lint、类型检查和生产构建全部成功；未读取、输出或调用真实 Key
+
 ## 7. 中断恢复
 
 恢复工作时依次执行：

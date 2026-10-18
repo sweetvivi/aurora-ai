@@ -42,6 +42,7 @@ import {
 } from '@/stores/draw-workspace';
 import { useModelCatalogStore } from '@/stores/model-catalog';
 import { useSessionStore } from '@/stores/session';
+import { clampImageSizePreset, getImageSizePresets } from '@/utils/model-capabilities';
 
 interface ModelOption {
   accent: string;
@@ -273,7 +274,6 @@ const retouchOperations: RetouchOperation[] = [
 ];
 
 const ratios = ['智能比例', '1:1', '4:3', '3:4', '16:9', '9:16'];
-const sizes = ['1K', '2K', '4K'];
 const amounts = [1, 2, 3, 4];
 const route = useRoute();
 const workspace = useDrawWorkspaceStore();
@@ -324,8 +324,17 @@ const retouchModels = computed<RetouchModelOption[]>(() =>
     value: model.alias,
   })),
 );
-
 const isGeneration = computed(() => route.name === 'image-generation');
+const activeImageModelAlias = computed(() =>
+  isGeneration.value ? selectedModel.value : selectedRetouchModel.value,
+);
+const activeImageProfile = computed(
+  () =>
+    modelCatalog.modelsFor('image').find((model) => model.alias === activeImageModelAlias.value)
+      ?.profile?.image,
+);
+const availableSizes = computed(() => getImageSizePresets(activeImageProfile.value));
+
 const toolKey = computed(() => (isGeneration.value ? 'image-generation' : 'smart-retouch'));
 const pageTitle = computed(() => (isGeneration.value ? '图片生成' : '智能修图'));
 const pageDescription = computed(() =>
@@ -509,7 +518,7 @@ function resetLocalForm(): void {
   selectedAmount.value = 1;
   activeGenerationCategory.value = 'all';
   selectedRatio.value = '智能比例';
-  selectedSize.value = '2K';
+  selectedSize.value = clampImageSizePreset('2K', availableSizes.value);
   selectedStorageDays.value = 1;
   generationStyleStrength.value = 60;
   generationSeed.value = '';
@@ -823,6 +832,14 @@ watch(
   { immediate: true },
 );
 
+watch(
+  [selectedModel, selectedRetouchModel, availableSizes],
+  () => {
+    selectedSize.value = clampImageSizePreset(selectedSize.value, availableSizes.value);
+  },
+  { immediate: true },
+);
+
 onBeforeUnmount(() => {
   resetRetouchHistory();
 });
@@ -861,6 +878,32 @@ onBeforeUnmount(() => {
               <i :style="{ '--model-accent': model.accent }">{{ model.label.slice(0, 1) }}</i>
               <span>{{ model.label }}</span>
               <CheckOutlined v-if="selectedModel === model.value" />
+            </button>
+          </div>
+        </section>
+
+        <section v-else class="image-tool-section">
+          <header>
+            <strong>修图模型</strong>
+            <span>{{ retouchModels.length }} 个可用模型</span>
+          </header>
+          <div class="image-model-grid">
+            <button
+              v-for="(model, index) in retouchModels"
+              :key="model.value"
+              type="button"
+              :class="{ active: selectedRetouchModel === model.value }"
+              @click="selectedRetouchModel = model.value"
+            >
+              <i
+                :style="{
+                  '--model-accent': modelAccents[index % modelAccents.length] ?? '#7157e8',
+                }"
+              >
+                {{ model.label.slice(0, 1) }}
+              </i>
+              <span>{{ model.label }}</span>
+              <CheckOutlined v-if="selectedRetouchModel === model.value" />
             </button>
           </div>
         </section>
@@ -975,7 +1018,7 @@ onBeforeUnmount(() => {
           </header>
           <div class="image-option-grid">
             <button
-              v-for="size in sizes"
+              v-for="size in availableSizes"
               :key="size"
               type="button"
               :class="{ active: selectedSize === size }"
@@ -1449,7 +1492,7 @@ onBeforeUnmount(() => {
           <label>
             <ScanOutlined />
             <select v-model="selectedSize" aria-label="输出清晰度">
-              <option v-for="size in sizes" :key="size" :value="size">{{ size }}</option>
+              <option v-for="size in availableSizes" :key="size" :value="size">{{ size }}</option>
             </select>
             <DownOutlined />
           </label>

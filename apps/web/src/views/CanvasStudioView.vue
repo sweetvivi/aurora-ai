@@ -53,6 +53,7 @@ import {
 } from '@/stores/draw-workspace';
 import { useModelCatalogStore } from '@/stores/model-catalog';
 import { parseLocalCanvasWorkflow, serializeLocalCanvasWorkflow } from '@/utils/canvas-persistence';
+import { clampImageSizePreset, getImageSizePresets } from '@/utils/model-capabilities';
 
 type CanvasNodeKind = 'image' | 'output' | 'prompt' | 'video';
 type CanvasNodeStatus = 'done' | 'failed' | 'generating' | 'idle' | 'queued';
@@ -302,6 +303,12 @@ const generationModels = computed<GenerationModel[]>(() =>
     value: model.alias,
   })),
 );
+const activeImageProfile = computed(
+  () =>
+    modelCatalog.modelsFor('image').find((model) => model.alias === selectedModel.value)?.profile
+      ?.image,
+);
+const availableSizes = computed(() => getImageSizePresets(activeImageProfile.value));
 
 const selectedNode = computed(() => nodes.value.find((node) => node.id === selectedNodeId.value));
 const selectedNodeCount = computed(() => selectedNodeIds.value.length);
@@ -2367,6 +2374,14 @@ watch(
   { immediate: true },
 );
 
+watch(
+  [selectedModel, availableSizes],
+  () => {
+    selectedSize.value = clampImageSizePreset(selectedSize.value, availableSizes.value);
+  },
+  { immediate: true },
+);
+
 function handleBeforeUnload(): void {
   if (hydrated) {
     writeLocalCanvas();
@@ -3270,7 +3285,7 @@ onBeforeUnmount(() => {
           </label>
           <label>
             <select v-model="selectedSize">
-              <option v-for="size in ['1K', '2K', '4K']" :key="size">
+              <option v-for="size in availableSizes" :key="size">
                 {{ size }}
               </option>
             </select>

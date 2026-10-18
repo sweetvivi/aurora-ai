@@ -28,7 +28,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { FileAsset } from '@/app/api';
 import GalleryArtwork from '@/components/GalleryArtwork.vue';
 import {
@@ -38,6 +38,7 @@ import {
 } from '@/stores/draw-workspace';
 import { useModelCatalogStore } from '@/stores/model-catalog';
 import { useSessionStore } from '@/stores/session';
+import { getImageSizePresets } from '@/utils/model-capabilities';
 
 type CommerceForm = 'background' | 'pattern' | 'placeholder' | 'replace' | 'retouch' | 'try-on';
 type UploadRole = 'background' | 'clothing' | 'model' | 'pattern' | 'product' | 'replacement';
@@ -402,7 +403,6 @@ const backgroundCategories = [
   '健康保健',
 ];
 const fusionModes = ['自然融合', '光影匹配', '边缘强化', '商品优先'];
-const backgroundResolutions = ['1K', '2K', '4K'];
 const patternApplications = ['胸前图案', '满版印花', '局部贴图', '披肩纹理'];
 const clothingCategories = [
   'T 恤',
@@ -419,14 +419,12 @@ const clothingCategories = [
   '休闲装',
 ];
 const patternStrengths = ['自然贴合', '保持纹理', '强化图案'];
-const patternResolutions = ['1K', '2K', '4K'];
 const replacementModesByTool: Record<string, string[]> = {
   'package-replace': ['包装整体', '正面标签', '盒型结构', '封口细节'],
   'component-replace': ['指定部件', '连接配件', '结构细节', '品牌饰件'],
   'material-replace': ['表面材质', '核心部件材质', '局部纹理', '金属玻璃布料质感'],
 };
 const replacementScopes = ['自动识别', '主体区域', '指定局部', '保留边缘光'];
-const replacementResolutions = ['1K', '2K', '4K'];
 const replacementUploadProfiles: Record<string, UploadMeta & { previewLabel: string }> = {
   'package-replace': {
     description: '上传希望替换成的包装、标签或盒型参考图',
@@ -448,10 +446,8 @@ const replacementUploadProfiles: Record<string, UploadMeta & { previewLabel: str
   },
 };
 const retouchModes = ['一键抠图', '商品精修', '高清放大', '背景净化和补光'];
-const retouchResolutions = ['1K', '2K', '4K'];
 const tryOnPoses = ['正面站姿', '自然走姿', '半身展示', '坐姿展示'];
 const tryOnScenes = ['纯色棚拍', '生活方式', '都市街景', '家居空间'];
-const tryOnResolutions = ['1K', '2K', '4K'];
 const ratios = ['1:1', '4:5', '3:4', '16:9', '9:16'];
 const amounts = [1, 2, 3, 4];
 const promptPresets = ['保持光线方向一致', '边缘融合自然', '突出商品材质', '留出文案空间'];
@@ -544,6 +540,9 @@ const prompt = ref('');
 const uploadError = ref('');
 const uploadingRole = ref<UploadRole | null>(null);
 const selectedImageModel = computed(() => modelCatalog.modelsFor('image')[0] ?? null);
+const availableResolutions = computed(() =>
+  getImageSizePresets(selectedImageModel.value?.profile?.image),
+);
 const pendingUploadRole = ref<UploadRole | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
 const backgroundCategory = ref('');
@@ -1190,7 +1189,7 @@ async function submitTask(): Promise<void> {
     prompt: buildPrompt(),
     ratio: selectedRatio.value,
     referenceFileIds: referenceFileId ? [referenceFileId] : undefined,
-    size: selectedOutputResolution.value || '2K',
+    size: selectedOutputResolution.value || availableResolutions.value[0] || '2K',
     sourceFileId: primaryImage.assetId,
     toolKey: 'commerce',
   });
@@ -1226,6 +1225,23 @@ function resetForm(): void {
   selectedAmount.value = 1;
 }
 
+function applyActiveResolutionConstraints(): void {
+  const resolutions = availableResolutions.value;
+  const resolutionRefs = [
+    backgroundResolution,
+    patternResolution,
+    replacementResolution,
+    retouchResolution,
+    tryOnResolution,
+  ];
+
+  for (const resolution of resolutionRefs) {
+    if (resolution.value && !resolutions.includes(resolution.value)) {
+      resolution.value = '';
+    }
+  }
+}
+
 function formatWorkTime(timestamp: number): string {
   return new Intl.DateTimeFormat('zh-CN', {
     day: '2-digit',
@@ -1249,6 +1265,10 @@ function workStatusLabel(status: DrawWorkStatus): string {
 onMounted(() => {
   void modelCatalog.load();
   void workspace.initialize();
+});
+
+watch([selectedImageModel, availableResolutions], applyActiveResolutionConstraints, {
+  immediate: true,
 });
 
 onBeforeUnmount(() => {
@@ -1434,7 +1454,7 @@ onBeforeUnmount(() => {
             <select v-model="backgroundResolution">
               <option value="">请选择输出分辨率（可选）</option>
               <option
-                v-for="resolution in backgroundResolutions"
+                v-for="resolution in availableResolutions"
                 :key="resolution"
                 :value="resolution"
               >
@@ -1568,7 +1588,7 @@ onBeforeUnmount(() => {
             <select v-model="patternResolution">
               <option value="">请选择图片分辨率（可选）</option>
               <option
-                v-for="resolution in patternResolutions"
+                v-for="resolution in availableResolutions"
                 :key="resolution"
                 :value="resolution"
               >
@@ -1650,7 +1670,7 @@ onBeforeUnmount(() => {
             <select v-model="replacementResolution">
               <option value="">请选择输出分辨率（可选）</option>
               <option
-                v-for="resolution in replacementResolutions"
+                v-for="resolution in availableResolutions"
                 :key="resolution"
                 :value="resolution"
               >
@@ -1748,7 +1768,7 @@ onBeforeUnmount(() => {
             <select v-model="retouchResolution">
               <option value="">请选择输出分辨率（可选）</option>
               <option
-                v-for="resolution in retouchResolutions"
+                v-for="resolution in availableResolutions"
                 :key="resolution"
                 :value="resolution"
               >
@@ -1825,7 +1845,11 @@ onBeforeUnmount(() => {
             <span>输出分辨率</span>
             <select v-model="tryOnResolution">
               <option value="">请选择输出分辨率（可选）</option>
-              <option v-for="resolution in tryOnResolutions" :key="resolution" :value="resolution">
+              <option
+                v-for="resolution in availableResolutions"
+                :key="resolution"
+                :value="resolution"
+              >
                 {{ resolution }}
               </option>
             </select>
