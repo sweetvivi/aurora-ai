@@ -98,6 +98,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
   }
 
   private resolveStatus(exception: unknown): number {
+    if (this.httpExceptionErrorCode(exception) === 'FILE_TOO_LARGE') {
+      return HttpStatus.PAYLOAD_TOO_LARGE;
+    }
+
     if (exception instanceof HttpException) {
       return exception.getStatus();
     }
@@ -111,6 +115,25 @@ export class ApiExceptionFilter implements ExceptionFilter {
     }
 
     return HttpStatus.INTERNAL_SERVER_ERROR;
+  }
+
+  private httpExceptionErrorCode(exception: unknown): string | null {
+    if (!(exception instanceof HttpException)) {
+      return null;
+    }
+
+    const response = exception.getResponse();
+
+    if (
+      typeof response === 'object' &&
+      response !== null &&
+      'code' in response &&
+      typeof (response as { code?: unknown }).code === 'string'
+    ) {
+      return (response as { code: string }).code;
+    }
+
+    return null;
   }
 
   private uploadErrorCode(exception: unknown): { code: string; message: string } | null {

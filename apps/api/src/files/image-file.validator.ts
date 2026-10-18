@@ -9,6 +9,7 @@ export interface UploadedImageFile {
 }
 
 const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/gif', 'image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
 
 export function validateImageUpload(
   file: UploadedImageFile | undefined,
@@ -41,6 +42,41 @@ export function validateImageUpload(
     throw new BadRequestException({
       code: 'FILE_CONTENT_MISMATCH',
       message: '文件内容与声明的图片格式不一致',
+    });
+  }
+}
+
+export function validateVideoUpload(
+  file: UploadedImageFile | undefined,
+  options: { maxBytes?: number } = {},
+): void {
+  if (!file || !Buffer.isBuffer(file.buffer) || file.buffer.length === 0) {
+    throw new BadRequestException({
+      code: 'FILE_REQUIRED',
+      message: '请选择要上传的视频文件',
+    });
+  }
+
+  if (options.maxBytes && file.buffer.length > options.maxBytes) {
+    throw new BadRequestException({
+      code: 'FILE_TOO_LARGE',
+      message: '视频文件超过允许的大小限制',
+    });
+  }
+
+  const mimeType = normalizeMimeType(file.mimetype);
+
+  if (!ALLOWED_VIDEO_MIME_TYPES.has(mimeType)) {
+    throw new BadRequestException({
+      code: 'FILE_TYPE_NOT_ALLOWED',
+      message: '仅支持 MP4、WebM 和 MOV 视频',
+    });
+  }
+
+  if (!isVideoContentCompatible(mimeType, file.buffer)) {
+    throw new BadRequestException({
+      code: 'FILE_CONTENT_MISMATCH',
+      message: '文件内容与声明的视频格式不一致',
     });
   }
 }
@@ -87,4 +123,16 @@ export function detectImageMimeType(buffer: Buffer): string | null {
   }
 
   return null;
+}
+
+function isVideoContentCompatible(mimeType: string, buffer: Buffer): boolean {
+  if (mimeType === 'video/webm') {
+    return (
+      buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBM'
+    );
+  }
+
+  return buffer.length >= 12 && buffer.subarray(4, 8).toString('ascii') === 'ftyp';
 }

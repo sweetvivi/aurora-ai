@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { FileAsset } from '@prisma/client';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
 import { STORAGE_ADAPTER, type StorageAdapter } from '../storage/storage.types';
@@ -7,18 +8,40 @@ import {
   normalizeMimeType,
   type UploadedImageFile,
   validateImageUpload,
+  validateVideoUpload,
 } from './image-file.validator';
+
+export const DEFAULT_IMAGE_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+export const DEFAULT_VIDEO_MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
 @Injectable()
 export class FilesService {
   constructor(
+    private readonly configService: ConfigService,
     @Inject(STORAGE_ADAPTER) private readonly storageAdapter: StorageAdapter,
     private readonly prismaService: PrismaService,
   ) {}
 
   async upload(userId: string, file: UploadedImageFile | undefined) {
-    validateImageUpload(file);
-    const uploadedFile = file as UploadedImageFile;
+    validateImageUpload(file, {
+      maxBytes: this.configService.get<number>('FILE_MAX_SIZE_BYTES', DEFAULT_IMAGE_MAX_SIZE_BYTES),
+    });
+
+    return this.persistUpload(userId, file as UploadedImageFile);
+  }
+
+  async uploadVideo(userId: string, file: UploadedImageFile | undefined) {
+    validateVideoUpload(file, {
+      maxBytes: this.configService.get<number>(
+        'VIDEO_FILE_MAX_SIZE_BYTES',
+        DEFAULT_VIDEO_MAX_SIZE_BYTES,
+      ),
+    });
+
+    return this.persistUpload(userId, file as UploadedImageFile);
+  }
+
+  private async persistUpload(userId: string, uploadedFile: UploadedImageFile) {
     const mimeType = normalizeMimeType(uploadedFile.mimetype);
     const stored = await this.storageAdapter.save({
       buffer: uploadedFile.buffer,
@@ -140,6 +163,9 @@ function extensionFromMimeType(mimeType: string): string {
     'image/gif': 'gif',
     'image/jpeg': 'jpg',
     'image/png': 'png',
+    'video/mp4': 'mp4',
+    'video/quicktime': 'mov',
+    'video/webm': 'webm',
     'image/webp': 'webp',
   };
 

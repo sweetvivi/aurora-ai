@@ -10,6 +10,7 @@ import {
   type VideoTask,
   type VideoTaskStatus,
   uploadImageFile,
+  uploadVideoFile,
 } from '@/app/api';
 import { useSessionStore } from './session';
 
@@ -36,6 +37,7 @@ export interface VideoWork {
   progress: number;
   prompt: string;
   ratio: string;
+  referenceVideoFileId: string | null;
   resolution: string;
   resultFileId: string;
   resultFileName: string;
@@ -64,6 +66,7 @@ interface CreateVideoGenerationInput {
   modelLabel: string;
   prompt: string;
   ratio: string;
+  referenceVideoFileId?: string;
   resolution: string;
   sourceFileId?: string;
 }
@@ -76,6 +79,7 @@ interface VideoTaskDisplayMetadata {
   modelAlias?: string;
   modelLabel?: string;
   ratio?: string;
+  referenceVideoFileId?: string;
   resolution?: string;
 }
 
@@ -170,6 +174,13 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
 
       return uploadImageFile(file);
     },
+    async uploadReferenceVideo(file: File): Promise<FileAsset> {
+      if (!(await this.ensureAuthenticated())) {
+        throw new Error(this.error?.message ?? '请先登录后再上传素材');
+      }
+
+      return uploadVideoFile(file);
+    },
     async createGeneration(input: CreateVideoGenerationInput): Promise<VideoWork | null> {
       if (this.submitting) {
         return null;
@@ -211,6 +222,7 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
               uiModelLabel: input.modelLabel,
             },
             prompt,
+            referenceVideoFileId: input.referenceVideoFileId,
             sourceFileId: input.sourceFileId,
           },
           idempotencyKey,
@@ -224,6 +236,7 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
           modelAlias: input.modelAlias || VIDEO_MODEL_ALIAS,
           modelLabel: input.modelLabel,
           ratio: input.ratio,
+          referenceVideoFileId: input.referenceVideoFileId,
           resolution: input.resolution,
         });
       } catch (error) {
@@ -252,6 +265,7 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
         modelLabel: work.modelLabel,
         prompt: work.prompt,
         ratio: work.ratio,
+        referenceVideoFileId: work.referenceVideoFileId ?? undefined,
         resolution: work.resolution,
         sourceFileId: work.sourceFileId ?? undefined,
       });
@@ -392,6 +406,10 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
           progress: task.progress,
           prompt: task.prompt,
           ratio: metadata?.ratio ?? asString(task.parameters?.ratio) ?? existing.ratio,
+          referenceVideoFileId:
+            metadata?.referenceVideoFileId ??
+            task.referenceVideoFile?.id ??
+            existing.referenceVideoFileId,
           resolution:
             metadata?.resolution ?? asString(task.parameters?.resolution) ?? existing.resolution,
           resultFileId: task.resultFile?.id ?? '',
@@ -429,6 +447,7 @@ export const useVideoWorkspaceStore = defineStore('video-workspace', {
         progress: task.progress,
         prompt: task.prompt,
         ratio: metadata?.ratio ?? asString(task.parameters?.ratio) ?? '16:9',
+        referenceVideoFileId: metadata?.referenceVideoFileId ?? task.referenceVideoFile?.id ?? null,
         resolution: metadata?.resolution ?? asString(task.parameters?.resolution) ?? '720P',
         resultFileId: task.resultFile?.id ?? '',
         resultFileName: task.resultFile?.originalName ?? '',

@@ -10,6 +10,9 @@ const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
+  'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
+  'video/webm': 'webm',
 };
 
 @Injectable()

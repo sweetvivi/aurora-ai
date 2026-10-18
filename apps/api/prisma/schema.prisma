@@ -314,6 +314,7 @@ model FileAsset {
   resultImageTasks    ImageTask[]         @relation("ImageTaskResult")
   videoSourceTasks    VideoTask[]         @relation("VideoTaskSourceFrame")
   videoLastFrameTasks VideoTask[]         @relation("VideoTaskLastFrame")
+  videoReferenceTasks VideoTask[]         @relation("VideoTaskReference")
   videoResultTasks    VideoTask[]         @relation("VideoTaskResult")
   messageAttachments  MessageAttachment[]
 
@@ -350,6 +351,7 @@ model VideoTask {
   userId            String
   sourceFileId      String?
   lastFrameFileId   String?
+  referenceVideoFileId String?
   resultFileId      String?
   modelAlias        String
   prompt            String          @db.Text
@@ -366,10 +368,12 @@ model VideoTask {
   user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   sourceFile        FileAsset?      @relation("VideoTaskSourceFrame", fields: [sourceFileId], references: [id], onDelete: SetNull)
   lastFrameFile     FileAsset?      @relation("VideoTaskLastFrame", fields: [lastFrameFileId], references: [id], onDelete: SetNull)
+  referenceVideoFile FileAsset?      @relation("VideoTaskReference", fields: [referenceVideoFileId], references: [id], onDelete: SetNull)
   resultFile        FileAsset?      @relation("VideoTaskResult", fields: [resultFileId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([referenceVideoFileId])
   @@map("video_tasks")
 }
 

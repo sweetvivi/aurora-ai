@@ -134,6 +134,51 @@ describe('SeedanceVideoProvider', () => {
       status: 'FAILED',
     });
   });
+
+  it('sends a reference video as an Ark video_url content item', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: 'task-reference-video' }), {
+        headers: { 'content-type': 'application/json' },
+        status: 200,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = createProvider();
+
+    await provider.createGeneration({
+      model: 'doubao-seedance-2-0-260128',
+      parameters: {
+        duration: 5,
+        ratio: '16:9',
+        resolution: '720p',
+      },
+      prompt: '保持参考视频里的动作节奏',
+      providerBaseUrl: 'https://gateway.example/doubao',
+      providerKeyRef: 'CUSTOM_SEEDANCE_KEY',
+      referenceVideo: {
+        buffer: Buffer.from('video-data'),
+        mimeType: 'video/mp4',
+        originalName: 'reference.mp4',
+      },
+    });
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+      content: [
+        {
+          type: 'video_url',
+          video_url: {
+            url: 'data:video/mp4;base64,dmlkZW8tZGF0YQ==',
+          },
+        },
+        {
+          text: '保持参考视频里的动作节奏',
+          type: 'text',
+        },
+      ],
+      model: 'doubao-seedance-2-0-260128',
+    });
+  });
 });
 
 function createProvider(): SeedanceVideoProvider {

@@ -39,6 +39,24 @@ describe('model registry', () => {
     });
   });
 
+  it('registers a reference-video capable Seedance model by default', () => {
+    const registry = createRegistry();
+    const model = registry.getByAlias('doubao-seedance-2-0');
+
+    expect(model).toMatchObject({
+      providerCode: 'volcengine',
+      providerModel: 'doubao-seedance-2-0-260128',
+      profile: {
+        video: {
+          maxDuration: 15,
+          resolutions: ['480P', '720P', '1080P', '4K'],
+          supportsLastFrame: true,
+          supportsVideoInput: true,
+        },
+      },
+    });
+  });
+
   it('loads enabled database models and keeps provider connection metadata', async () => {
     const registry = createRegistry({}, [
       {
@@ -245,7 +263,7 @@ describe('model registry', () => {
       count: expect.any(Number),
       source: 'defaults',
     });
-    expect(registry.list()).toHaveLength(13);
+    expect(registry.list()).toHaveLength(14);
   });
 
   it('falls back to defaults when the initial database load fails', async () => {
@@ -257,7 +275,7 @@ describe('model registry', () => {
     const registry = new ModelRegistryService(new ConfigService({}), prisma);
 
     await expect(registry.reload()).resolves.toMatchObject({
-      count: 13,
+      count: 14,
       source: 'defaults',
     });
     expect(registry.getByAlias('openai-gpt-6-astra').providerModel).toBe('gpt-6-astra');

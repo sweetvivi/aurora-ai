@@ -167,6 +167,22 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
     providerCode: 'volcengine',
     providerModel: 'doubao-seedance-1-0-pro-250528',
   },
+  {
+    alias: 'doubao-seedance-2-0',
+    capabilities: ['video'],
+    displayName: 'Seedance 2.0',
+    profile: {
+      video: {
+        maxDuration: 15,
+        resolutions: ['480P', '720P', '1080P', '4K'],
+        supportsAudio: false,
+        supportsLastFrame: true,
+        supportsVideoInput: true,
+      },
+    },
+    providerCode: 'volcengine',
+    providerModel: 'doubao-seedance-2-0-260128',
+  },
 ];
 
 export function resolveModelCapabilityProfile(input: {

@@ -31,6 +31,7 @@ const POLL_PROGRESS_STEP = 4;
 type VideoTaskWithFiles = Prisma.VideoTaskGetPayload<{
   include: {
     lastFrameFile: true;
+    referenceVideoFile: true;
     resultFile: true;
     sourceFile: true;
   };
@@ -107,6 +108,7 @@ export class VideoTasksService implements OnModuleInit {
 
     const capabilityViolation = findVideoModelConstraintViolation({
       hasLastFrame: Boolean(input.lastFrameFileId),
+      hasReferenceVideo: Boolean(input.referenceVideoFileId),
       parameters: input.parameters,
       profile: model.profile,
       sourceFileId: input.sourceFileId,
@@ -145,6 +147,27 @@ export class VideoTasksService implements OnModuleInit {
       }
     }
 
+    if (input.referenceVideoFileId) {
+      if (input.sourceFileId || input.lastFrameFileId) {
+        throw new ConflictException({
+          code: 'VIDEO_MODE_CONFLICT',
+          message: '参考视频模式不能同时提交首帧、尾帧或参考图',
+        });
+      }
+
+      const referenceVideo = await this.filesService.getOwnedAsset(
+        userId,
+        input.referenceVideoFileId,
+      );
+
+      if (!referenceVideo.mimeType.startsWith('video/')) {
+        throw new ConflictException({
+          code: 'VIDEO_REFERENCE_FILE_INVALID',
+          message: '参考文件必须是视频文件',
+        });
+      }
+    }
+
     const existing = await this.prismaService.videoTask.findUnique({
       where: { idempotencyKey },
     });
@@ -168,6 +191,7 @@ export class VideoTasksService implements OnModuleInit {
           modelAlias: model.alias,
           parameters: input.parameters as Prisma.InputJsonValue | undefined,
           prompt,
+          referenceVideoFileId: input.referenceVideoFileId,
           sourceFileId: input.sourceFileId,
           userId,
         },
@@ -208,6 +232,7 @@ export class VideoTasksService implements OnModuleInit {
     const tasks = await this.prismaService.videoTask.findMany({
       include: {
         lastFrameFile: true,
+        referenceVideoFile: true,
         resultFile: true,
         sourceFile: true,
       },
@@ -228,6 +253,7 @@ export class VideoTasksService implements OnModuleInit {
     const task = await this.prismaService.videoTask.findFirst({
       include: {
         lastFrameFile: true,
+        referenceVideoFile: true,
         resultFile: true,
         sourceFile: true,
       },
@@ -337,6 +363,7 @@ export class VideoTasksService implements OnModuleInit {
     const task = await this.prismaService.videoTask.findUnique({
       include: {
         lastFrameFile: true,
+        referenceVideoFile: true,
         sourceFile: true,
       },
       where: { id: taskId },
@@ -365,6 +392,13 @@ export class VideoTasksService implements OnModuleInit {
           providerCode: model.providerCode,
           providerKeyRef: model.keyRef,
           prompt: task.prompt,
+          referenceVideo: task.referenceVideoFile
+            ? {
+                buffer: await this.storageAdapter.read(task.referenceVideoFile.storageKey),
+                mimeType: task.referenceVideoFile.mimeType,
+                originalName: task.referenceVideoFile.originalName,
+              }
+            : undefined,
           sourceImage: task.sourceFile
             ? {
                 buffer: await this.storageAdapter.read(task.sourceFile.storageKey),
@@ -593,6 +627,7 @@ export class VideoTasksService implements OnModuleInit {
       task.prompt !== prompt ||
       task.sourceFileId !== (input.sourceFileId ?? null) ||
       task.lastFrameFileId !== (input.lastFrameFileId ?? null) ||
+      task.referenceVideoFileId !== (input.referenceVideoFileId ?? null) ||
       !parametersMatch
     ) {
       throw new ConflictException({
@@ -627,6 +662,7 @@ export class VideoTasksService implements OnModuleInit {
       parameters: task.parameters,
       progress: task.progress,
       prompt: task.prompt,
+      referenceVideoFile: task.referenceVideoFile ? this.toFileDto(task.referenceVideoFile) : null,
       resultFile: task.resultFile ? this.toFileDto(task.resultFile) : null,
       sourceFile: task.sourceFile ? this.toFileDto(task.sourceFile) : null,
       startedAt: task.startedAt,
@@ -672,11 +708,14 @@ export class VideoTasksService implements OnModuleInit {
       VIDEO_GENERATION_FAILED: '视频生成失败，本次积分已退回',
       VIDEO_INVALID_RESPONSE: '视频生成服务返回了无效响应，本次积分已退回',
       VIDEO_LAST_FRAME_UNSUPPORTED: '当前视频模型暂不支持首尾帧模式，本次积分已退回',
+      VIDEO_INPUT_UNSUPPORTED: '当前视频模型暂不支持参考视频，本次积分已退回',
+      VIDEO_MODE_CONFLICT: '参考视频模式不能与首尾帧或其他参考图同时使用',
       VIDEO_NOT_CONFIGURED: '视频生成服务尚未配置，本次积分已退回',
       VIDEO_PROVIDER_INVALID_RESULT: '视频生成服务返回了空结果，请重试',
       VIDEO_PROVIDER_TASK_NOT_FOUND: '视频任务已失效，请重新提交',
       VIDEO_PROVIDER_UNAVAILABLE: '视频生成服务暂时不可用，本次积分已退回',
       VIDEO_RATE_LIMITED: '视频生成请求过于频繁，本次积分已退回',
+      VIDEO_REFERENCE_FILE_INVALID: '参考文件必须是视频文件',
       VIDEO_REQUEST_ERROR: '视频生成请求失败，本次积分已退回',
       VIDEO_RESULT_DOWNLOAD_FAILED: '视频结果下载失败，本次积分已退回',
       VIDEO_RESULT_TOO_LARGE: '视频结果超过允许的大小，本次积分已退回',

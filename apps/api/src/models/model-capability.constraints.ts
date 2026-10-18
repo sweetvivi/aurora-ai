@@ -68,6 +68,7 @@ export function findImageModelConstraintViolation(input: {
 
 export function findVideoModelConstraintViolation(input: {
   hasLastFrame: boolean;
+  hasReferenceVideo?: boolean;
   parameters?: Record<string, unknown>;
   profile?: ModelCapabilityProfile;
   sourceFileId?: string;
@@ -116,7 +117,8 @@ export function findVideoModelConstraintViolation(input: {
   }
 
   if (
-    (input.parameters?.videoFileId !== undefined ||
+    (input.hasReferenceVideo ||
+      input.parameters?.videoFileId !== undefined ||
       input.parameters?.video_file_id !== undefined) &&
     profile.supportsVideoInput === false
   ) {

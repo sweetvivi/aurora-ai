@@ -7,6 +7,7 @@ import type {
   VideoGenerationSnapshot,
   VideoProvider,
   VideoSourceImage,
+  VideoSourceVideo,
 } from '../video-provider';
 
 const DEFAULT_RESULT_MIME_TYPE = 'video/mp4';
@@ -195,6 +196,15 @@ export class SeedanceVideoProvider implements VideoProvider {
       }
     }
 
+    if (input.referenceVideo) {
+      content.push({
+        type: 'video_url',
+        video_url: {
+          url: toDataUrl(input.referenceVideo),
+        },
+      });
+    }
+
     content.push({
       text: input.prompt,
       type: 'text',
@@ -342,7 +352,7 @@ export class SeedanceVideoProvider implements VideoProvider {
   }
 }
 
-function toDataUrl(image: VideoSourceImage): string {
+function toDataUrl(image: VideoSourceImage | VideoSourceVideo): string {
   return `data:${image.mimeType};base64,${image.buffer.toString('base64')}`;
 }
 

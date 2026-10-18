@@ -79,6 +79,30 @@ describe('XaiVideoProvider', () => {
       }),
     );
   });
+
+  it('rejects reference video before sending an unsupported provider request', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = createProvider();
+
+    await expect(
+      provider.createGeneration({
+        prompt: '参考视频动作',
+        providerBaseUrl: 'https://custom-video.example/v1/',
+        providerKeyRef: 'CUSTOM_VIDEO_API_KEY',
+        referenceVideo: {
+          buffer: Buffer.from('0000ftypisom'),
+          mimeType: 'video/mp4',
+          originalName: 'reference.mp4',
+        },
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'VIDEO_INPUT_UNSUPPORTED',
+      },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 function createProvider(): XaiVideoProvider {

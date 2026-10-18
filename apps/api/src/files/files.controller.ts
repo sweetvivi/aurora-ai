@@ -25,6 +25,15 @@ export class FilesController {
     return this.filesService.upload(userId, file);
   }
 
+  @Post('video')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadVideo(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: UploadedImageFile | undefined,
+  ) {
+    return this.filesService.uploadVideo(userId, file);
+  }
+
   @Get()
   list(@CurrentUser('id') userId: string, @Query() query: ListFilesQueryDto) {
     return this.filesService.list(userId, query.limit);

@@ -29,7 +29,7 @@ import {
   useVideoWorkspaceStore,
 } from '@/stores/video-workspace';
 
-type VideoMode = 'first-last-frame' | 'image-to-video' | 'text-to-video';
+type VideoMode = 'first-last-frame' | 'image-to-video' | 'reference-video' | 'text-to-video';
 type GalleryTab = 'discover' | 'mine';
 
 interface VideoModel {
@@ -43,6 +43,7 @@ interface VideoModel {
 
 interface SourceFrame {
   id: string;
+  kind: 'image' | 'video';
   name: string;
   url: string;
 }
@@ -71,6 +72,11 @@ const modes: VideoModeOption[] = [
     description: '控制首尾画面',
     label: '首尾帧',
     value: 'first-last-frame',
+  },
+  {
+    description: '上传视频控制动作与镜头',
+    label: '参考视频',
+    value: 'reference-video',
   },
 ];
 
@@ -216,6 +222,28 @@ const firstLastFrameAvailability = computed(() => {
     availabilityLabel: '能力待确认',
   };
 });
+const referenceVideoAvailability = computed(() => {
+  const supportsVideoInput = activeVideoProfile.value?.supportsVideoInput;
+
+  if (supportsVideoInput === true) {
+    return {
+      available: true,
+      availabilityLabel: '用视频控制动作',
+    };
+  }
+
+  if (supportsVideoInput === false) {
+    return {
+      available: false,
+      availabilityLabel: '模型不支持',
+    };
+  }
+
+  return {
+    available: false,
+    availabilityLabel: '能力待确认',
+  };
+});
 const audioAvailability = computed<'supported' | 'unknown' | 'unsupported'>(() => {
   const supportsAudio = activeVideoProfile.value?.supportsAudio;
 
@@ -226,15 +254,25 @@ const audioAvailability = computed<'supported' | 'unknown' | 'unsupported'>(() =
   return supportsAudio === false ? 'unsupported' : 'unknown';
 });
 const availableModes = computed<VideoModeOption[]>(() =>
-  modes.map((item) =>
-    item.value === 'first-last-frame'
-      ? {
-          ...item,
-          available: firstLastFrameAvailability.value.available,
-          availabilityLabel: firstLastFrameAvailability.value.availabilityLabel,
-        }
-      : item,
-  ),
+  modes.map((item) => {
+    if (item.value === 'first-last-frame') {
+      return {
+        ...item,
+        available: firstLastFrameAvailability.value.available,
+        availabilityLabel: firstLastFrameAvailability.value.availabilityLabel,
+      };
+    }
+
+    if (item.value === 'reference-video') {
+      return {
+        ...item,
+        available: referenceVideoAvailability.value.available,
+        availabilityLabel: referenceVideoAvailability.value.availabilityLabel,
+      };
+    }
+
+    return item;
+  }),
 );
 const availableDurations = computed(() => {
   const maximum = activeVideoProfile.value?.maxDuration;
@@ -267,6 +305,10 @@ const sortedTasks = computed(() =>
 const activeTasks = computed(() => videoWorkspace.activeWorks);
 const needsSource = computed(() => mode.value !== 'text-to-video');
 const requiredFrameCount = computed(() => (mode.value === 'first-last-frame' ? 2 : 1));
+const usesReferenceVideo = computed(() => mode.value === 'reference-video');
+const sourceAccept = computed(() =>
+  usesReferenceVideo.value ? 'video/mp4,video/webm,video/quicktime' : 'image/*',
+);
 const canSubmit = computed(() => {
   if (videoWorkspace.submitting || activeTasks.value.length > 0 || !prompt.value.trim()) {
     return false;
@@ -318,12 +360,15 @@ async function handleSourceUpload(event: Event): Promise<void> {
 
   try {
     for (const file of files.slice(0, availableSlots)) {
-      const asset = await videoWorkspace.uploadFrame(file);
+      const asset = usesReferenceVideo.value
+        ? await videoWorkspace.uploadReferenceVideo(file)
+        : await videoWorkspace.uploadFrame(file);
 
       sourceFrames.value = [
         ...sourceFrames.value,
         {
           id: asset.id,
+          kind: usesReferenceVideo.value ? 'video' : 'image',
           name: file.name,
           url: URL.createObjectURL(file),
         },
@@ -410,6 +455,7 @@ async function consumeRouteContext(): Promise<void> {
     sourceFrames.value = [
       {
         id: asset.id,
+        kind: 'image',
         name: frameName,
         url: URL.createObjectURL(frameFile),
       },
@@ -423,9 +469,16 @@ function changeMode(nextMode: VideoMode): void {
   const nextModeOption = availableModes.value.find((item) => item.value === nextMode);
 
   if (nextModeOption?.available === false) {
+    const unavailableMessage =
+      nextMode === 'reference-video'
+        ? '当前模型不支持参考视频，请切换到支持视频输入的模型'
+        : nextMode === 'first-last-frame'
+          ? '当前模型不支持首尾帧，请切换为文生视频或图生视频'
+          : '当前模型的视频能力待确认';
+
     showNotice(
       nextModeOption.availabilityLabel === '模型不支持'
-        ? '当前模型不支持首尾帧，请切换为文生视频或图生视频'
+        ? unavailableMessage
         : '当前模型的视频能力待确认',
     );
     return;
@@ -433,6 +486,17 @@ function changeMode(nextMode: VideoMode): void {
 
   mode.value = nextMode;
   formError.value = '';
+
+  const requiredSourceKind =
+    nextMode === 'text-to-video' ? null : nextMode === 'reference-video' ? 'video' : 'image';
+  const hasIncompatibleSource =
+    requiredSourceKind === null ||
+    sourceFrames.value.some((frame) => frame.kind !== requiredSourceKind);
+
+  if (hasIncompatibleSource) {
+    removeAllSourceFrames();
+    return;
+  }
 
   if (nextMode !== 'first-last-frame' && sourceFrames.value.length > 1) {
     const [firstFrame] = sourceFrames.value;
@@ -468,6 +532,10 @@ function applyActiveModelConstraints(): void {
     changeMode('image-to-video');
   }
 
+  if (mode.value === 'reference-video' && !referenceVideoAvailability.value.available) {
+    changeMode('image-to-video');
+  }
+
   if (audioAvailability.value !== 'supported') {
     audioEnabled.value = false;
   }
@@ -483,7 +551,11 @@ async function submitTask(): Promise<void> {
 
   if (needsSource.value && sourceFrames.value.length !== requiredFrameCount.value) {
     formError.value =
-      mode.value === 'first-last-frame' ? '请上传首帧和尾帧图片' : '请先上传一张参考图';
+      mode.value === 'first-last-frame'
+        ? '请上传首帧和尾帧图片'
+        : usesReferenceVideo.value
+          ? '请先上传一个参考视频'
+          : '请先上传一张参考图';
     return;
   }
 
@@ -498,8 +570,10 @@ async function submitTask(): Promise<void> {
     modelLabel: activeModel.value?.label ?? '视频模型',
     prompt: prompt.value.trim(),
     ratio: selectedRatio.value,
+    referenceVideoFileId: mode.value === 'reference-video' ? sourceIds[0] : undefined,
     resolution: selectedResolution.value,
-    sourceFileId: needsSource.value ? sourceIds[0] : undefined,
+    sourceFileId:
+      mode.value === 'text-to-video' || usesReferenceVideo.value ? undefined : sourceIds[0],
   });
 
   if (!task) {
@@ -790,13 +864,19 @@ onBeforeUnmount(() => {
 
           <section v-if="needsSource" class="video-section">
             <header>
-              <strong>{{ mode === 'first-last-frame' ? '首帧与尾帧' : '参考画面' }}</strong>
+              <strong>{{
+                mode === 'first-last-frame'
+                  ? '首帧与尾帧'
+                  : usesReferenceVideo
+                    ? '参考视频'
+                    : '参考画面'
+              }}</strong>
               <span>{{ sourceFrames.length }} / {{ requiredFrameCount }}</span>
             </header>
             <input
               ref="sourceInput"
               type="file"
-              accept="image/*"
+              :accept="sourceAccept"
               multiple
               hidden
               @change="handleSourceUpload"
@@ -807,8 +887,17 @@ onBeforeUnmount(() => {
                 :key="frame.url"
                 class="video-source-frame"
               >
-                <img :src="frame.url" :alt="frame.name" />
-                <span>{{ index === 0 ? '首帧' : '尾帧' }}</span>
+                <video
+                  v-if="frame.kind === 'video'"
+                  :src="frame.url"
+                  controls
+                  playsinline
+                  preload="metadata"
+                />
+                <img v-else :src="frame.url" :alt="frame.name" />
+                <span>{{
+                  frame.kind === 'video' ? '参考视频' : index === 0 ? '首帧' : '尾帧'
+                }}</span>
                 <button type="button" aria-label="移除画面" @click="removeSourceFrame(index)">
                   <CloseOutlined />
                 </button>
@@ -820,8 +909,18 @@ onBeforeUnmount(() => {
                 @click="sourceInput?.click()"
               >
                 <UploadOutlined />
-                <strong>{{ sourceFrames.length === 0 ? '上传参考画面' : '补充尾帧' }}</strong>
-                <small>当前支持图片，视频/音频待接入</small>
+                <strong>{{
+                  usesReferenceVideo
+                    ? '上传参考视频'
+                    : sourceFrames.length === 0
+                      ? '上传参考画面'
+                      : '补充尾帧'
+                }}</strong>
+                <small>{{
+                  usesReferenceVideo
+                    ? '支持 MP4、WebM、MOV，最大 50MB'
+                    : '支持 JPEG、PNG、WebP、GIF'
+                }}</small>
               </button>
             </div>
           </section>
@@ -1598,7 +1697,9 @@ onBeforeUnmount(() => {
   background: #131317;
 }
 
-.video-source-frame img {
+.video-source-frame img,
+.video-source-frame video {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;

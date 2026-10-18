@@ -10,6 +10,7 @@ const apiMocks = vi.hoisted(() => ({
   hasStoredTokens: vi.fn(),
   listVideoTasks: vi.fn(),
   uploadImageFile: vi.fn(),
+  uploadVideoFile: vi.fn(),
 }));
 
 vi.mock('@/app/api', async () => {
@@ -207,6 +208,124 @@ describe('video workspace store', () => {
     expect(store.works[0]?.generateAudio).toBe(true);
     expect(store.works[0]?.status).toBe('done');
   });
+
+  it('uploads a reference video and submits it without image frame fields', async () => {
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+    const referenceFile = {
+      checksum: 'video-checksum',
+      createdAt: new Date().toISOString(),
+      id: 'file-reference-video',
+      mimeType: 'video/mp4',
+      originalName: 'reference.mp4',
+      size: 4_096,
+    };
+    apiMocks.uploadVideoFile.mockResolvedValue(referenceFile);
+    apiMocks.createVideoTask.mockResolvedValue(
+      makeTask({
+        id: 'task-reference-video',
+        modelAlias: 'doubao-seedance-2-0',
+        parameters: {
+          duration: 5,
+          mode: 'reference-video',
+          ratio: '16:9',
+          resolution: '720P',
+          uiModel: 'doubao-seedance-2-0',
+          uiModelLabel: 'Seedance 2.0',
+        },
+        referenceVideoFile: referenceFile,
+        status: 'SUCCEEDED',
+      }),
+    );
+    const store = useVideoWorkspaceStore();
+    const file = new File(['test-video'], 'reference.mp4', { type: 'video/mp4' });
+
+    await expect(store.uploadReferenceVideo(file)).resolves.toEqual(referenceFile);
+    await store.createGeneration({
+      duration: 5,
+      generateAudio: false,
+      mode: 'reference-video',
+      model: 'doubao-seedance-2-0',
+      modelAlias: 'doubao-seedance-2-0',
+      modelLabel: 'Seedance 2.0',
+      prompt: '保持参考视频的动作',
+      ratio: '16:9',
+      referenceVideoFileId: referenceFile.id,
+      resolution: '720P',
+    });
+
+    expect(apiMocks.uploadVideoFile).toHaveBeenCalledWith(file);
+    expect(apiMocks.createVideoTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lastFrameFileId: undefined,
+        referenceVideoFileId: 'file-reference-video',
+        sourceFileId: undefined,
+      }),
+      expect.stringMatching(/^video-generation-/),
+    );
+    expect(store.works[0]?.referenceVideoFileId).toBe('file-reference-video');
+  });
+
+  it('preserves reference video fields when retrying a failed task', async () => {
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+    apiMocks.createVideoTask.mockResolvedValue(
+      makeTask({
+        id: 'task-reference-retried',
+        referenceVideoFile: {
+          checksum: 'retry-checksum',
+          createdAt: new Date().toISOString(),
+          id: 'file-reference-retry',
+          mimeType: 'video/mp4',
+          originalName: 'retry.mp4',
+          size: 2_048,
+        },
+        status: 'SUCCEEDED',
+      }),
+    );
+    const store = useVideoWorkspaceStore();
+
+    store.mergeTask(
+      makeTask({
+        id: 'task-reference-failed',
+        modelAlias: 'doubao-seedance-2-0',
+        parameters: {
+          duration: 5,
+          mode: 'reference-video',
+          ratio: '16:9',
+          resolution: '720P',
+          uiModel: 'doubao-seedance-2-0',
+          uiModelLabel: 'Seedance 2.0',
+        },
+        referenceVideoFile: {
+          checksum: 'retry-checksum',
+          createdAt: new Date().toISOString(),
+          id: 'file-reference-retry',
+          mimeType: 'video/mp4',
+          originalName: 'retry.mp4',
+          size: 2_048,
+        },
+        status: 'FAILED',
+      }),
+    );
+
+    await store.retryWork('task-reference-failed');
+
+    expect(apiMocks.createVideoTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelAlias: 'doubao-seedance-2-0',
+        referenceVideoFileId: 'file-reference-retry',
+        sourceFileId: undefined,
+      }),
+      expect.stringMatching(/^video-generation-/),
+    );
+  });
 });
 
 function makeTask(overrides: Partial<VideoTask> = {}): VideoTask {
@@ -228,6 +347,7 @@ function makeTask(overrides: Partial<VideoTask> = {}): VideoTask {
     },
     progress: 0,
     prompt: '测试视频',
+    referenceVideoFile: null,
     resultFile: null,
     sourceFile: null,
     startedAt: null,

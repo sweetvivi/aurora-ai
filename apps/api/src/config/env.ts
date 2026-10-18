@@ -63,6 +63,11 @@ export const envSchema = z.object({
     .int()
     .min(1_024)
     .default(10 * 1024 * 1024),
+  VIDEO_FILE_MAX_SIZE_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1_024)
+    .default(50 * 1024 * 1024),
   IMAGE_MOCK_DELAY_MS: z.coerce.number().int().min(0).max(60_000).default(1_200),
   IMAGE_MOCK_IMAGE_SIZE: z.coerce.number().int().min(64).max(1_024).default(512),
   IMAGE_PROVIDER: z.enum(['auto', 'mock', 'openai']).default('auto'),

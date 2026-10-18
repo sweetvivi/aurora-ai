@@ -22,6 +22,11 @@ export class CreateVideoTaskDto {
   lastFrameFileId?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  referenceVideoFileId?: string;
+
+  @IsOptional()
   @IsObject()
   parameters?: Record<string, unknown>;
 }

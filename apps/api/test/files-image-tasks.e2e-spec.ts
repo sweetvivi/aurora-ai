@@ -21,6 +21,10 @@ const PNG_BUFFER = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 );
+const MP4_BUFFER = Buffer.from([
+  0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00,
+  0x69, 0x73, 0x6f, 0x6d, 0x6d, 0x70, 0x34, 0x32,
+]);
 
 describe('file uploads and image tasks', () => {
   let app: INestApplication;
@@ -140,6 +144,38 @@ describe('file uploads and image tasks', () => {
       .expect(413);
 
     expect(oversizedResponse.body.error.code).toBe('FILE_TOO_LARGE');
+  });
+
+  it('uploads a validated video through the dedicated video endpoint', async () => {
+    const { accessToken } = await registerUser();
+
+    const uploadResponse = await request(app.getHttpServer())
+      .post('/api/v1/files/video')
+      .set('authorization', `Bearer ${accessToken}`)
+      .attach('file', MP4_BUFFER, {
+        contentType: 'video/mp4',
+        filename: 'reference.mp4',
+      })
+      .expect(201);
+
+    expect(uploadResponse.body.data).toMatchObject({
+      checksum: createHash('sha256').update(MP4_BUFFER).digest('hex'),
+      mimeType: 'video/mp4',
+      originalName: 'reference.mp4',
+      size: MP4_BUFFER.length,
+    });
+    expect(uploadResponse.body.data).not.toHaveProperty('storageKey');
+
+    const mismatchedResponse = await request(app.getHttpServer())
+      .post('/api/v1/files/video')
+      .set('authorization', `Bearer ${accessToken}`)
+      .attach('file', Buffer.from('not-an-mp4'), {
+        contentType: 'video/mp4',
+        filename: 'invalid.mp4',
+      })
+      .expect(400);
+
+    expect(mismatchedResponse.body.error.code).toBe('FILE_CONTENT_MISMATCH');
   });
 
   it('creates an image task, settles points, and returns the result file', async () => {

@@ -31,7 +31,7 @@
 - 超级智能体：预置与自建智能体、6358 条官方目录、18 类筛选、搜索、收藏、分页、创建器、能力选择、服务端持久化、编辑已创建智能体、真实 SSE 对话和历史记录抽屉
 - 智能修图：画布式工作台、处理方式快捷切换、原图/结果对比、最多 30 步撤销/恢复、任务记录和真实图片任务链路
 - 图片生成：参考产品式作品历史、高级设置、存储天数、效果示例和底部固定创作栏
-- 视频生成：按参考产品行为从主平台独立打开 `/video`，使用自带深色工具栏和工作区；支持文生视频、单图参考、4000 字提示词、任务轮询、取消、重试、下载和播放；Seedance 1.0/1.5/2.x/2.5 的能力约束按官方插件校准，逐模型开放首尾帧、音频和参考视频能力，Grok 等不支持模型会禁用对应选项，未知 Seedance endpoint 使用保守的宽能力回退，极速模式继续明确标记
+- 视频生成：按参考产品行为从主平台独立打开 `/video`，使用自带深色工具栏和工作区；支持文生视频、单图参考、参考视频、4000 字提示词、任务轮询、取消、重试、下载和播放；Seedance 1.0/1.5/2.x/2.5 的能力约束按官方插件校准，逐模型开放首尾帧、音频和参考视频能力，参考视频会上传为受控文件并随任务、幂等和重试完整恢复，Grok 等不支持模型会禁用对应选项，未知 Seedance endpoint 使用保守的宽能力回退，极速模式继续明确标记
 - AI 画布：节点增删、多选拖拽、连线校验、缩放平移、图片/输出/视频节点、从节点派生文本/图像/视频任务、3D 视角控制、素材库、组合分组、右键菜单、自动布局、工作流 JSON 导入导出、批量生成队列、历史、灵感面板、本地备份、服务端持久化和云端工作流库；工作流库支持新建、打开、重命名和删除非当前画布。空图片节点可直接上传并进入图生图/图生视频，工作流与历史面板支持最大化，底部创作区可展开，节点工具栏和网格状态已按参考产品交互收口
 - 电商工具：四栏工作台、商品换背景、服饰图案替换、产品包装/部件/材质替换、商品抠图、放大、风格转换、虚拟模特试穿和手持模特替换；鞋履行走、服装平铺、白底主图与批量商品图已改为单商品图精修流程，并补齐专属处理方式和仅保存在浏览器本地的建议箱
 - 运行时模型目录：绘画、画布、修图、图片生成、电商和视频工作台统一读取后台已启用模型；后台保存或导入后即时刷新，API 不可用时回退到内置兼容模型
@@ -45,7 +45,7 @@
 当前批次验证结果：
 
 - `pnpm format:check`、`pnpm lint`、`pnpm typecheck` 通过
-- `pnpm test`：API 25 个文件 98 项，Web 18 个文件 77 项
+- `pnpm test`：API 26 个文件 107 项，Web 18 个文件 79 项
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-canvas-studio.mjs`、`verify-video-tasks.mjs`、`verify-m2-interactions.mjs`、`verify-m2-routes.mjs` 和 `verify-admin-modules.mjs` 全部通过
 - `node outputs/ui-reference/verify-admin-modules.mjs` 通过，模块改名、角标、排序和显隐会同步刷新共享目录；桌面端和移动端无横向溢出、无页面脚本错误
@@ -69,6 +69,7 @@
 - `node outputs/ui-reference/verify-retouch-history.mjs` 通过，示例选择、原图上传、撤销/恢复和缩放历史在桌面端与移动端均正常；验收使用 Mock，不调用真实 Provider
 - `node outputs/ui-reference/verify-video-studio.mjs`、`verify-video-preview.mjs` 和 `verify-video-tasks.mjs` 通过，视频工作台、预览层、任务轮询、取消/重试和桌面/移动端布局均正常
 - `node outputs/ui-reference/verify-video-capabilities.mjs` 通过，Grok 首尾帧与音效禁用、Seedance 首尾帧上传和音效提交参数、重试恢复及桌面/移动端布局均正常；验收使用 Mock 和 Playwright 路由拦截，不调用真实视频接口
+- `node outputs/ui-reference/verify-video-capabilities.mjs` 同步覆盖 Seedance 1.0 拒绝参考视频、Seedance 2.0 上传参考视频并提交、任务恢复和桌面/移动端布局；50 MB 视频上传仅接受 MP4/WebM/MOV 文件头，自动化验收不调用真实视频接口
 - `node outputs/ui-reference/verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-video-tasks.mjs`、`verify-video-studio.mjs`、`verify-video-preview.mjs` 和 `verify-m2-routes.mjs` 已在本轮 Provider 路由改动后通过；全部测试使用 Mock 或 Playwright 路由拦截，不调用真实付费接口
 - 图片任务 E2E 覆盖十张输入、第十一张拒绝、越权文件拒绝和自由参数注入防护
 

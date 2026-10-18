@@ -24,6 +24,13 @@ export class XaiVideoProvider implements VideoProvider {
       );
     }
 
+    if (input.referenceVideo) {
+      throw this.createError(
+        'VIDEO_INPUT_UNSUPPORTED',
+        '当前真实视频模型暂不支持参考视频，请切换其他生成方式',
+      );
+    }
+
     const apiKey = this.resolveApiKey(input.providerKeyRef);
 
     if (!apiKey) {

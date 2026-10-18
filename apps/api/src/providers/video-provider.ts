@@ -4,6 +4,12 @@ export interface VideoSourceImage {
   originalName: string;
 }
 
+export interface VideoSourceVideo {
+  buffer: Buffer;
+  mimeType: string;
+  originalName: string;
+}
+
 export interface GenerateVideoInput {
   lastFrameImage?: VideoSourceImage;
   model?: string;
@@ -12,6 +18,7 @@ export interface GenerateVideoInput {
   providerCode?: string;
   providerKeyRef?: string;
   prompt: string;
+  referenceVideo?: VideoSourceVideo;
   sourceImage?: VideoSourceImage;
 }
 

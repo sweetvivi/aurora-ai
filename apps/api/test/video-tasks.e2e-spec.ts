@@ -22,6 +22,10 @@ const PNG_BUFFER = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 );
+const MP4_BUFFER = Buffer.from([
+  0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00,
+  0x69, 0x73, 0x6f, 0x6d, 0x6d, 0x70, 0x34, 0x32,
+]);
 const VIDEO_BUFFER = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
 
 describe('video tasks', () => {
@@ -29,10 +33,13 @@ describe('video tasks', () => {
   let prisma: PrismaService;
   const storage = new MemoryStorageAdapter();
   let providerMode: 'failure' | 'hold' | 'success';
+  let lastVideoInput: GenerateVideoInput | undefined;
 
   const videoProvider: VideoProvider = {
     supportsLastFrame: false,
     async createGeneration(input: GenerateVideoInput) {
+      lastVideoInput = input;
+
       if (providerMode === 'failure') {
         throw new ServiceUnavailableException({
           code: 'VIDEO_PROVIDER_UNAVAILABLE',
@@ -178,6 +185,69 @@ describe('video tasks', () => {
     ).toBe(1);
   });
 
+  it('creates a Seedance task with a reference video and passes it to the provider', async () => {
+    providerMode = 'success';
+    lastVideoInput = undefined;
+    const { accessToken } = await registerUser();
+    const referenceVideoFileId = await uploadReferenceVideo(accessToken, 'reference.mp4');
+
+    const createResponse = await request(app.getHttpServer())
+      .post('/api/v1/video-tasks')
+      .set('authorization', `Bearer ${accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        modelAlias: 'doubao-seedance-2-0',
+        parameters: {
+          duration: 5,
+          ratio: '16:9',
+          resolution: '720P',
+        },
+        prompt: '保留参考视频的镜头运动并生成极光',
+        referenceVideoFileId,
+      })
+      .expect(202);
+
+    const task = await waitForTerminalTask(accessToken, createResponse.body.data.id as string);
+
+    expect(task).toMatchObject({
+      modelAlias: 'doubao-seedance-2-0',
+      referenceVideoFile: {
+        id: referenceVideoFileId,
+        mimeType: 'video/mp4',
+      },
+      status: 'SUCCEEDED',
+    });
+    const observedVideoInput = lastVideoInput as GenerateVideoInput | undefined;
+
+    expect(observedVideoInput).toMatchObject({
+      model: 'doubao-seedance-2-0-260128',
+      referenceVideo: {
+        mimeType: 'video/mp4',
+        originalName: 'reference.mp4',
+      },
+    });
+    expect(observedVideoInput?.referenceVideo?.buffer).toEqual(MP4_BUFFER);
+  });
+
+  it('rejects a reference video on a model that does not support video input', async () => {
+    providerMode = 'success';
+    const { accessToken } = await registerUser();
+    const referenceVideoFileId = await uploadReferenceVideo(accessToken, 'unsupported.mp4');
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/video-tasks')
+      .set('authorization', `Bearer ${accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        modelAlias: 'xai-grok-imagine-video',
+        prompt: '参考视频不支持测试',
+        referenceVideoFileId,
+      })
+      .expect(409);
+
+    expect(response.body.error.code).toBe('VIDEO_INPUT_UNSUPPORTED');
+  });
+
   it('refunds points when the video provider fails', async () => {
     providerMode = 'failure';
     const { accessToken, email } = await registerUser();
@@ -276,6 +346,19 @@ describe('video tasks', () => {
       .set('authorization', `Bearer ${accessToken}`)
       .attach('file', PNG_BUFFER, {
         contentType: 'image/png',
+        filename,
+      })
+      .expect(201);
+
+    return response.body.data.id as string;
+  }
+
+  async function uploadReferenceVideo(accessToken: string, filename: string): Promise<string> {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/files/video')
+      .set('authorization', `Bearer ${accessToken}`)
+      .attach('file', MP4_BUFFER, {
+        contentType: 'video/mp4',
         filename,
       })
       .expect(201);

@@ -125,5 +125,14 @@ describe('model capability constraints', () => {
     ).toMatchObject({
       code: 'VIDEO_INPUT_UNSUPPORTED',
     });
+    expect(
+      findVideoModelConstraintViolation({
+        hasLastFrame: false,
+        hasReferenceVideo: true,
+        profile: videoProfile,
+      }),
+    ).toMatchObject({
+      code: 'VIDEO_INPUT_UNSUPPORTED',
+    });
   });
 });

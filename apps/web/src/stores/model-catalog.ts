@@ -121,6 +121,20 @@ const fallbackModels: ModelCatalogItem[] = [
       },
     },
   },
+  {
+    alias: 'doubao-seedance-2-0',
+    capabilities: ['video'],
+    displayName: 'Seedance 2.0',
+    profile: {
+      video: {
+        maxDuration: 15,
+        resolutions: ['480P', '720P', '1080P', '4K'],
+        supportsAudio: false,
+        supportsLastFrame: true,
+        supportsVideoInput: true,
+      },
+    },
+  },
 ];
 
 let loadPromise: Promise<void> | null = null;

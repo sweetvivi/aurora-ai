@@ -261,6 +261,7 @@ export interface VideoTask {
   parameters: Record<string, unknown> | null;
   progress: number;
   prompt: string;
+  referenceVideoFile: FileAsset | null;
   resultFile: FileAsset | null;
   sourceFile: FileAsset | null;
   startedAt: string | null;
@@ -843,6 +844,18 @@ export async function uploadImageFile(file: File): Promise<FileAsset> {
   return response.data.data;
 }
 
+export async function uploadVideoFile(file: File): Promise<FileAsset> {
+  const formData = new FormData();
+
+  formData.append('file', file);
+
+  const response = await apiClient.post<ApiEnvelope<FileAsset>>('/api/v1/files/video', formData, {
+    timeout: 120_000,
+  });
+
+  return response.data.data;
+}
+
 export async function fetchFileBlob(fileId: string): Promise<Blob> {
   const response = await apiClient.get<Blob>(
     `/api/v1/files/${encodeURIComponent(fileId)}/content`,
@@ -897,6 +910,7 @@ export async function createVideoTask(
     modelAlias?: string;
     parameters?: Record<string, unknown>;
     prompt: string;
+    referenceVideoFileId?: string;
     sourceFileId?: string;
   },
   idempotencyKey: string,

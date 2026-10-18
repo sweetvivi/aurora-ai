@@ -1118,6 +1118,17 @@ node outputs/ui-reference/verify-m2-interactions.mjs
 - `verify-model-capability-options.mjs` 已适配当前折叠式电商目录，先展开“商品换背景”再选择“智能背景融合”，不改变产品行为
 - 完整验证通过：Web 18 个文件 77 项、API 25 个文件 97 项，格式、lint、类型检查、生产构建和视频相关桌面/移动端验收均成功；验收使用 Mock 或路由拦截，未读取、输出或调用真实 Key
 
+### 参考视频任务闭环
+
+- 新增 `POST /api/v1/files/video`，只接受 MP4、WebM 和 MOV，逐文件校验文件头并默认限制 50 MB；文件仍通过现有私有存储适配器保存，只有读取到当前用户的任务才能作为参考视频提交
+- `VideoTask` 新增可空 `referenceVideoFileId` 关系与索引，迁移 `20261018200000_add_video_reference_file` 只新增列、索引和外键，不修改或删除现有任务数据
+- 参考视频模式与首尾帧、参考图互斥；任务创建、参数校验、幂等比较、失败重试、列表/详情 DTO 和前端恢复都会保留参考视频文件
+- Seedance Provider 会把参考视频转换为 Ark `video_url` 数据 URL；xAI/Grok 对参考视频返回明确的 `VIDEO_INPUT_UNSUPPORTED`，不会静默降级成错误模式
+- 新增默认别名 `doubao-seedance-2-0`（上游模型 `doubao-seedance-2-0-260128`），公开能力为最高 15 秒、480P/720P/1080P/4K、首尾帧和参考视频输入、默认无音频
+- 视频工作台新增“参考视频”模式、视频预览、格式/大小提示、模型能力禁用状态和提交/重试恢复；`verify-video-capabilities.mjs` 覆盖 Seedance 1.0 拒绝参考视频和 Seedance 2.0 上传提交
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；全量结果为 Web 18 个文件 79 项、API 26 个文件 107 项，浏览器验收 `verify-video-capabilities.mjs` 在 `1440x1000` 与 `390x844` 均无页面脚本错误或横向溢出
+- 本批未调用真实付费 Provider；未读取、输出、提交或截图任何真实 Key。`本地密钥目录` 当前说明仍将 4 号测试 Key 标记为 Grok/xAI，不能把它误当作 Seedance Key
+
 ## 7. 中断恢复
 
 恢复工作时依次执行：

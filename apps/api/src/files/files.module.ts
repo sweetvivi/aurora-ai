@@ -2,7 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MulterModule } from '@nestjs/platform-express';
 import { FilesController } from './files.controller';
-import { FilesService } from './files.service';
+import {
+  DEFAULT_IMAGE_MAX_SIZE_BYTES,
+  DEFAULT_VIDEO_MAX_SIZE_BYTES,
+  FilesService,
+} from './files.service';
 
 @Module({
   imports: [
@@ -10,7 +14,10 @@ import { FilesService } from './files.service';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         limits: {
-          fileSize: configService.get<number>('FILE_MAX_SIZE_BYTES', 10 * 1024 * 1024),
+          fileSize: Math.max(
+            configService.get<number>('FILE_MAX_SIZE_BYTES', DEFAULT_IMAGE_MAX_SIZE_BYTES),
+            configService.get<number>('VIDEO_FILE_MAX_SIZE_BYTES', DEFAULT_VIDEO_MAX_SIZE_BYTES),
+          ),
           files: 1,
         },
       }),
