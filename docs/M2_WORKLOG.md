@@ -961,6 +961,25 @@ node outputs/ui-reference/verify-image-workbench-detail.mjs
 - 移动端恢复到文档流布局，避免固定创作条遮挡长表单；桌面、平板和移动端均无横向溢出
 - 现有图片生成与工作台细节验收全部通过；验收使用已 Mock 的现有页面数据，没有读取、输出或调用真实 Key
 
+AI 绘画作品广场与生成参数对齐：
+
+```text
+pnpm exec prettier --write apps/web/src/views/DrawStudioView.vue
+pnpm --filter @aurora/web typecheck
+pnpm lint
+node outputs/ui-reference/verify-draw-editor.mjs
+node outputs/ui-reference/verify-draw.mjs
+node outputs/ui-reference/verify-draw-navigation.mjs
+node outputs/ui-reference/verify-newdraw-templates.mjs
+node outputs/ui-reference/capture-draw-generator.mjs
+```
+
+- 作品广场在无真实作品时显示 12 张参考产品式灵感卡，支持分类过滤、提示词搜索、尺寸和比例展示；桌面端使用四列紧凑网格，移动端保持两列
+- “使用该提示词”只回填左侧绘画描述，不再自动切换“我的作品”，符合参考产品当前交互
+- 绘画描述上限扩展为 2000 字，并补齐 AI 优化、清空、字数提示和高级设置；高级设置可调整图片比例与作品保存时间
+- 移动端参数区增加固定底栏安全间距，桌面端 `1440x1000` 和移动端 `390x844` 均无横向溢出，作品区搜索和卡片操作可用
+- 类型检查、lint、四组绘画浏览器验收和截图审计全部通过；验收仅使用 Mock 与路由拦截，不调用真实 Provider，不读取或输出 Key
+
 ## 7. 中断恢复
 
 恢复工作时依次执行：

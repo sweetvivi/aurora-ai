@@ -70,6 +70,15 @@ interface ReferenceImage {
   url: string;
 }
 
+interface GalleryInspiration {
+  category: string;
+  id: string;
+  image: string;
+  prompt: string;
+  ratio: string;
+  size: string;
+}
+
 const navigation: NavigationItem[] = [
   { icon: HomeOutlined, label: '首页', to: '/' },
   { icon: PictureOutlined, label: '作品广场', to: '/draw' },
@@ -92,6 +101,112 @@ const galleryFilters = [
   '风景',
   '建筑',
   '其他',
+];
+const galleryInspirations: GalleryInspiration[] = [
+  {
+    category: '风景',
+    id: 'inspiration-landscape-morning',
+    image: '/showcase/landscape-v1.png',
+    prompt:
+      '清晨薄雾笼罩的山谷与湖泊，金色阳光穿过云层，远处雪山倒映在平静水面，电影感广角摄影，细节丰富。',
+    ratio: '4:3',
+    size: '1456 × 1088',
+  },
+  {
+    category: '人物',
+    id: 'inspiration-fashion-editorial',
+    image: '/showcase/fashion-v1.png',
+    prompt:
+      '时尚杂志全身人像摄影，模特站在自然光充足的室内，服装细节清晰，低饱和电影色彩，高级编辑风格。',
+    ratio: '2:3',
+    size: '1024 × 1536',
+  },
+  {
+    category: '写实',
+    id: 'inspiration-portrait-window',
+    image: '/showcase/portrait-v1.png',
+    prompt: '年轻女性坐在窗边，柔和侧光照亮面部，皮肤质感真实自然，浅景深背景，高清肖像摄影。',
+    ratio: '1:1',
+    size: '1024 × 1024',
+  },
+  {
+    category: '3D',
+    id: 'inspiration-concept-station',
+    image: '/showcase/concept-v1.png',
+    prompt:
+      '未来概念设计，悬浮在云海之上的研究站，流线型建筑与自然环境融合，清晨光线，精细三维渲染。',
+    ratio: '16:9',
+    size: '1600 × 900',
+  },
+  {
+    category: '其他',
+    id: 'inspiration-product-glass',
+    image: '/showcase/product-v1.png',
+    prompt:
+      '高端香氛产品广告摄影，透明玻璃瓶置于简洁石材台面，水滴与折射光影真实，商业质感，极简构图。',
+    ratio: '3:4',
+    size: '1024 × 1365',
+  },
+  {
+    category: '风景',
+    id: 'inspiration-forest-lake',
+    image: '/showcase/landscape-v1.png',
+    prompt:
+      '高山森林与翡翠色湖泊，薄雾沿山脊流动，阳光从树梢洒下，空气通透，自然风光摄影，超广角构图。',
+    ratio: '4:3',
+    size: '1456 × 1088',
+  },
+  {
+    category: '人物',
+    id: 'inspiration-dress-studio',
+    image: '/showcase/fashion-v1.png',
+    prompt:
+      '模特在极简摄影棚中展示轻盈连衣裙，柔和的顶部灯光，姿势自然，服装布料纹理清晰，商业人像。',
+    ratio: '3:4',
+    size: '1024 × 1365',
+  },
+  {
+    category: '写实',
+    id: 'inspiration-restored-portrait',
+    image: '/showcase/restore-v1.png',
+    prompt:
+      '老照片自然修复与上色，保留人物真实五官和年代质感，清理划痕与噪点，光线柔和，高清细节。',
+    ratio: '4:3',
+    size: '1600 × 1200',
+  },
+  {
+    category: '动漫',
+    id: 'inspiration-anime-city',
+    image: '/showcase/concept-v1.png',
+    prompt: '日系动漫城市傍晚场景，少年站在天台眺望远方，晚霞照亮建筑与云层，线条干净，色彩通透。',
+    ratio: '16:9',
+    size: '1600 × 900',
+  },
+  {
+    category: '建筑',
+    id: 'inspiration-modern-house',
+    image: '/showcase/concept-v1.png',
+    prompt:
+      '现代山间住宅建筑摄影，混凝土与木材构成克制立面，室内暖光与暮色天空形成对比，建筑杂志风格。',
+    ratio: '3:2',
+    size: '1440 × 960',
+  },
+  {
+    category: '国风',
+    id: 'inspiration-ink-landscape',
+    image: '/showcase/landscape-v1.png',
+    prompt: '新中式水墨山水，层叠群山与飘渺云雾，淡青与墨色晕染，留白舒展，东方美学意境。',
+    ratio: '4:3',
+    size: '1456 × 1088',
+  },
+  {
+    category: '头像',
+    id: 'inspiration-avatar-light',
+    image: '/showcase/portrait-v1.png',
+    prompt: '精致半身头像，人物正面看向镜头，柔和环形光，背景干净，肤色自然，适合社交媒体使用。',
+    ratio: '1:1',
+    size: '1024 × 1024',
+  },
 ];
 const effectCategories = DRAW_EFFECT_CATEGORIES;
 const effectTemplates = DRAW_EFFECT_TEMPLATES;
@@ -275,9 +390,11 @@ const selectedMode = ref('文生图');
 const activeResultTab = ref<'gallery' | 'mine'>('gallery');
 const activeEffectCategory = ref('全部');
 const activeGalleryFilter = ref('全部');
+const gallerySearchQuery = ref('');
 const selectedEffectId = ref('');
 const selectedStorage = ref('1天');
 const templateAdvancedOpen = ref(false);
+const generatorAdvancedOpen = ref(false);
 const templateExampleId = ref('');
 const selectedWorkDetailId = ref('');
 const detailPrompt = ref('');
@@ -356,15 +473,34 @@ const visibleWorks = computed(() => {
     activeResultTab.value === 'gallery'
       ? workspace.works.filter((work) => work.status === 'done')
       : [...workspace.works];
+  const query = gallerySearchQuery.value.trim().toLowerCase();
+  const searchedWorks = query
+    ? works.filter((work) => `${work.prompt} ${work.modelLabel}`.toLowerCase().includes(query))
+    : works;
 
   if (activeResultTab.value !== 'gallery' || activeGalleryFilter.value === '全部') {
-    return works;
+    return searchedWorks;
   }
 
-  return works.filter(
+  return searchedWorks.filter(
     (work) => inferGalleryCategory(work.prompt, work.modelLabel) === activeGalleryFilter.value,
   );
 });
+const visibleInspirations = computed(() => {
+  const query = gallerySearchQuery.value.trim().toLowerCase();
+
+  return galleryInspirations.filter((inspiration) => {
+    const matchesCategory =
+      activeGalleryFilter.value === '全部' || inspiration.category === activeGalleryFilter.value;
+    const matchesQuery =
+      !query || `${inspiration.prompt} ${inspiration.category}`.toLowerCase().includes(query);
+
+    return matchesCategory && matchesQuery;
+  });
+});
+const galleryResultCount = computed(() =>
+  visibleWorks.value.length > 0 ? visibleWorks.value.length : visibleInspirations.value.length,
+);
 const activeWorkDetail = computed(
   () =>
     workspace.works.find(
@@ -615,8 +751,21 @@ function handleTemplateExampleKeydown(event: KeyboardEvent): void {
 }
 
 function usePromptInComposer(value: string): void {
-  prompt.value = value;
-  activeResultTab.value = 'mine';
+  prompt.value = value.slice(0, 2_000);
+}
+
+function optimizePrompt(): void {
+  const currentPrompt = prompt.value.trim();
+  const optimization =
+    '画面主体明确，构图完整，前后景层次自然，光影方向统一，色彩协调，材质与细节清晰，高质量画面。';
+
+  prompt.value = currentPrompt
+    ? `${currentPrompt}，${optimization}`.slice(0, 2_000)
+    : `一张具有完整构图和自然光影的高质量图片，${optimization}`;
+}
+
+function clearPrompt(): void {
+  prompt.value = '';
 }
 
 async function startGeneration(): Promise<void> {
@@ -1355,17 +1504,27 @@ onBeforeUnmount(() => {
               </div>
             </section>
 
-            <label class="draw-generator__prompt">
+            <section class="draw-generator__prompt">
               <strong>绘画描述</strong>
               <span>
                 <textarea
                   v-model="prompt"
-                  maxlength="500"
+                  aria-label="绘画描述"
+                  maxlength="2000"
                   placeholder="描述你想生成的图片，例如：春日樱花树下的橘猫，柔和自然光，高清摄影"
                 />
-                <small>{{ prompt.length }} / 500</small>
               </span>
-            </label>
+              <div class="draw-generator__prompt-actions">
+                <button type="button" @click="optimizePrompt">
+                  <ThunderboltFilled />
+                  AI 优化
+                </button>
+                <span>
+                  <small>{{ prompt.length }} / 2000</small>
+                  <button type="button" :disabled="!prompt" @click="clearPrompt">清空</button>
+                </span>
+              </div>
+            </section>
 
             <section class="draw-param-section draw-generator__references">
               <header>
@@ -1449,6 +1608,38 @@ onBeforeUnmount(() => {
               </div>
             </section>
 
+            <section class="draw-generator__advanced">
+              <button
+                type="button"
+                :aria-expanded="generatorAdvancedOpen"
+                @click="generatorAdvancedOpen = !generatorAdvancedOpen"
+              >
+                <span>
+                  <strong>高级设置</strong>
+                  <small>{{ selectedRatio }} · 保存 {{ selectedStorage }}</small>
+                </span>
+                <DownOutlined :class="{ 'is-open': generatorAdvancedOpen }" />
+              </button>
+              <div v-if="generatorAdvancedOpen">
+                <label>
+                  <span>图片比例</span>
+                  <select v-model="selectedRatio" aria-label="选择图片比例">
+                    <option v-for="ratio in ratios" :key="ratio" :value="ratio">
+                      {{ ratio }}
+                    </option>
+                  </select>
+                </label>
+                <label>
+                  <span>作品保存</span>
+                  <select v-model="selectedStorage" aria-label="选择作品保存时间">
+                    <option v-for="storage in storageOptions" :key="storage" :value="storage">
+                      {{ storage }}
+                    </option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
             <button
               type="button"
               class="draw-generator__submit"
@@ -1468,12 +1659,20 @@ onBeforeUnmount(() => {
                 <span>
                   {{
                     activeResultTab === 'gallery'
-                      ? '浏览已经完成的本地生成作品'
+                      ? `${galleryResultCount} 张灵感，点击提示词可直接使用`
                       : '查看生成状态与最近创作记录'
                   }}
                 </span>
               </div>
-              <em v-if="generating">
+              <div v-if="activeResultTab === 'gallery'" class="draw-generator__search">
+                <SearchOutlined />
+                <input
+                  v-model="gallerySearchQuery"
+                  aria-label="搜索提示词"
+                  placeholder="搜索提示词..."
+                />
+              </div>
+              <em v-else-if="generating">
                 {{ workspace.submitting ? '正在提交任务...' : '正在生成图片...' }}
               </em>
             </header>
@@ -1689,12 +1888,43 @@ onBeforeUnmount(() => {
               </article>
             </div>
 
+            <div
+              v-else-if="activeResultTab === 'gallery' && visibleInspirations.length > 0"
+              class="draw-generator__inspiration-grid"
+            >
+              <article
+                v-for="inspiration in visibleInspirations"
+                :key="inspiration.id"
+                class="draw-inspiration-card"
+              >
+                <div class="draw-inspiration-card__visual">
+                  <img :src="inspiration.image" :alt="inspiration.prompt" />
+                </div>
+                <p>{{ inspiration.prompt }}</p>
+                <div>
+                  <small>{{ inspiration.size }}</small>
+                  <button type="button" @click="usePromptInComposer(inspiration.prompt)">
+                    <ThunderboltFilled />
+                    使用该提示词
+                  </button>
+                </div>
+              </article>
+            </div>
+
             <div v-else class="draw-generator__empty">
               <span>
                 <PictureOutlined />
               </span>
-              <strong>还没有生成作品</strong>
-              <p>填写绘画描述并点击立即生成，结果会出现在这里。</p>
+              <strong>{{
+                activeResultTab === 'gallery' ? '没有匹配的提示词' : '还没有生成作品'
+              }}</strong>
+              <p>
+                {{
+                  activeResultTab === 'gallery'
+                    ? '尝试切换分类或调整搜索关键词。'
+                    : '填写绘画描述并点击立即生成，结果会出现在这里。'
+                }}
+              </p>
             </div>
           </section>
         </div>
@@ -3563,7 +3793,7 @@ onBeforeUnmount(() => {
   display: block;
   width: 100%;
   min-height: 112px;
-  padding: 11px 11px 24px;
+  padding: 11px;
   border: 1px solid #dfe3e8;
   border-radius: 8px;
   outline: 0;
@@ -3585,10 +3815,60 @@ onBeforeUnmount(() => {
   color: #a5acb7;
 }
 
+.draw-generator__prompt-actions {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.draw-generator__prompt-actions > button,
+.draw-generator__prompt-actions span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.draw-generator__prompt-actions > button {
+  height: 28px;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid #8064ea;
+  border-radius: 6px;
+  background: #f7f4ff;
+  color: #6748dc;
+  font-size: 8px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.draw-generator__prompt-actions > button:hover {
+  background: #6d49e8;
+  color: #fff;
+}
+
+.draw-generator__prompt-actions span {
+  gap: 8px;
+}
+
 .draw-generator__prompt small {
-  position: absolute;
-  right: 9px;
-  bottom: 7px;
+  color: #9ba3af;
+  font-size: 8px;
+}
+
+.draw-generator__prompt-actions span button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #6d49e8;
+  font-size: 8px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.draw-generator__prompt-actions span button:disabled {
+  color: #b7bec8;
+  cursor: not-allowed;
 }
 
 .draw-generator__references > div {
@@ -3702,6 +3982,83 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 1px rgb(101 64 219 / 8%);
 }
 
+.draw-generator__advanced {
+  margin-top: 17px;
+  padding-top: 17px;
+  border-top: 1px solid #eef0f3;
+}
+
+.draw-generator__advanced > button {
+  display: flex;
+  width: 100%;
+  min-height: 35px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #3d4652;
+  text-align: left;
+  cursor: pointer;
+}
+
+.draw-generator__advanced > button > span {
+  display: grid;
+  gap: 2px;
+}
+
+.draw-generator__advanced > button strong {
+  font-size: 9px;
+  font-weight: 780;
+}
+
+.draw-generator__advanced > button small {
+  color: #9ba3af;
+  font-size: 7px;
+}
+
+.draw-generator__advanced > button :deep(svg) {
+  color: #8e97a4;
+  font-size: 9px;
+  transition: transform 160ms ease;
+}
+
+.draw-generator__advanced > button :deep(svg.is-open) {
+  transform: rotate(180deg);
+}
+
+.draw-generator__advanced > div {
+  display: grid;
+  gap: 9px;
+  padding-top: 9px;
+}
+
+.draw-generator__advanced label {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: 68px minmax(0, 1fr);
+}
+
+.draw-generator__advanced label > span {
+  color: #727c89;
+  font-size: 8px;
+}
+
+.draw-generator__advanced select {
+  width: 100%;
+  height: 32px;
+  padding: 0 28px 0 9px;
+  border: 1px solid #dfe4e9;
+  border-radius: 7px;
+  outline: 0;
+  background: #fff;
+  color: #4d5663;
+  font: inherit;
+  font-size: 8px;
+}
+
 .draw-generator__submit {
   position: sticky;
   z-index: 3;
@@ -3755,7 +4112,7 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(8px);
 }
 
-.draw-generator__results > header > div {
+.draw-generator__results > header > div:first-child {
   display: grid;
   gap: 3px;
 }
@@ -3775,6 +4132,39 @@ onBeforeUnmount(() => {
   font-size: 8px;
   font-style: normal;
   font-weight: 750;
+}
+
+.draw-generator__search {
+  display: flex;
+  width: min(250px, 36vw);
+  height: 32px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid #dfe4e9;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.draw-generator__search :deep(svg) {
+  flex: 0 0 auto;
+  color: #8d97a4;
+  font-size: 11px;
+}
+
+.draw-generator__search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #3d4652;
+  font: inherit;
+  font-size: 8px;
+}
+
+.draw-generator__search input::placeholder {
+  color: #a6aeb8;
 }
 
 .draw-generator__gallery-filters {
@@ -3838,6 +4228,93 @@ onBeforeUnmount(() => {
 
 .draw-generator__work-grid--mine {
   grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));
+}
+
+.draw-generator__inspiration-grid {
+  display: grid;
+  align-items: start;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+}
+
+.draw-inspiration-card {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e1e5ea;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 15px rgb(31 43 61 / 4%);
+  break-inside: avoid;
+}
+
+.draw-inspiration-card__visual {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #eef1f4;
+}
+
+.draw-inspiration-card__visual img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 220ms ease;
+}
+
+.draw-inspiration-card:hover .draw-inspiration-card__visual img {
+  transform: scale(1.025);
+}
+
+.draw-inspiration-card > p {
+  display: -webkit-box;
+  min-height: 50px;
+  overflow: hidden;
+  margin: 0;
+  padding: 10px 10px 6px;
+  color: #4d5663;
+  font-size: 8px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.draw-inspiration-card > div:last-child {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.draw-inspiration-card small {
+  min-width: 0;
+  overflow: hidden;
+  color: #9aa3af;
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draw-inspiration-card button {
+  display: inline-flex;
+  min-width: max-content;
+  height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: #6243d8;
+  color: #fff;
+  font-size: 7px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.draw-inspiration-card button:hover {
+  background: #5033c4;
 }
 
 .draw-work-card {
@@ -5107,6 +5584,7 @@ onBeforeUnmount(() => {
 
   .draw-generator__params {
     overflow: visible;
+    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
     border-right: 0;
     border-bottom: 1px solid #e7eaee;
   }
@@ -5137,8 +5615,32 @@ onBeforeUnmount(() => {
 
 @media (max-width: 760px) {
   .draw-generator__model-grid,
-  .draw-generator__work-grid {
+  .draw-generator__work-grid,
+  .draw-generator__inspiration-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .draw-generator__params {
+    padding: 14px 14px calc(92px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .draw-generator__model-grid button {
+    min-height: 44px;
+    padding: 6px;
+  }
+
+  .draw-generator__prompt textarea {
+    min-height: 96px;
+  }
+
+  .draw-generator__results > header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .draw-generator__search {
+    width: 100%;
   }
 
   .draw-generator__work-grid--mine {
