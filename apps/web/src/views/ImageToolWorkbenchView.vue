@@ -3040,20 +3040,24 @@ onBeforeUnmount(() => {
 
 .generation-category-filter {
   display: flex;
+  width: 100%;
   max-width: 100%;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 9px;
   margin-top: 24px;
+  padding: 0 0 0 68px;
 }
 
 .generation-category-filter button {
   display: inline-flex;
-  height: 38px;
+  min-width: 136px;
+  height: 42px;
+  flex: 0 0 auto;
   align-items: center;
   gap: 6px;
-  padding: 0 19px;
+  padding: 0 27px;
   border: 1px solid #dde5e2;
   border-radius: 8px;
   background: #fff;
@@ -3065,6 +3069,10 @@ onBeforeUnmount(() => {
     border-color 150ms ease,
     background-color 150ms ease,
     color 150ms ease;
+}
+
+.generation-category-filter button:first-child {
+  min-width: 100px;
 }
 
 .generation-category-filter button :deep(svg) {
@@ -4598,7 +4606,7 @@ onBeforeUnmount(() => {
     justify-content: flex-start;
     overflow-x: auto;
     flex-wrap: nowrap;
-    padding-bottom: 3px;
+    padding: 0 0 3px;
     scrollbar-width: none;
   }
 
