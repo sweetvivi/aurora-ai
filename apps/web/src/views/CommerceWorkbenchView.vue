@@ -79,7 +79,7 @@ interface PreviewExample {
   before: string;
 }
 
-const catalogGroups: CatalogGroup[] = [
+const sourceCatalogGroups: CatalogGroup[] = [
   {
     label: '商品替换',
     items: [
@@ -375,6 +375,105 @@ const catalogGroups: CatalogGroup[] = [
   },
 ];
 
+const sourceCommerceTools = sourceCatalogGroups.flatMap((group) => group.items);
+const sourceToolByValue = new Map(sourceCommerceTools.map((tool) => [tool.value, tool]));
+
+function pickTools(...values: string[]): CommerceTool[] {
+  return values.map((value) => {
+    const tool = sourceToolByValue.get(value);
+
+    if (!tool) {
+      throw new Error(`Unknown commerce tool: ${value}`);
+    }
+
+    return tool;
+  });
+}
+
+const catalogGroups: CatalogGroup[] = [
+  {
+    label: '商品替换',
+    items: pickTools(
+      'display-stand-replace',
+      'pattern-replace',
+      'scene-prop-replace',
+      'season-atmosphere',
+      'scene-migration',
+      'hand-model-replace',
+      'package-replace',
+      'component-replace',
+      'material-replace',
+    ),
+  },
+  {
+    label: '商品换背景',
+    items: pickTools(
+      'background-blend',
+      'one-click-background',
+      'light-perspective',
+      'artistic-background',
+      'batch-background',
+      'home-background',
+      'tech-background',
+      'food-background',
+      'beauty-background',
+      'fashion-background',
+    ),
+  },
+  {
+    label: '模特试衣',
+    items: pickTools('virtual-model'),
+  },
+  {
+    label: 'AI换模特',
+    items: [],
+  },
+  {
+    label: '商品抠图',
+    items: pickTools('image-cutout', 'style-transfer', 'image-upscale'),
+  },
+  {
+    label: '鞋子上脚',
+    items: [],
+  },
+  {
+    label: '一键穿搭',
+    items: [],
+  },
+  {
+    label: '自定义试衣',
+    items: [],
+  },
+  {
+    label: '穿戴图生成',
+    items: [],
+  },
+  {
+    label: '小红书风格',
+    items: [],
+  },
+  {
+    label: '产品精修',
+    items: [],
+  },
+  {
+    label: '商品主图优化',
+    items: [],
+  },
+  {
+    label: '场景合成',
+    items: [],
+  },
+  {
+    label: '服装搭配',
+    items: [],
+  },
+  {
+    label: '其他',
+    items: [],
+  },
+];
+
 const commerceTools = catalogGroups.flatMap((group) => group.items);
 const emptyDisplayTool: CommerceTool = {
   accent: '#3678e8',
@@ -533,6 +632,7 @@ const sessionStore = useSessionStore();
 
 const searchQuery = ref('');
 const selectedToolKey = ref('');
+const expandedGroupLabels = ref<string[]>([]);
 const previewSide = ref<PreviewSide>('after');
 const historyOpen = ref(false);
 const helpOpen = ref(false);
@@ -574,6 +674,12 @@ const imageUploads = ref<Record<UploadRole, UploadState | null>>({
 const activeTool = computed<CommerceTool | null>(
   () => commerceTools.find((tool) => tool.value === selectedToolKey.value) ?? null,
 );
+const activeToolGroup = computed(
+  () =>
+    catalogGroups.find((group) =>
+      group.items.some((tool) => tool.value === selectedToolKey.value),
+    ) ?? null,
+);
 const displayTool = computed<CommerceTool>(() => activeTool.value ?? emptyDisplayTool);
 const filteredGroups = computed(() => {
   const keyword = searchQuery.value.trim().toLowerCase();
@@ -583,19 +689,23 @@ const filteredGroups = computed(() => {
   }
 
   return catalogGroups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter(
-        (item) =>
-          item.label.toLowerCase().includes(keyword) ||
-          item.description.toLowerCase().includes(keyword),
-      ),
-    }))
-    .filter((group) => group.items.length > 0);
+    .map((group) => {
+      const groupMatches = group.label.toLowerCase().includes(keyword);
+
+      return {
+        ...group,
+        items: groupMatches
+          ? group.items
+          : group.items.filter(
+              (item) =>
+                item.label.toLowerCase().includes(keyword) ||
+                item.description.toLowerCase().includes(keyword),
+            ),
+        matchedByLabel: groupMatches,
+      };
+    })
+    .filter((group) => group.items.length > 0 || group.matchedByLabel);
 });
-const filteredToolCount = computed(() =>
-  filteredGroups.value.reduce((count, group) => count + group.items.length, 0),
-);
 const isToolSelected = computed(() => activeTool.value !== null);
 const isAvailableTool = computed(
   () => isToolSelected.value && displayTool.value.form !== 'placeholder',
@@ -928,6 +1038,14 @@ function clearParameters(): void {
 
 function setTool(tool: CommerceTool): void {
   selectedToolKey.value = tool.value;
+  const group = catalogGroups.find((item) =>
+    item.items.some((candidate) => candidate.value === tool.value),
+  );
+
+  if (group && !expandedGroupLabels.value.includes(group.label)) {
+    expandedGroupLabels.value = [...expandedGroupLabels.value, group.label];
+  }
+
   clearParameters();
   prompt.value = '';
   previewSide.value = 'after';
@@ -949,8 +1067,22 @@ function handleMobileToolChange(event: Event): void {
 function selectAllTools(): void {
   searchQuery.value = '';
   selectedToolKey.value = '';
+  expandedGroupLabels.value = [];
   previewSide.value = 'after';
   uploadError.value = '';
+}
+
+function isGroupExpanded(label: string): boolean {
+  return searchQuery.value.trim().length > 0 || expandedGroupLabels.value.includes(label);
+}
+
+function toggleGroup(label: string): void {
+  if (expandedGroupLabels.value.includes(label)) {
+    expandedGroupLabels.value = expandedGroupLabels.value.filter((item) => item !== label);
+    return;
+  }
+
+  expandedGroupLabels.value = [...expandedGroupLabels.value, label];
 }
 
 function setPromptPreset(value: string): void {
@@ -1297,7 +1429,7 @@ onBeforeUnmount(() => {
         <span>全部</span>
         <RightOutlined />
         <template v-if="activeTool">
-          <span>{{ activeTool.form === 'background' ? '商品换背景' : '商品替换' }}</span>
+          <span>{{ activeToolGroup?.label ?? '商品替换' }}</span>
           <RightOutlined />
           <strong>{{ activeTool.label }}</strong>
         </template>
@@ -1352,34 +1484,46 @@ onBeforeUnmount(() => {
 
         <div class="commerce-catalog__groups">
           <section v-for="group in filteredGroups" :key="group.label">
-            <header>
+            <button
+              type="button"
+              class="commerce-catalog__group-toggle"
+              :class="{ expanded: isGroupExpanded(group.label) }"
+              :aria-expanded="isGroupExpanded(group.label)"
+              @click="toggleGroup(group.label)"
+            >
               <span>
                 <AppstoreOutlined />
                 {{ group.label }}
               </span>
-              <RightOutlined />
-            </header>
-            <button
-              v-for="tool in group.items"
-              :key="tool.value"
-              type="button"
-              class="commerce-catalog__item"
-              :class="{
-                active: selectedToolKey === tool.value,
-                muted: tool.form === 'placeholder',
-              }"
-              @click="setTool(tool)"
-            >
-              <i :style="{ '--tool-accent': tool.accent }">
-                <component :is="tool.icon" />
-              </i>
-              <span>{{ tool.label }}</span>
-              <em v-if="tool.form === 'placeholder'">即将开放</em>
+              <small v-if="group.items.length">{{ group.items.length }}</small>
               <RightOutlined />
             </button>
+            <div v-if="isGroupExpanded(group.label)" class="commerce-catalog__group-items">
+              <button
+                v-for="tool in group.items"
+                :key="tool.value"
+                type="button"
+                class="commerce-catalog__item"
+                :class="{
+                  active: selectedToolKey === tool.value,
+                  muted: tool.form === 'placeholder',
+                }"
+                @click="setTool(tool)"
+              >
+                <i :style="{ '--tool-accent': tool.accent }">
+                  <component :is="tool.icon" />
+                </i>
+                <span>{{ tool.label }}</span>
+                <em v-if="tool.form === 'placeholder'">即将开放</em>
+                <RightOutlined />
+              </button>
+              <div v-if="group.items.length === 0" class="commerce-catalog__group-empty">
+                暂无智能体
+              </div>
+            </div>
           </section>
 
-          <div v-if="filteredToolCount === 0" class="commerce-catalog__empty">
+          <div v-if="filteredGroups.length === 0" class="commerce-catalog__empty">
             <SearchOutlined />
             <strong>没有找到匹配工具</strong>
             <span>尝试缩短关键词</span>
@@ -2529,26 +2673,68 @@ onBeforeUnmount(() => {
   padding-top: 8px;
 }
 
-.commerce-catalog__groups > section > header {
-  display: flex;
+.commerce-catalog__group-toggle {
+  display: grid;
   height: 28px;
   align-items: center;
-  justify-content: space-between;
+  gap: 5px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  width: 100%;
   padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
   color: #768291;
   font-size: 8px;
+  text-align: left;
+  cursor: pointer;
 }
 
-.commerce-catalog__groups > section > header > span {
+.commerce-catalog__group-toggle:hover {
+  background: #f6f8fb;
+}
+
+.commerce-catalog__group-toggle > span {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   font-weight: 750;
 }
 
-.commerce-catalog__groups > section > header :deep(svg) {
+.commerce-catalog__group-toggle > small {
+  display: grid;
+  min-width: 16px;
+  height: 16px;
+  place-items: center;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #f0f3f7;
+  color: #99a4b0;
+  font-size: 6px;
+}
+
+.commerce-catalog__group-toggle :deep(svg) {
   color: #8e9aa7;
   font-size: 8px;
+  transition: transform 160ms ease;
+}
+
+.commerce-catalog__group-toggle.expanded :deep(svg:last-child) {
+  transform: rotate(90deg);
+}
+
+.commerce-catalog__group-items {
+  display: grid;
+  gap: 1px;
+  padding-bottom: 4px;
+}
+
+.commerce-catalog__group-empty {
+  display: grid;
+  height: 34px;
+  place-items: center;
+  color: #a0a9b4;
+  font-size: 7px;
 }
 
 .commerce-catalog__item {
