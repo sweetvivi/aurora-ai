@@ -46,7 +46,7 @@
 当前批次验证结果：
 
 - `pnpm format:check`、`pnpm lint`、`pnpm typecheck` 通过
-- `pnpm test`：API 26 个文件 110 项，Web 19 个文件 85 项
+- `pnpm test`：API 26 个文件 110 项，Web 20 个文件 88 项
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-canvas-studio.mjs`、`verify-video-tasks.mjs`、`verify-m2-interactions.mjs`、`verify-m2-routes.mjs` 和 `verify-admin-modules.mjs` 全部通过
 - `node outputs/ui-reference/verify-m2-routes.mjs` 当前覆盖 18 个主路由；新增占位模块在桌面端与移动端均可加载，侧栏激活态正确，无横向溢出或页面脚本错误

@@ -12,6 +12,7 @@ import {
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { uploadImageFile, type FileAsset, type ReasoningEffort } from '@/app/api';
 import type { ChatAttachment } from '@/stores/chat-workspace';
+import { isImeComposing } from '@/utils/keyboard';
 
 const MAX_ATTACHMENTS = 3;
 const reasoningOptions: Array<{ label: string; value: ReasoningEffort }> = [
@@ -188,7 +189,7 @@ function handleSend(): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (event.ctrlKey && event.key === 'Enter') {
+  if (event.ctrlKey && event.key === 'Enter' && !isImeComposing(event)) {
     event.preventDefault();
     handleSend();
   }

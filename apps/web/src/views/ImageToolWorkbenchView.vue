@@ -42,6 +42,7 @@ import {
 } from '@/stores/draw-workspace';
 import { useModelCatalogStore } from '@/stores/model-catalog';
 import { useSessionStore } from '@/stores/session';
+import { isImeComposing } from '@/utils/keyboard';
 import { clampImageSizePreset, getImageSizePresets } from '@/utils/model-capabilities';
 
 interface ModelOption {
@@ -777,6 +778,15 @@ async function submitTask(): Promise<void> {
   }
 }
 
+function handlePromptKeydown(event: KeyboardEvent): void {
+  if (isImeComposing(event)) {
+    return;
+  }
+
+  event.preventDefault();
+  void submitTask();
+}
+
 function formatWorkTime(timestamp: number): string {
   return new Intl.DateTimeFormat('zh-CN', {
     day: '2-digit',
@@ -1435,7 +1445,7 @@ onBeforeUnmount(() => {
           v-model="prompt"
           maxlength="1000"
           placeholder="请详细描述您想要生成的图片，例如：一只可爱的小猫坐在樱花树下，春日阳光透过花瓣洒下，高清摄影风格，柔和光线..."
-          @keydown.enter.exact.prevent="submitTask"
+          @keydown.enter.exact="handlePromptKeydown"
         />
         <small>{{ prompt.length }}/1000</small>
       </label>
@@ -1727,7 +1737,7 @@ onBeforeUnmount(() => {
             v-model="instruction"
             maxlength="600"
             placeholder="输入您想要的修改效果（@ 选择图片，/ 修图指令）"
-            @keydown.enter.exact.prevent="submitTask"
+            @keydown.enter.exact="handlePromptKeydown"
           />
         </label>
 

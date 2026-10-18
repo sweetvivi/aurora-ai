@@ -258,3 +258,12 @@
 - `verify-m2-routes.mjs` 扩展为覆盖 18 个路由；桌面端 `1440x1000` 与移动端 `390x844` 均确认路由可加载、侧栏激活态正确、无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`；全量测试为 API 26 个文件 110 项、Web 19 个文件 85 项
 - 本轮只使用 Mock 路由验收，不读取、输出或调用任何真实 Key
+
+## 20. 2026-10-19 中文输入法组合输入防误提交
+
+- 新增共享键盘工具 `apps/web/src/utils/keyboard.ts`，统一判断输入法组合输入状态：优先读取标准 `KeyboardEvent.isComposing`，并兼容部分中文输入法仍使用的 `keyCode === 229`
+- 将该判断接入 `ChatComposer` 的 `Ctrl/Cmd + Enter` 发送、超级智能体详情输入框、智能体创建预览、图片生成页、智能修图页、AI 绘画页和 AI 画布创作/灵感快捷键
+- 中文候选词组合期间按 Enter 现在只确认候选词，不会提前发送消息或提交任务；组合结束后正常 Enter 行为保持不变
+- 新增 `keyboard.spec.ts`，覆盖标准组合标记、旧版 `keyCode 229` 和组合结束后的普通 Enter
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
+- 本轮只使用本地测试，不读取、输出或调用任何真实 Key

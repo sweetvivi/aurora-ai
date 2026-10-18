@@ -22,6 +22,7 @@ import { useRoute, useRouter } from 'vue-router';
 import MarkdownMessage from '@/components/MarkdownMessage.vue';
 import { getAgentById } from '@/data/agents';
 import { useAgentWorkspaceStore, type AgentSession } from '@/stores/agent-workspace';
+import { isImeComposing } from '@/utils/keyboard';
 
 const route = useRoute();
 const router = useRouter();
@@ -224,6 +225,15 @@ async function sendMessage(): Promise<void> {
 
   activeSessionId.value = session.id;
   await scrollToLatest();
+}
+
+function handleComposerKeydown(event: KeyboardEvent): void {
+  if (isImeComposing(event)) {
+    return;
+  }
+
+  event.preventDefault();
+  void sendMessage();
 }
 
 function stopStreaming(): void {
@@ -497,7 +507,7 @@ watch(
             rows="2"
             :disabled="streaming"
             placeholder="请输入你的需求，例如：研究一个主题、制定旅行攻略、生成可视化网页或数据报告。"
-            @keydown.enter.exact.prevent="sendMessage"
+            @keydown.enter.exact="handleComposerKeydown"
           />
           <div class="agent-detail__input-footer">
             <div class="agent-detail__input-lead">

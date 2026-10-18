@@ -52,6 +52,7 @@ import {
 } from '@/stores/draw-workspace';
 import { useModelCatalogStore } from '@/stores/model-catalog';
 import { parseLocalCanvasWorkflow, serializeLocalCanvasWorkflow } from '@/utils/canvas-persistence';
+import { isImeComposing } from '@/utils/keyboard';
 import { clampImageSizePreset, getImageSizePresets } from '@/utils/model-capabilities';
 
 type CanvasNodeKind = 'image' | 'output' | 'prompt' | 'video';
@@ -1858,6 +1859,14 @@ async function submitComposer(): Promise<void> {
   persistCanvas();
 }
 
+function handleComposerShortcut(event: KeyboardEvent): void {
+  if (isImeComposing(event)) {
+    return;
+  }
+
+  void submitComposer();
+}
+
 function sendInspiration(): void {
   const prompt = inspirationMessage.value.trim();
 
@@ -1868,6 +1877,14 @@ function sendInspiration(): void {
   addPromptNode(prompt);
   composerPrompt.value = prompt;
   inspirationMessage.value = '';
+}
+
+function handleInspirationShortcut(event: KeyboardEvent): void {
+  if (isImeComposing(event)) {
+    return;
+  }
+
+  sendInspiration();
 }
 
 async function openCloudWorkflow(workflow: CanvasWorkflowRecord): Promise<void> {
@@ -3477,7 +3494,7 @@ onBeforeUnmount(() => {
           v-model="composerPrompt"
           maxlength="1000"
           placeholder="描述你想生成的内容..."
-          @keydown.ctrl.enter="submitComposer"
+          @keydown.ctrl.enter="handleComposerShortcut"
         />
         <button
           type="button"
@@ -3647,7 +3664,7 @@ onBeforeUnmount(() => {
         <textarea
           v-model="inspirationMessage"
           placeholder="开始你的灵感之旅..."
-          @keydown.ctrl.enter="sendInspiration"
+          @keydown.ctrl.enter="handleInspirationShortcut"
         />
         <footer>
           <button type="button" aria-label="添加素材" @click="activeRailMenu = 'assets'">

@@ -14,6 +14,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { agentCapabilityOptions, type AgentCapabilityId } from '@/data/agents';
 import { type AgentDraft, useAgentWorkspaceStore } from '@/stores/agent-workspace';
+import { isImeComposing } from '@/utils/keyboard';
 
 const route = useRoute();
 const router = useRouter();
@@ -252,6 +253,15 @@ function sendPreview(): void {
   previewPrompt.value = '';
 }
 
+function handlePreviewKeydown(event: KeyboardEvent): void {
+  if (isImeComposing(event)) {
+    return;
+  }
+
+  event.preventDefault();
+  sendPreview();
+}
+
 watch(
   editingId,
   () => {
@@ -484,7 +494,7 @@ watch(
             <input
               v-model="previewPrompt"
               placeholder="输入一句话调试当前智能体"
-              @keydown.enter.prevent="sendPreview"
+              @keydown.enter.exact="handlePreviewKeydown"
             />
             <button type="button" :disabled="!previewPrompt.trim()" @click="sendPreview">
               <SendOutlined />
