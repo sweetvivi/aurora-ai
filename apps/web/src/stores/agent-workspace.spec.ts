@@ -463,6 +463,53 @@ describe('agent workspace store', () => {
     expect(store.status).toBe('error');
   });
 
+  it('marks an unexpectedly closed stream as failed instead of leaving it streaming', async () => {
+    const agent = getAgentById('code-mentor')!;
+
+    apiMocks.streamChat.mockImplementation(
+      async (
+        _input: unknown,
+        handlers: {
+          onMeta: (event: {
+            assistantMessageId: string;
+            balance: number;
+            conversationId: string;
+            modelAlias: string;
+            pointsCost: number;
+            requestId: string;
+          }) => void;
+        },
+      ) => {
+        handlers.onMeta({
+          assistantMessageId: 'assistant-agent-closed',
+          balance: 99,
+          conversationId: 'conversation-agent-closed',
+          modelAlias: 'openai-gpt-6-astra',
+          pointsCost: 1,
+          requestId: 'request-agent-closed',
+        });
+      },
+    );
+
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+    const store = useAgentWorkspaceStore();
+
+    await store.initialize();
+    const session = await store.sendMessage(agent, '检查这段流式代码');
+
+    expect(session.messages[1]).toMatchObject({
+      content: '生成连接意外中断，请重试',
+      status: 'FAILED',
+    });
+    expect(store.error).toBe('生成连接意外中断，请重试');
+    expect(store.status).toBe('error');
+    expect(store.streamingSessionId).toBeNull();
+  });
+
   it('streams into a pre-created session so the detail view can bind it immediately', async () => {
     const agent = getAgentById('visual-prompt')!;
     let finishStream: (() => void) | undefined;

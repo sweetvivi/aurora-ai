@@ -547,6 +547,15 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
           },
           activeAgentStreamController.signal,
         );
+
+        const message = session.messages.find((item) => item.id === assistantMessageId);
+
+        if (message?.status === 'STREAMING') {
+          message.content ||= '生成连接意外中断，请重试';
+          message.status = 'FAILED';
+          session.updatedAt = Date.now();
+          this.error = '生成连接意外中断，请重试';
+        }
       } catch (error) {
         const message = session.messages.find((item) => item.id === assistantMessageId);
         const aborted = error instanceof DOMException && error.name === 'AbortError';

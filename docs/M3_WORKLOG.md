@@ -172,3 +172,12 @@
 - 全量验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、API 26 个文件 110 项、Web 19 个文件 84 项
 - `node outputs/ui-reference/verify-draw-modes.mjs`、`verify-draw-navigation.mjs`、`verify-newdraw-templates.mjs` 和 `verify-draw.mjs` 通过；桌面端 `1440x1000` 与移动端 `390x844` 无脚本错误或横向溢出
 - 本地验收截图：`outputs/ui-reference/draw-modes-desktop.png`、`outputs/ui-reference/draw-modes-mobile.png`
+
+## 12. 2026-10-18 智能体流式异常关闭收口
+
+- 修复智能体流式请求在收到 `onDone` 或 `onError` 前意外关闭连接时，助手消息可能长期停留在 `STREAMING` 的问题
+- 未完成的消息现在会保留已有正文，缺失正文时补充“生成连接意外中断，请重试”，并标记为 `FAILED`
+- 会话状态和错误提示同步收口，避免用户看到永久加载状态
+- 新增 `agent-workspace` 回归测试，覆盖连接提前结束但未触发完成事件的场景
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`
+- 全量测试为 API 26 个文件 110 项、Web 19 个文件 85 项

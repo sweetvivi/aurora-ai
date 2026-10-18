@@ -279,6 +279,7 @@
 - 2026-10-17：修正 `.gitignore` 的 `storage/` 规则误匹配 `apps/api/src/storage/`，避免后端存储模块再次被遗漏出提交。
 - 2026-10-17：修正 `.gitignore` 的 `data/` 规则误匹配 `apps/web/src/data/`，消除 GitHub Actions 干净检出时缺少智能体目录模块导致的类型检查失败。
 - 2026-10-17：修正 GitHub Actions 测试阶段缺少 PostgreSQL 导致的 `ECONNREFUSED`，CI 现在会等待数据库健康并执行 `prisma migrate deploy` 后再测试。
+- 2026-10-18：修正智能体流式连接在 `onDone`/`onError` 前意外关闭时消息永久停留在 `STREAMING` 的问题；现在会保留已收到的正文，缺失正文时显示“生成连接意外中断，请重试”，并将消息标记为 `FAILED`。
 
 ### Removed
 
