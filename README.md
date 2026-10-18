@@ -100,6 +100,8 @@ pnpm infra:down
 - Redis：`127.0.0.1:6379`
 - API：`http://127.0.0.1:3001/api/v1/health`
 
+`pnpm dev:web` 默认把 `/api` 代理到 `http://127.0.0.1:3001`。如果本机 API 跑在其他端口（例如已有旧实例占着 3001），在 `apps/web/.env.local` 里写 `WEB_API_PROXY_TARGET=http://127.0.0.1:3006` 即可切换代理目标；该文件已被 `.gitignore` 忽略，仓库默认行为不变。
+
 `infra:down` 保留数据卷。不要在未确认数据备份和影响范围前执行 `docker compose down -v`。
 
 ## 开始工作前必须阅读
