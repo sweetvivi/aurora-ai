@@ -863,7 +863,7 @@ function formatConversationTime(value: string | null): string {
             <h1>
               您好，
               <span
-                >👋今天有什么我可以帮你的吗？<i class="chat-welcome__caret" aria-hidden="true"
+                >👋今天有什么我可以帮你的<i class="chat-welcome__caret" aria-hidden="true"
               /></span>
             </h1>
           </div>
@@ -1481,7 +1481,7 @@ function formatConversationTime(value: string | null): string {
 }
 
 .chat-main__model-select {
-  width: 180px;
+  width: 210px;
 }
 
 .chat-main__model-select :deep(.ant-select-selector) {
@@ -1580,10 +1580,10 @@ function formatConversationTime(value: string | null): string {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 0 16px;
+  padding: 0 21px;
   border-radius: 999px;
   color: #6e7787;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 750;
   text-decoration: none;
   white-space: nowrap;
@@ -1645,7 +1645,7 @@ function formatConversationTime(value: string | null): string {
   position: relative;
   width: min(100%, 820px);
   justify-items: stretch;
-  margin: 72px auto 28px;
+  margin: 50px auto 28px;
 }
 
 .chat-model-series {
@@ -1688,7 +1688,7 @@ function formatConversationTime(value: string | null): string {
 }
 
 .chat-welcome__heading {
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
 
 .chat-welcome h1 {
@@ -1702,6 +1702,7 @@ function formatConversationTime(value: string | null): string {
 
 .chat-welcome h1 span {
   display: block;
+  margin-top: 26px;
 }
 
 .chat-welcome__caret {
@@ -2132,6 +2133,10 @@ function formatConversationTime(value: string | null): string {
 
   .chat-welcome h1 {
     font-size: 22px;
+  }
+
+  .chat-welcome h1 span {
+    margin-top: 12px;
   }
 
   .chat-welcome__heading {
