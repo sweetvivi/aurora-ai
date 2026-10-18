@@ -1442,11 +1442,11 @@ function formatConversationTime(value: string | null): string {
 
 .chat-main__toolbar {
   display: grid;
-  height: 70px;
+  height: 62px;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
   grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
-  padding: 0 28px;
+  padding: 0 24px;
   border-bottom: 1px solid #eef0f4;
 }
 
@@ -1597,11 +1597,11 @@ function formatConversationTime(value: string | null): string {
 
 .chat-conversation {
   overflow-y: auto;
-  padding: 48px 28px 24px;
+  padding: 40px 24px 24px;
 }
 
 .chat-conversation.active {
-  padding-top: 30px;
+  padding-top: 26px;
 }
 
 .chat-loading {
@@ -1624,7 +1624,7 @@ function formatConversationTime(value: string | null): string {
   position: relative;
   width: min(100%, 820px);
   justify-items: stretch;
-  margin: 58px auto 30px;
+  margin: 46px auto 28px;
 }
 
 .chat-model-series {
@@ -1729,7 +1729,7 @@ function formatConversationTime(value: string | null): string {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 28px;
+  margin-top: 24px;
   text-align: left;
 }
 
@@ -1750,17 +1750,17 @@ function formatConversationTime(value: string | null): string {
 .chat-suggestions {
   display: grid;
   width: 100%;
-  gap: 10px;
+  gap: 9px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: 28px;
+  margin-top: 22px;
 }
 
 .chat-suggestions button {
   display: grid;
-  min-height: 112px;
+  min-height: 102px;
   align-content: start;
   justify-items: start;
-  padding: 13px;
+  padding: 12px;
   border: 1px solid #e5e8ee;
   border-radius: 10px;
   background: rgb(255 255 255 / 88%);
@@ -1790,7 +1790,7 @@ function formatConversationTime(value: string | null): string {
 }
 
 .chat-suggestions strong {
-  margin-top: 12px;
+  margin-top: 10px;
   font-size: 11px;
 }
 
@@ -1804,9 +1804,9 @@ function formatConversationTime(value: string | null): string {
 .chat-chart-types {
   display: grid;
   width: 100%;
-  gap: 8px;
+  gap: 7px;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .chat-chart-types button {

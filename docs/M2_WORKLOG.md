@@ -31,6 +31,15 @@
 
 ## 3. 已实现内容
 
+### 对话与绘画视觉密度收口
+
+- 页面：`apps/web/src/views/ChatView.vue`、`apps/web/src/views/DrawStudioView.vue`
+- 模型对话顶部工具栏从 70px 收紧到 62px，缩短欢迎区上方留白，并压缩示例提示词卡、图表类型网格的间距和卡片高度，保持推荐卡、模型切换、历史抽屉和消息逻辑不变
+- AI 绘画内层侧栏、模型行、工具分组、章节标题和内容卡片同步收紧垂直间距；主内容区域保持两级侧栏和参考产品式工作台结构，绘画标题字距改为 0
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm --filter @aurora/web typecheck`、`pnpm test`、`pnpm build`
+- 浏览器验收通过：`verify-m2-routes.mjs`、`verify-m2-interactions.mjs`、`verify-chat-message-layout.mjs`、`verify-draw-editor.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出和页面脚本错误
+- 本批仅调整前端样式和文档，不调用真实 Provider，不读取、输出或提交 Key
+
 ### 首页发现工作台
 
 - 页面：`apps/web/src/views/HomeView.vue`、`apps/web/src/views/ChatView.vue`

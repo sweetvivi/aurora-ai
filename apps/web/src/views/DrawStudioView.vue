@@ -2147,7 +2147,7 @@ onBeforeUnmount(() => {
 
 .draw-library__header {
   display: grid;
-  min-height: 62px;
+  min-height: 58px;
   align-items: center;
   gap: 9px;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -2207,10 +2207,10 @@ onBeforeUnmount(() => {
 
 .draw-library__search {
   display: flex;
-  height: 34px;
+  height: 32px;
   align-items: center;
   gap: 7px;
-  margin: 12px 14px 9px;
+  margin: 10px 14px 8px;
   padding: 0 10px;
   border: 1px solid #e5e7eb;
   border-radius: 7px;
@@ -2229,13 +2229,13 @@ onBeforeUnmount(() => {
 .draw-library__navigation {
   display: grid;
   gap: 2px;
-  padding: 4px 10px 10px;
+  padding: 3px 10px 8px;
   border-bottom: 1px solid #f0f1f4;
 }
 
 .draw-library__navigation a {
   display: grid;
-  min-height: 34px;
+  min-height: 32px;
   align-items: center;
   gap: 9px;
   grid-template-columns: 17px minmax(0, 1fr);
@@ -2261,7 +2261,7 @@ onBeforeUnmount(() => {
 .draw-library__models {
   display: grid;
   gap: 3px;
-  padding: 13px 10px;
+  padding: 11px 10px;
   border-bottom: 1px solid #f0f1f4;
 }
 
@@ -2269,7 +2269,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px 7px;
+  padding: 0 8px 6px;
   color: #8b93a0;
   font-size: 9px;
 }
@@ -2282,7 +2282,7 @@ onBeforeUnmount(() => {
 .draw-library__models button {
   position: relative;
   display: grid;
-  min-height: 34px;
+  min-height: 32px;
   align-items: center;
   gap: 8px;
   grid-template-columns: 22px minmax(0, 1fr) auto;
@@ -2344,7 +2344,7 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 3px;
   margin-top: auto;
-  padding: 12px 10px 16px;
+  padding: 10px 10px 14px;
   border-top: 1px solid #f0f1f4;
 }
 
@@ -2357,7 +2357,7 @@ onBeforeUnmount(() => {
 
 .draw-library__shortcut button {
   display: grid;
-  height: 34px;
+  height: 32px;
   align-items: center;
   gap: 8px;
   grid-template-columns: 16px minmax(0, 1fr) auto;
@@ -2376,14 +2376,14 @@ onBeforeUnmount(() => {
 }
 
 .draw-library__tools {
-  padding: 11px 10px 13px;
+  padding: 10px 10px 12px;
   border-bottom: 1px solid #f0f1f4;
 }
 
 .draw-library__tools-toggle {
   display: flex;
   width: 100%;
-  min-height: 32px;
+  min-height: 30px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -2424,8 +2424,8 @@ onBeforeUnmount(() => {
 
 .draw-library__tool-groups {
   display: grid;
-  gap: 11px;
-  padding: 7px 0 0;
+  gap: 9px;
+  padding: 6px 0 0;
 }
 
 .draw-library__tool-groups section {
@@ -2443,7 +2443,7 @@ onBeforeUnmount(() => {
 .draw-library__tool-groups section > button {
   display: grid;
   min-width: 0;
-  min-height: 41px;
+  min-height: 38px;
   align-items: center;
   gap: 8px;
   grid-template-columns: 24px minmax(0, 1fr);
@@ -4486,14 +4486,14 @@ onBeforeUnmount(() => {
 }
 
 .draw-main__inner {
-  width: min(100%, 1060px);
+  width: min(100%, 1040px);
   margin: 0 auto;
-  padding: 0 28px 64px;
+  padding: 0 26px 60px;
 }
 
 .draw-main__navigation {
   display: flex;
-  min-height: 54px;
+  min-height: 50px;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
@@ -4534,16 +4534,16 @@ onBeforeUnmount(() => {
 }
 
 .draw-composer {
-  padding: 30px 8px 26px;
+  padding: 27px 8px 24px;
   text-align: center;
 }
 
 .draw-composer__heading h1 {
   margin: 0;
   color: #1e242d;
-  font-size: 29px;
+  font-size: 34px;
   font-weight: 860;
-  letter-spacing: -0.035em;
+  letter-spacing: 0;
 }
 
 .draw-composer__heading p {
@@ -4554,7 +4554,7 @@ onBeforeUnmount(() => {
 
 .draw-composer__box {
   width: min(100%, 900px);
-  margin: 24px auto 0;
+  margin: 22px auto 0;
   padding: 12px 14px 11px;
   border: 1px solid #dfe3e8;
   border-radius: 10px;
@@ -4750,11 +4750,11 @@ onBeforeUnmount(() => {
 }
 
 .draw-section {
-  padding: 25px 0 4px;
+  padding: 23px 0 4px;
 }
 
 .draw-section + .draw-section {
-  margin-top: 18px;
+  margin-top: 16px;
   border-top: 1px solid #f1f2f5;
 }
 
@@ -4763,7 +4763,7 @@ onBeforeUnmount(() => {
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .draw-section__heading h2 {
@@ -4793,15 +4793,15 @@ onBeforeUnmount(() => {
 
 .draw-type-grid {
   display: grid;
-  gap: 11px;
+  gap: 10px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .draw-type-card {
   display: grid;
-  min-height: 164px;
+  min-height: 156px;
   align-content: start;
-  padding: 16px;
+  padding: 15px;
   border: 1px solid #e4e7eb;
   border-radius: 8px;
   background: #fff;
@@ -4969,7 +4969,7 @@ onBeforeUnmount(() => {
 }
 
 .draw-tool-group + .draw-tool-group {
-  margin-top: 18px;
+  margin-top: 16px;
 }
 
 .draw-tool-group > h3 {
@@ -4990,13 +4990,13 @@ onBeforeUnmount(() => {
 
 .draw-tool-grid {
   display: grid;
-  gap: 10px;
+  gap: 9px;
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .draw-tool-card {
   display: grid;
-  min-height: 116px;
+  min-height: 108px;
   place-items: center;
   align-content: center;
   gap: 7px;
