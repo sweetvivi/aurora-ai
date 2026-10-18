@@ -24,6 +24,7 @@ export interface GroupModelResponse {
   displayName: string;
   error?: string;
   id: string;
+  pointsCost?: number;
   requestId?: string;
   status: GroupResponseStatus;
 }
@@ -319,6 +320,7 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
               if (target) {
                 target.assistantMessageId = event.assistantMessageId;
                 target.conversationId = event.conversationId;
+                target.pointsCost = event.pointsCost;
                 target.requestId = event.requestId;
               }
 
@@ -388,6 +390,37 @@ export const useGroupChatWorkspaceStore = defineStore('group-chat-workspace', {
         .finally(() => {
           activeControllers = new Map();
         });
+    },
+    async retryResponse(roundId: string, responseId: string): Promise<void> {
+      const round = this.rounds.find((item) => item.id === roundId);
+      const response = round?.responses.find((item) => item.id === responseId);
+
+      if (!round || !response || this.streaming) {
+        return;
+      }
+
+      response.assistantMessageId = undefined;
+      response.content = '';
+      response.createdAt = new Date().toISOString();
+      response.error = undefined;
+      response.pointsCost = undefined;
+      response.requestId = undefined;
+      response.status = 'PENDING';
+      this.status = 'streaming';
+      this.persistWorkspace();
+
+      try {
+        await this.runModelResponse(round.id, response.id, {
+          content: round.content,
+          fileIds: round.attachments.map((attachment) => attachment.fileId),
+        });
+      } finally {
+        await useSessionStore()
+          .refreshProfile()
+          .catch(() => undefined);
+        this.status = 'ready';
+        this.persistWorkspace();
+      }
     },
     stopAll(): void {
       for (const controller of activeControllers.values()) {
@@ -614,6 +647,7 @@ function normalizePersistedResponse(value: unknown): GroupModelResponse | null {
     displayName: value.displayName,
     error: optionalString(value.error),
     id: value.id,
+    pointsCost: optionalPositiveNumber(value.pointsCost),
     requestId: optionalString(value.requestId),
     status,
   };
@@ -675,4 +709,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function optionalPositiveNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }

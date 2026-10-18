@@ -153,6 +153,9 @@ describe('group chat workspace store', () => {
       '来自 model-2 回答',
       '来自 model-3 回答',
     ]);
+    expect(groupStore.rounds[0]?.responses.map((response) => response.pointsCost)).toEqual([
+      1, 1, 1,
+    ]);
     expect(sessionStore.points).toBe(97);
     expect(groupStore.status).toBe('ready');
   });
@@ -207,6 +210,95 @@ describe('group chat workspace store', () => {
       error: '模型二响应超时',
     });
     expect(sessionStore.points).toBe(100);
+    expect(groupStore.status).toBe('ready');
+  });
+
+  it('retries only the failed model without replacing successful answers', async () => {
+    const attempts = new Map<string, number>();
+
+    apiMocks.streamChat.mockImplementation(
+      async (input: { modelAlias: string }, handlers: StreamHandlers) => {
+        const attempt = (attempts.get(input.modelAlias) ?? 0) + 1;
+
+        attempts.set(input.modelAlias, attempt);
+
+        if (input.modelAlias === 'model-2' && attempt === 1) {
+          handlers.onMeta({
+            assistantMessageId: 'assistant-model-2-failed',
+            balance: 100,
+            conversationId: 'conversation-model-2',
+            modelAlias: input.modelAlias,
+            pointsCost: 1,
+            requestId: 'request-model-2-failed',
+          });
+          handlers.onError({
+            balance: 100,
+            code: 'LLM_TIMEOUT',
+            message: '模型二首次响应超时',
+            refunded: true,
+            requestId: 'request-model-2-failed',
+          });
+          return;
+        }
+
+        handlers.onMeta({
+          assistantMessageId: `assistant-${input.modelAlias}`,
+          balance: 99,
+          conversationId: `conversation-${input.modelAlias}`,
+          modelAlias: input.modelAlias,
+          pointsCost: 1,
+          requestId: `request-${input.modelAlias}`,
+        });
+        handlers.onDelta({
+          content: input.modelAlias === 'model-2' ? '模型二重试成功' : `${input.modelAlias} 原回答`,
+        });
+        handlers.onDone({
+          assistantMessageId: `assistant-${input.modelAlias}`,
+          balance: 100,
+          requestId: `request-${input.modelAlias}`,
+          status: 'COMPLETED',
+        });
+      },
+    );
+
+    const sessionStore = useSessionStore();
+    const groupStore = useGroupChatWorkspaceStore();
+
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+
+    await groupStore.initialize();
+    groupStore.syncModels(models.slice(0, 3));
+    await groupStore.sendMessage('只重试失败模型');
+
+    const round = groupStore.rounds[0];
+    const successfulResponses = [round?.responses[0], round?.responses[2]];
+    const failedResponse = round?.responses[1];
+
+    expect(failedResponse).toMatchObject({
+      conversationId: 'conversation-model-2',
+      pointsCost: 1,
+      status: 'FAILED',
+    });
+
+    await groupStore.retryResponse(round?.id ?? '', failedResponse?.id ?? '');
+
+    expect(apiMocks.streamChat).toHaveBeenCalledTimes(4);
+    expect(groupStore.rounds[0]?.responses[0]).toBe(successfulResponses[0]);
+    expect(groupStore.rounds[0]?.responses[2]).toBe(successfulResponses[1]);
+    expect(groupStore.rounds[0]?.responses[1]).toMatchObject({
+      content: '模型二重试成功',
+      conversationId: 'conversation-model-2',
+      pointsCost: 1,
+      status: 'COMPLETED',
+    });
+    expect(apiMocks.streamChat.mock.calls[3]?.[0]).toMatchObject({
+      content: '只重试失败模型',
+      conversationId: 'conversation-model-2',
+      modelAlias: 'model-2',
+    });
     expect(groupStore.status).toBe('ready');
   });
 

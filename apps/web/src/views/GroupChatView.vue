@@ -163,6 +163,10 @@ function retryRound(round: GroupChatRound): void {
   groupStore.retryRound(round.id);
 }
 
+function retryResponse(roundId: string, responseId: string): void {
+  void groupStore.retryResponse(roundId, responseId);
+}
+
 function retryLastRound(): void {
   if (lastRound.value) {
     retryRound(lastRound.value);
@@ -252,14 +256,20 @@ function openCapability(item: ChatCapabilityPreset): void {
                 +{{ selectedCount - 3 }}
               </i>
             </div>
-            <span>{{ selectedCount > 0 ? `已选 ${selectedCount} 个模型` : '请选择模型' }}</span>
+            <span>
+              {{
+                selectedCount > 0
+                  ? `已选 ${selectedCount} 个模型 · 将独立计费 ${selectedCount} 次`
+                  : '请选择模型'
+              }}
+            </span>
           </div>
 
           <section v-if="selectorOpen" class="group-model-picker__panel" aria-label="选择模型">
             <header>
               <span>
                 <strong>选择对话模型</strong>
-                <small>最多同时选择 10 个模型</small>
+                <small>最多 10 个模型，每个模型独立请求并分别计费</small>
               </span>
               <div>
                 <button type="button" @click="groupStore.selectAllModels">全选</button>
@@ -420,6 +430,7 @@ function openCapability(item: ChatCapabilityPreset): void {
                 :key="response.id"
                 class="group-model-response"
                 :class="`group-model-response--${response.status.toLowerCase()}`"
+                :data-model-alias="response.alias"
               >
                 <header>
                   <i :style="{ '--model-accent': modelAccent(response.alias) }">
@@ -450,11 +461,33 @@ function openCapability(item: ChatCapabilityPreset): void {
                   </div>
                 </div>
 
-                <footer v-if="response.status === 'COMPLETED'">
-                  <button type="button" @click="copyResponse(response.id, response.content)">
+                <footer
+                  v-if="
+                    response.status === 'COMPLETED' ||
+                    response.status === 'FAILED' ||
+                    response.status === 'CANCELLED'
+                  "
+                >
+                  <button
+                    v-if="response.status === 'COMPLETED'"
+                    type="button"
+                    @click="copyResponse(response.id, response.content)"
+                  >
                     <CopyOutlined />
                     {{ copiedResponseId === response.id ? '已复制' : '复制' }}
                   </button>
+                  <button
+                    v-else
+                    type="button"
+                    :disabled="groupStore.streaming"
+                    @click="retryResponse(round.id, response.id)"
+                  >
+                    <ReloadOutlined />
+                    重试此模型
+                  </button>
+                  <span v-if="response.pointsCost" class="group-model-response__cost">
+                    单次 {{ response.pointsCost }} 积分
+                  </span>
                 </footer>
               </article>
             </div>
@@ -1139,6 +1172,7 @@ function openCapability(item: ChatCapabilityPreset): void {
   display: flex;
   min-height: 37px;
   align-items: center;
+  justify-content: space-between;
   padding: 5px 8px;
   border-top: 1px solid #eef1f5;
 }
@@ -1160,6 +1194,17 @@ function openCapability(item: ChatCapabilityPreset): void {
 .group-model-response > footer button:hover {
   background: #f1f5ff;
   color: #356fe0;
+}
+
+.group-model-response > footer button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.group-model-response__cost {
+  color: #9aa3b0;
+  font-size: 8px;
+  white-space: nowrap;
 }
 
 .group-chat-round__retry {
@@ -1224,6 +1269,7 @@ function openCapability(item: ChatCapabilityPreset): void {
   }
 
   .group-model-picker__summary > span {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
