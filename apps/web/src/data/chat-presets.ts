@@ -102,11 +102,6 @@ export const chatChartTemplates: ChatChartPreset[] = [
     preview: 'bar',
   },
   {
-    label: '象形柱图',
-    prompt: '请把下面的数据整理成象形柱图，用直观图形对比各类别的数量和规模。',
-    preview: 'pictorial-bar',
-  },
-  {
     label: '饼图',
     prompt: '请把下面的数据整理成占比分析，说明主要构成和变化原因。',
     preview: 'pie',
@@ -120,11 +115,6 @@ export const chatChartTemplates: ChatChartPreset[] = [
     label: '热力图',
     prompt: '请把下面的数据整理成热力图分析，识别高峰、低谷和明显聚集区域。',
     preview: 'heat',
-  },
-  {
-    label: '气泡图',
-    prompt: '请把下面的数据整理成气泡图分析，同时比较数值、规模和分布关系。',
-    preview: 'bubble',
   },
   {
     label: '词云',
@@ -150,6 +140,16 @@ export const chatChartTemplates: ChatChartPreset[] = [
     label: '堆积柱状图',
     prompt: '请把下面的数据整理成堆积柱状图分析，说明总量和各组成部分的变化。',
     preview: 'stack',
+  },
+  {
+    label: '象形柱图',
+    prompt: '请把下面的数据整理成象形柱图，用直观图形对比各类别的数量和规模。',
+    preview: 'pictorial-bar',
+  },
+  {
+    label: '气泡图',
+    prompt: '请把下面的数据整理成气泡图分析，同时比较数值、规模和分布关系。',
+    preview: 'bubble',
   },
   {
     label: '旭日图',

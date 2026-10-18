@@ -136,11 +136,6 @@ const chartTemplates = [
     preview: 'bar',
   },
   {
-    label: '象形柱图',
-    prompt: '请把下面的数据整理成象形柱图，用直观图形对比各类别的数量和规模。',
-    preview: 'pictorial-bar',
-  },
-  {
     label: '饼图',
     prompt: '请把下面的数据整理成占比分析，说明主要构成和变化原因。',
     preview: 'pie',
@@ -154,11 +149,6 @@ const chartTemplates = [
     label: '热力图',
     prompt: '请把下面的数据整理成热力图分析，识别高峰、低谷和明显聚集区域。',
     preview: 'heat',
-  },
-  {
-    label: '气泡图',
-    prompt: '请把下面的数据整理成气泡图分析，同时比较数值、规模和分布关系。',
-    preview: 'bubble',
   },
   {
     label: '词云',
@@ -184,6 +174,16 @@ const chartTemplates = [
     label: '堆积柱状图',
     prompt: '请把下面的数据整理成堆积柱状图分析，说明总量和各组成部分的变化。',
     preview: 'stack',
+  },
+  {
+    label: '象形柱图',
+    prompt: '请把下面的数据整理成象形柱图，用直观图形对比各类别的数量和规模。',
+    preview: 'pictorial-bar',
+  },
+  {
+    label: '气泡图',
+    prompt: '请把下面的数据整理成气泡图分析，同时比较数值、规模和分布关系。',
+    preview: 'bubble',
   },
   {
     label: '旭日图',
@@ -1481,7 +1481,7 @@ function formatConversationTime(value: string | null): string {
 }
 
 .chat-main__model-select {
-  width: 210px;
+  width: 178px;
 }
 
 .chat-main__model-select :deep(.ant-select-selector) {
@@ -1580,7 +1580,7 @@ function formatConversationTime(value: string | null): string {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 0 21px;
+  padding: 0 14px;
   border-radius: 999px;
   color: #6e7787;
   font-size: 12px;
@@ -1645,13 +1645,13 @@ function formatConversationTime(value: string | null): string {
   position: relative;
   width: min(100%, 820px);
   justify-items: stretch;
-  margin: 50px auto 28px;
+  margin: 94px auto 16px;
 }
 
 .chat-model-series {
   display: grid;
   position: absolute;
-  top: 14px;
+  top: -66px;
   right: 0;
   gap: 8px;
   justify-items: end;
@@ -1696,13 +1696,13 @@ function formatConversationTime(value: string | null): string {
   color: #313643;
   font-size: 25px;
   font-weight: 800;
-  line-height: 1.5;
+  line-height: 1.3;
   text-align: left;
 }
 
 .chat-welcome h1 span {
   display: block;
-  margin-top: 26px;
+  margin-top: 0;
 }
 
 .chat-welcome__caret {
@@ -1858,7 +1858,7 @@ function formatConversationTime(value: string | null): string {
   display: grid;
   width: 100%;
   gap: 7px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-top: 11px;
 }
 
