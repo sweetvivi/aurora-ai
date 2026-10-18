@@ -57,7 +57,7 @@ const activeTab = ref<CatalogTab>('official');
 const selectedCategory = ref('全部');
 const search = ref('');
 const currentPage = ref(1);
-const catalogOpen = ref(false);
+const catalogOpen = ref(true);
 const historyOpen = ref(false);
 const historyQuery = ref('');
 const landingPrompt = ref('');
@@ -964,7 +964,9 @@ function goToPage(page: number): void {
           </div>
         </article>
       </section>
+    </section>
 
+    <section class="agent-home agent-home--quickstart">
       <div class="agent-home__quick-label">
         <span>快速开始</span>
         <i />
@@ -1383,11 +1385,34 @@ function goToPage(page: number): void {
 
 <style scoped>
 .agents-catalog-page {
+  display: flex;
+  flex-direction: column;
   min-height: calc(100vh - 56px);
   padding: 30px 28px 58px;
   background:
     radial-gradient(circle at 50% 0, rgb(61 202 136 / 8%), transparent 440px),
     linear-gradient(180deg, #f7fcf9 0, #fff 430px);
+}
+
+/* 参考产品把智能体资源库紧接在创建卡片下方，快速开始与模板推荐后置保留 */
+.agent-home {
+  order: 1;
+}
+
+.agents-catalog {
+  order: 2;
+}
+
+.agent-home--quickstart {
+  order: 3;
+}
+
+.agent-showcase {
+  order: 4;
+}
+
+.agents-callout {
+  order: 5;
 }
 
 .agents-hero,
