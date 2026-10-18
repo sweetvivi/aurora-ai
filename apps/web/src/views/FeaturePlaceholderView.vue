@@ -3,7 +3,14 @@ import {
   ApartmentOutlined,
   AudioOutlined,
   BgColorsOutlined,
+  BookOutlined,
+  CompassOutlined,
+  DeploymentUnitOutlined,
+  LineChartOutlined,
+  ReadOutlined,
   ShoppingCartOutlined,
+  SoundOutlined,
+  ThunderboltOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons-vue';
 import type { Component } from 'vue';
@@ -43,10 +50,66 @@ const features: Record<string, FeatureConfig> = {
   },
   music: {
     accent: '#b44d91',
-    description: '音乐生成、配音与声音处理入口',
+    description: '原创音乐、伴奏与声音处理入口',
     icon: AudioOutlined,
     label: 'Music Studio',
-    title: 'AI 音乐',
+    title: 'Sound 音乐',
+  },
+  stocks: {
+    accent: '#c0532b',
+    description: '行情看板、财务解读与走势预测入口',
+    icon: LineChartOutlined,
+    label: 'Market Studio',
+    title: '股票分析',
+  },
+  voice: {
+    accent: '#3f7fb8',
+    description: '真人音色还原、声音克隆与配音入口',
+    icon: SoundOutlined,
+    label: 'Voice Studio',
+    title: 'AI 配音 2.0',
+  },
+  'image-processing': {
+    accent: '#6a7f3f',
+    description: '照片调色、降噪与批量处理入口',
+    icon: BgColorsOutlined,
+    label: 'Image Processing',
+    title: '图片处理',
+  },
+  education: {
+    accent: '#8a5cc4',
+    description: '备课、出题与作业批改入口',
+    icon: ReadOutlined,
+    label: 'Education Studio',
+    title: 'AI 教育',
+  },
+  'free-tools': {
+    accent: '#2f8f8a',
+    description: '免登录可用的在线小工具集入口',
+    icon: ThunderboltOutlined,
+    label: 'Free Tools',
+    title: '免费工具',
+  },
+  'modeling-3d': {
+    accent: '#5f6dc4',
+    description: '图片或文字生成可导出 3D 模型入口',
+    icon: DeploymentUnitOutlined,
+    label: '3D Studio',
+    title: '3D 建模',
+  },
+  'ai-search': {
+    accent: '#3d7a5f',
+    description: '资料检索与 arXiv 论文聚合入口',
+    icon: CompassOutlined,
+    label: 'AI Search',
+    title: '超级 AI 搜索',
+  },
+  thesis: {
+    accent: '#a2603a',
+    description: '开题、写作与答辩材料整理入口',
+    icon: BookOutlined,
+    label: 'Thesis Assistant',
+    title: '论文助手',
   },
   video: {
     accent: '#4c74d9',
@@ -77,7 +140,7 @@ const feature = computed(() => features[String(route.name)] ?? fallbackFeature);
       <div class="feature-placeholder__state">
         <i />
         <strong>功能建设中</strong>
-        <span>入口已经保留，当前阶段先完成智能体和绘画主链路。</span>
+        <span>入口已经保留，功能会按优先级逐步补齐。</span>
       </div>
       <div class="feature-placeholder__blueprint" aria-hidden="true">
         <span />

@@ -115,11 +115,75 @@ export const appRoutes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'stocks',
+        name: 'stocks',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: '股票分析',
+        },
+      },
+      {
+        path: 'voice',
+        name: 'voice',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: 'AI 配音',
+        },
+      },
+      {
+        path: 'image-processing',
+        name: 'image-processing',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: '图片处理',
+        },
+      },
+      {
+        path: 'education',
+        name: 'education',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: 'AI 教育',
+        },
+      },
+      {
+        path: 'free-tools',
+        name: 'free-tools',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: '免费工具',
+        },
+      },
+      {
+        path: 'modeling-3d',
+        name: 'modeling-3d',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: '3D 建模',
+        },
+      },
+      {
+        path: 'ai-search',
+        name: 'ai-search',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: '超级 AI 搜索',
+        },
+      },
+      {
+        path: 'thesis',
+        name: 'thesis',
+        component: () => import('@/views/FeaturePlaceholderView.vue'),
+        meta: {
+          title: '论文助手',
+        },
+      },
+      {
         path: 'music',
         name: 'music',
         component: () => import('@/views/FeaturePlaceholderView.vue'),
         meta: {
-          title: 'AI 音乐',
+          title: 'Sound 音乐',
         },
       },
     ],

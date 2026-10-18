@@ -38,6 +38,7 @@
 - Provider 动态路由：图片和视频任务会按模型的厂商代码、Base URL 和上游模型识别 OpenAI-compatible、Seedream 或 Seedance 协议；显式 `mock`/旧 Provider 模式仍可覆盖，自动模式缺少对应 Key 时回退 Mock，不会因新增路由改变本地演示行为
 - M3 管理后台：管理员路由守卫、总览、用户管理、积分调整、厂商管理、模型管理，以及数据库优先的运行时模型注册表
 - 模块展示管理：后台可配置模块名称、导航说明、图标、封面、分组、路由、排序、角标和显隐；主侧栏使用参考产品式“模块名 + 灰色说明”两行导航，封面支持受控本地上传、外部 URL、预览和清除，主侧栏、移动底栏、首页快捷入口、精选工具和分类会统一读取同一份模块目录
+- 模块位置预留：主侧栏已按参考产品补齐股票分析、AI配音2.0、图片处理、AI教育、免费工具、3D建模、超级AI搜索和论文助手等后续模块入口，先保留名称、说明、图标、分组和路由，功能按优先级逐步补齐
 - 厂商模型探测：后台可输入瞬态 Key 或服务端 Key 引用，检测 OpenAI-compatible `/models`，预览能力标签并批量导入所选模型；瞬态 Key 不落库、不回显、不写日志
 - 图片任务按模型能力校验参考图、清晰度、组图和图层拆分；GPT Image 最多 10 张输入，Seedream 4.x/5 Lite 最多 14 张。主图和参考图会写入任务参数并参与幂等、恢复和 Provider 多图输入
 - 桌面端 `1440x1000` 和移动端 `390x844` 的本地 Playwright 验收脚本位于 `outputs/ui-reference/`
@@ -48,6 +49,7 @@
 - `pnpm test`：API 26 个文件 110 项，Web 19 个文件 85 项
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-canvas-studio.mjs`、`verify-video-tasks.mjs`、`verify-m2-interactions.mjs`、`verify-m2-routes.mjs` 和 `verify-admin-modules.mjs` 全部通过
+- `node outputs/ui-reference/verify-m2-routes.mjs` 当前覆盖 18 个主路由；新增占位模块在桌面端与移动端均可加载，侧栏激活态正确，无横向溢出或页面脚本错误
 - `node outputs/ui-reference/verify-admin-modules.mjs` 通过，模块改名、导航说明、角标、排序和显隐会同步刷新共享目录；桌面端和移动端无横向溢出、无页面脚本错误
 - `node outputs/ui-reference/verify-admin-provider-probe.mjs` 通过，桌面端和移动端无横向溢出，探测 Key 未出现在页面、响应或控制台
 - `node outputs/ui-reference/verify-canvas-studio.mjs` 通过，画布批量面板、右键菜单、组合分组、节点生成菜单、云端恢复、自动保存和失败回退在桌面端与移动端无脚本错误或横向溢出
@@ -76,7 +78,7 @@
 
 下一步：
 
-- 继续按参考产品精修模型对话、AI 绘画、超级智能体、智能修图、图片生成和视频生成
+- 继续按参考产品精修模型对话、AI 绘画、超级智能体、智能修图、图片生成和视频生成，再依次推进 AI 画布、电商工具及后续占位模块
 - 评估超级对话批量后端接口，降低多模型分别建会话带来的状态分散，同时保持现有独立计费、失败隔离和临时共享上下文语义
 - 深化 AI 画布和电商工具工作流，并与参考产品实际跳转行为保持一致
 - 继续完善后台模块展示配置的封面尺寸校验、站内路由校验和资源迁移策略；真实 Key 仍只从服务端环境变量读取，若要改为后台持久化必须单独评审加密、轮换、审计和备份方案
