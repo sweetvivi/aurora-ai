@@ -6,6 +6,7 @@ import {
   BgColorsOutlined,
   CheckOutlined,
   CloseOutlined,
+  CloudOutlined,
   DeleteOutlined,
   DownOutlined,
   DownloadOutlined,
@@ -67,6 +68,7 @@ interface ToolItem {
   accent: string;
   description: string;
   glyph: string;
+  icon?: Component;
   label: string;
   tags: string[];
 }
@@ -226,17 +228,27 @@ const DEFAULT_SIZE_PRESETS = ['1K', '2K', '4K'];
 const creativeTypes: ToolItem[] = [
   {
     accent: '#3979ed',
-    description: '从文字或参考图生成高质量画面，适合灵感探索与内容配图。',
+    description: '从文字、参考图到高质量画面生成。',
     glyph: '绘',
-    label: 'AI 绘画',
-    tags: ['文生图', '图片重绘', '批量探索'],
+    icon: CloudOutlined,
+    label: 'AI绘画',
+    tags: ['文生图', '图片重绘', '参考图', '批量探索'],
+  },
+  {
+    accent: '#27a36f',
+    description: '让图片动起来，生成产品短片和创意镜头。',
+    glyph: '视',
+    icon: VideoCameraOutlined,
+    label: 'AI视频',
+    tags: ['图生视频', '文生视频', '视频特效'],
   },
   {
     accent: '#e28732',
-    description: '完成放大、扩图、擦除、修复和商品图批量处理。',
+    description: '抠图、扩图、擦除、修复等常用 AI 工具。',
     glyph: '修',
+    icon: HighlightOutlined,
     label: '图片编辑',
-    tags: ['图片放大', 'AI 扩图', '一键抠图'],
+    tags: ['图片放大', '抠图', '擦除', '修复'],
   },
 ];
 
@@ -690,6 +702,11 @@ function handleCreativeTag(item: ToolItem, tag: string): void {
     return;
   }
 
+  if (/视频/.test(tag)) {
+    openVideoStudio();
+    return;
+  }
+
   if (/抠图/.test(tag)) {
     openRetouch('cutout');
     return;
@@ -700,13 +717,18 @@ function handleCreativeTag(item: ToolItem, tag: string): void {
     return;
   }
 
+  if (/擦除/.test(tag)) {
+    openRetouch('erase');
+    return;
+  }
+
   if (/修复|重绘/.test(tag)) {
     openRetouch('enhance');
     return;
   }
 
   openGenerator({
-    mode: item.label === 'AI 绘画' || item.label === '批量创作' ? '文生图' : '参考图重绘',
+    mode: item.label === 'AI绘画' || item.label === '批量创作' ? '文生图' : '参考图重绘',
   });
 }
 
@@ -871,8 +893,13 @@ function handleCreativeType(item: ToolItem): void {
     return;
   }
 
+  if (item.label === 'AI视频') {
+    openVideoStudio();
+    return;
+  }
+
   openGenerator({
-    mode: item.label === 'AI 绘画' ? '文生图' : '参考图重绘',
+    mode: item.label === 'AI绘画' ? '文生图' : '参考图重绘',
   });
 }
 
@@ -2169,10 +2196,16 @@ onBeforeUnmount(() => {
             </p>
 
             <footer class="draw-composer__toolbar">
-              <span class="draw-composer__mode-label">
-                <PictureOutlined />
-                图片
-              </span>
+              <div class="draw-composer__medium" role="group" aria-label="创作类型">
+                <button type="button" class="active" aria-pressed="true">
+                  <PictureOutlined />
+                  图片
+                </button>
+                <button type="button" aria-pressed="false" @click="openVideoStudio">
+                  <VideoCameraOutlined />
+                  视频
+                </button>
+              </div>
 
               <label>
                 <select v-model="currentModel" aria-label="选择绘画模型">
@@ -2243,7 +2276,6 @@ onBeforeUnmount(() => {
           <header class="draw-section__heading">
             <div>
               <h2>选择创作类型</h2>
-              <p>从常用目标开始，系统会自动准备对应的模型与参数。</p>
             </div>
           </header>
 
@@ -2257,13 +2289,16 @@ onBeforeUnmount(() => {
               @click="handleCreativeType(item)"
               @keyup.enter="handleCreativeType(item)"
             >
-              <span class="draw-tool-glyph" :style="{ '--tool-accent': item.accent }">
-                {{ item.glyph }}
-              </span>
-              <div>
-                <h3>{{ item.label }}</h3>
-                <p>{{ item.description }}</p>
-              </div>
+              <header class="draw-type-card__head">
+                <span class="draw-tool-glyph" :style="{ '--tool-accent': item.accent }">
+                  <component :is="item.icon" v-if="item.icon" />
+                  <template v-else>{{ item.glyph }}</template>
+                </span>
+                <div>
+                  <h3>{{ item.label }}</h3>
+                  <p>{{ item.description }}</p>
+                </div>
+              </header>
               <footer>
                 <button
                   v-for="tag in item.tags"
@@ -5212,7 +5247,7 @@ onBeforeUnmount(() => {
 .draw-main__inner {
   width: min(100%, 1040px);
   margin: 0 auto;
-  padding: 0 26px 60px;
+  padding: 0 41px 60px;
 }
 
 .draw-main__navigation {
@@ -5389,21 +5424,40 @@ onBeforeUnmount(() => {
   margin-top: 7px;
 }
 
-.draw-composer__mode-label {
+.draw-composer__medium {
   display: inline-flex;
   flex: 0 0 auto;
-  height: 29px;
   align-items: center;
-  gap: 5px;
-  padding: 0 9px;
+  gap: 2px;
+  height: 34px;
+  padding: 2px;
   border-radius: 7px;
   background: #f2f4f6;
+}
+
+.draw-composer__medium button {
+  display: inline-flex;
+  height: 100%;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
   color: #626c79;
   font-size: 9px;
   font-weight: 700;
+  cursor: pointer;
 }
 
-.draw-composer__mode-label :deep(svg) {
+.draw-composer__medium button.active {
+  border-color: #e0e4e9;
+  background: #fff;
+  color: #2f3640;
+  box-shadow: 0 1px 3px rgb(31 41 58 / 8%);
+}
+
+.draw-composer__medium :deep(svg) {
   color: #5f5ad8;
   font-size: 11px;
 }
@@ -5544,7 +5598,7 @@ onBeforeUnmount(() => {
 .draw-section__heading h2 {
   margin: 0;
   color: #252b34;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 820;
 }
 
@@ -5569,14 +5623,14 @@ onBeforeUnmount(() => {
 .draw-type-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .draw-type-card {
   display: grid;
-  min-height: 156px;
+  min-height: 189px;
   align-content: start;
-  padding: 15px;
+  padding: 24px;
   border: 1px solid #e4e7eb;
   border-radius: 8px;
   background: #fff;
@@ -5586,6 +5640,31 @@ onBeforeUnmount(() => {
     border-color 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
+}
+
+.draw-type-card__head {
+  display: grid;
+  align-items: start;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.draw-type-card .draw-tool-glyph {
+  width: 36px;
+  height: 36px;
+  font-size: 11px;
+}
+
+.draw-type-card .draw-tool-glyph :deep(svg) {
+  font-size: 19px;
+}
+
+.draw-type-card .draw-type-card__head h3 {
+  margin: 0;
+}
+
+.draw-type-card .draw-type-card__head p {
+  margin: 4px 0 0;
 }
 
 .draw-type-card:hover,
@@ -5616,6 +5695,10 @@ onBeforeUnmount(() => {
   font-size: 15px;
 }
 
+.draw-type-card h3 {
+  font-size: 17px;
+}
+
 .draw-type-card p,
 .draw-commerce-card p {
   margin: 7px 0 0;
@@ -5624,11 +5707,16 @@ onBeforeUnmount(() => {
   line-height: 1.7;
 }
 
+.draw-type-card p {
+  font-size: 11px;
+  line-height: 2;
+}
+
 .draw-type-card footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 13px;
+  gap: 8px;
+  margin-top: 18px;
 }
 
 .draw-type-card footer button,
@@ -5641,6 +5729,12 @@ onBeforeUnmount(() => {
   color: #626c7a;
   font-size: 8px;
   cursor: pointer;
+}
+
+.draw-type-card footer button {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 11px;
 }
 
 .draw-commerce-grid {
