@@ -39,13 +39,13 @@
 - M3 管理后台：管理员路由守卫、总览、用户管理、积分调整、厂商管理、模型管理，以及数据库优先的运行时模型注册表
 - 模块展示管理：后台可配置模块名称、图标、封面、分组、路由、排序、角标和显隐；封面支持受控本地上传、外部 URL、预览和清除，主侧栏、移动底栏、首页快捷入口、精选工具和分类会统一读取同一份模块目录
 - 厂商模型探测：后台可输入瞬态 Key 或服务端 Key 引用，检测 OpenAI-compatible `/models`，预览能力标签并批量导入所选模型；瞬态 Key 不落库、不回显、不写日志
-- 图片任务支持最多 10 张输入图片（1 张主图加最多 9 张已授权参考图）；主图和参考图会写入任务参数并参与幂等、恢复和 Provider 多图输入
+- 图片任务按模型能力校验参考图、清晰度、组图和图层拆分；GPT Image 最多 10 张输入，Seedream 4.x/5 Lite 最多 14 张。主图和参考图会写入任务参数并参与幂等、恢复和 Provider 多图输入
 - 桌面端 `1440x1000` 和移动端 `390x844` 的本地 Playwright 验收脚本位于 `outputs/ui-reference/`
 
 当前批次验证结果：
 
 - `pnpm format:check`、`pnpm lint`、`pnpm typecheck` 通过
-- `pnpm test`：API 24 个文件 91 项，Web 16 个文件 66 项
+- `pnpm test`：API 25 个文件 97 项，Web 16 个文件 66 项
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-canvas-studio.mjs`、`verify-video-tasks.mjs`、`verify-m2-interactions.mjs`、`verify-m2-routes.mjs` 和 `verify-admin-modules.mjs` 全部通过
 - `node outputs/ui-reference/verify-admin-modules.mjs` 通过，模块改名、角标、排序和显隐会同步刷新共享目录；桌面端和移动端无横向溢出、无页面脚本错误

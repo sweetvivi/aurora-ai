@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import type { PrismaService } from '../infrastructure/prisma/prisma.service';
 import { describe, expect, it, vi } from 'vitest';
-import { ModelRegistryService } from './model-registry.service';
+import { ModelRegistryService, resolveModelCapabilityProfile } from './model-registry.service';
 
 function createRegistry(
   config: Record<string, unknown> = {},
@@ -69,6 +69,68 @@ describe('model registry', () => {
         providerModel: 'provider-chat-v1',
       },
     ]);
+  });
+
+  it('derives capability profiles for known image and video model families', () => {
+    expect(
+      resolveModelCapabilityProfile({
+        alias: 'seedream-5-lite',
+        capabilities: ['image'],
+        providerCode: 'volcengine',
+        providerModel: 'doubao-seedream-5-0-lite-260128',
+      }),
+    ).toMatchObject({
+      image: {
+        maxReferenceImages: 14,
+        sizePresets: ['2K', '3K', '4K'],
+        supportsSequentialGeneration: true,
+      },
+    });
+
+    expect(
+      resolveModelCapabilityProfile({
+        alias: 'seedance-1-5-pro',
+        capabilities: ['video'],
+        providerCode: 'volcengine',
+        providerModel: 'doubao-seedance-1-5-pro-250528',
+      }),
+    ).toMatchObject({
+      video: {
+        maxDuration: 12,
+        resolutions: ['480P', '720P', '1080P'],
+        supportsAudio: true,
+        supportsLastFrame: true,
+      },
+    });
+  });
+
+  it('does not assign capability profiles to unrelated model families', () => {
+    expect(
+      resolveModelCapabilityProfile({
+        alias: 'unknown-image',
+        capabilities: ['image'],
+        providerCode: 'custom-provider',
+        providerModel: 'custom-image-v1',
+      }),
+    ).toBeUndefined();
+
+    expect(
+      resolveModelCapabilityProfile({
+        alias: 'volcengine-generic-image',
+        capabilities: ['image'],
+        providerCode: 'volcengine',
+        providerModel: 'generic-image-v1',
+      }),
+    ).toBeUndefined();
+
+    expect(
+      resolveModelCapabilityProfile({
+        alias: 'volcengine-generic-video',
+        capabilities: ['video'],
+        providerCode: 'volcengine',
+        providerModel: 'generic-video-v1',
+      }),
+    ).toBeUndefined();
   });
 
   it('falls back to defaults when the database has no enabled models', async () => {

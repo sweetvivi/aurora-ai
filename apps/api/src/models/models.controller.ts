@@ -15,6 +15,7 @@ export class ModelsController {
         alias: model.alias,
         capabilities: model.capabilities,
         displayName: model.displayName,
+        ...(model.profile ? { profile: model.profile } : {}),
       }));
 
     return { items };

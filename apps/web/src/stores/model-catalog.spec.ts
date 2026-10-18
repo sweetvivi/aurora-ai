@@ -35,11 +35,24 @@ describe('model catalog store', () => {
         alias: 'image-live',
         capabilities: ['image'],
         displayName: 'Live Image',
+        profile: {
+          image: {
+            maxReferenceImages: 10,
+            sizePresets: ['1K', '2K'],
+          },
+        },
       },
       {
         alias: 'image-live',
         capabilities: ['video'],
         displayName: 'Live Image Updated',
+        profile: {
+          video: {
+            maxDuration: 15,
+            resolutions: ['720P', '1080P'],
+            supportsLastFrame: false,
+          },
+        },
       },
       {
         alias: 'unsupported',
@@ -59,6 +72,17 @@ describe('model catalog store', () => {
       alias: 'image-live',
       capabilities: ['image', 'video'],
       displayName: 'Live Image Updated',
+      profile: {
+        image: {
+          maxReferenceImages: 10,
+          sizePresets: ['1K', '2K'],
+        },
+        video: {
+          maxDuration: 15,
+          resolutions: ['720P', '1080P'],
+          supportsLastFrame: false,
+        },
+      },
     });
     expect(store.modelsFor('chat')).toHaveLength(0);
   });

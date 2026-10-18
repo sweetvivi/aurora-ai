@@ -27,7 +27,7 @@ export class CreateImageTaskDto {
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(9)
+  @ArrayMaxSize(13)
   @ArrayUnique()
   @IsString({ each: true })
   @MaxLength(100, { each: true })

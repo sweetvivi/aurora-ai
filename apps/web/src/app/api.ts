@@ -150,10 +150,31 @@ export interface AuthResult {
   user: AuthenticatedUser;
 }
 
+export interface ImageCapabilityProfile {
+  maxReferenceImages: number;
+  sizePresets: string[];
+  supportsLayerDecomposition?: boolean;
+  supportsSequentialGeneration?: boolean;
+}
+
+export interface VideoCapabilityProfile {
+  maxDuration: number;
+  resolutions: string[];
+  supportsAudio?: boolean;
+  supportsLastFrame?: boolean;
+  supportsVideoInput?: boolean;
+}
+
+export interface ModelCapabilityProfile {
+  image?: ImageCapabilityProfile;
+  video?: VideoCapabilityProfile;
+}
+
 export interface ChatModel {
   alias: string;
   capabilities: Array<'chat' | 'embedding' | 'image' | 'video' | 'vision'>;
   displayName: string;
+  profile?: ModelCapabilityProfile;
 }
 
 export interface PersistedAgent extends AgentCatalogItem {

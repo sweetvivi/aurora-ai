@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { FilesService } from '../files/files.service';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
+import { findVideoModelConstraintViolation } from '../models/model-capability.constraints';
 import { ModelRegistryService } from '../models/model-registry.service';
 import { PointsService } from '../points/points.service';
 import { STORAGE_ADAPTER, type StorageAdapter } from '../storage/storage.types';
@@ -102,6 +103,17 @@ export class VideoTasksService implements OnModuleInit {
         code: 'VIDEO_MODEL_NOT_FOUND',
         message: '所选模型不支持视频生成',
       });
+    }
+
+    const capabilityViolation = findVideoModelConstraintViolation({
+      hasLastFrame: Boolean(input.lastFrameFileId),
+      parameters: input.parameters,
+      profile: model.profile,
+      sourceFileId: input.sourceFileId,
+    });
+
+    if (capabilityViolation) {
+      throw new ConflictException(capabilityViolation);
     }
 
     if (input.sourceFileId) {

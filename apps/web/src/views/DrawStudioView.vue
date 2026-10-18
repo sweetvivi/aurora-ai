@@ -211,7 +211,8 @@ const galleryInspirations: GalleryInspiration[] = [
 const effectCategories = DRAW_EFFECT_CATEGORIES;
 const effectTemplates = DRAW_EFFECT_TEMPLATES;
 const storageOptions = ['1天', '3天', '7天'];
-const MAX_REFERENCE_IMAGES = 10;
+const DEFAULT_MAX_REFERENCE_IMAGES = 10;
+const DEFAULT_SIZE_PRESETS = ['1K', '2K', '4K'];
 
 const creativeTypes: ToolItem[] = [
   {
@@ -419,6 +420,21 @@ const models = computed<ModelItem[]>(() =>
     value: model.alias,
   })),
 );
+const activeImageProfile = computed(
+  () =>
+    modelCatalog.modelsFor('image').find((model) => model.alias === currentModel.value)?.profile
+      ?.image,
+);
+const availableSizePresets = computed(() => {
+  const presets = activeImageProfile.value?.sizePresets
+    ?.map((preset) => preset.trim().toUpperCase())
+    .filter(Boolean);
+
+  return presets?.length ? Array.from(new Set(presets)) : DEFAULT_SIZE_PRESETS;
+});
+const maxReferenceImages = computed(
+  () => activeImageProfile.value?.maxReferenceImages ?? DEFAULT_MAX_REFERENCE_IMAGES,
+);
 
 const filteredModels = computed(() => {
   const query = libraryQuery.value.trim().toLowerCase();
@@ -579,8 +595,11 @@ function syncGeneratorFromRoute(): void {
     selectedAmount.value = routeAmount;
   }
 
-  if (typeof routeSize === 'string' && ['1K', '2K', '4K'].includes(routeSize)) {
-    selectedSize.value = routeSize;
+  if (
+    typeof routeSize === 'string' &&
+    availableSizePresets.value.includes(routeSize.trim().toUpperCase())
+  ) {
+    selectedSize.value = routeSize.trim().toUpperCase();
   }
 
   if (typeof routeMode === 'string' && creationModes.includes(routeMode)) {
@@ -882,10 +901,10 @@ async function handleReferenceUpload(event: Event): Promise<void> {
     return;
   }
 
-  const remaining = MAX_REFERENCE_IMAGES - referenceImages.value.length;
+  const remaining = maxReferenceImages.value - referenceImages.value.length;
 
   if (remaining <= 0) {
-    referenceError.value = `最多上传 ${MAX_REFERENCE_IMAGES} 张参考图`;
+    referenceError.value = `最多上传 ${maxReferenceImages.value} 张参考图`;
     input.value = '';
     return;
   }
@@ -913,7 +932,7 @@ async function handleReferenceUpload(event: Event): Promise<void> {
     ];
 
     if (files.length > acceptedFiles.length) {
-      referenceError.value = `最多上传 ${MAX_REFERENCE_IMAGES} 张参考图，超出的图片未上传`;
+      referenceError.value = `最多上传 ${maxReferenceImages.value} 张参考图，超出的图片未上传`;
     }
   } catch (error) {
     referenceError.value = error instanceof Error ? error.message : '参考图上传失败，请重试';
@@ -932,6 +951,32 @@ function removeReference(referenceId: string): void {
 
   referenceImages.value = referenceImages.value.filter((item) => item.id !== referenceId);
 }
+
+function applyActiveModelConstraints(): void {
+  const presets = availableSizePresets.value;
+  const maximumReferences = maxReferenceImages.value;
+
+  if (!presets.includes(selectedSize.value)) {
+    selectedSize.value = presets[0] ?? '1K';
+  }
+
+  if (referenceImages.value.length <= maximumReferences) {
+    return;
+  }
+
+  const removed = referenceImages.value.slice(maximumReferences);
+
+  for (const image of removed) {
+    URL.revokeObjectURL(image.url);
+  }
+
+  referenceImages.value = referenceImages.value.slice(0, maximumReferences);
+  referenceError.value = `当前模型最多上传 ${maximumReferences} 张参考图，超出部分已移除`;
+}
+
+watch([currentModel, availableSizePresets], applyActiveModelConstraints, {
+  immediate: true,
+});
 
 function formatWorkTime(timestamp: number): string {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -1353,14 +1398,14 @@ onBeforeUnmount(() => {
             accept="image/*"
             multiple
             hidden
-            :disabled="uploadingReference || referenceImages.length >= MAX_REFERENCE_IMAGES"
+            :disabled="uploadingReference || referenceImages.length >= maxReferenceImages"
             @change="handleReferenceUpload"
           />
           <button
             type="button"
             class="draw-template-composer__upload"
             aria-label="上传参考图"
-            :disabled="uploadingReference || referenceImages.length >= MAX_REFERENCE_IMAGES"
+            :disabled="uploadingReference || referenceImages.length >= maxReferenceImages"
             @click="templateReferenceInput?.click()"
           >
             <img v-if="referenceImages[0]" :src="referenceImages[0].url" alt="" />
@@ -1369,11 +1414,13 @@ onBeforeUnmount(() => {
             <span>
               {{
                 referenceImages.length
-                  ? `${referenceImages.length} / ${MAX_REFERENCE_IMAGES}`
+                  ? `${referenceImages.length} / ${maxReferenceImages}`
                   : '上传图片'
               }}
             </span>
-            <small>{{ referenceImages.length ? '继续添加' : '最多 10 张' }}</small>
+            <small>
+              {{ referenceImages.length ? '继续添加' : `最多 ${maxReferenceImages} 张` }}
+            </small>
           </button>
           <label class="draw-template-composer__prompt">
             <textarea
@@ -1394,7 +1441,7 @@ onBeforeUnmount(() => {
             <label>
               <span>输出清晰度</span>
               <select v-model="selectedSize">
-                <option v-for="size in ['1K', '2K', '4K']" :key="size" :value="size">
+                <option v-for="size in availableSizePresets" :key="size" :value="size">
                   {{ size }}
                 </option>
               </select>
@@ -1533,7 +1580,7 @@ onBeforeUnmount(() => {
                   {{
                     uploadingReference
                       ? '上传中...'
-                      : `已上传 ${referenceImages.length} / ${MAX_REFERENCE_IMAGES} 张`
+                      : `已上传 ${referenceImages.length} / ${maxReferenceImages} 张`
                   }}
                 </span>
               </header>
@@ -1543,7 +1590,7 @@ onBeforeUnmount(() => {
                 accept="image/*"
                 multiple
                 hidden
-                :disabled="uploadingReference || referenceImages.length >= MAX_REFERENCE_IMAGES"
+                :disabled="uploadingReference || referenceImages.length >= maxReferenceImages"
                 @change="handleReferenceUpload"
               />
               <div>
@@ -1558,10 +1605,10 @@ onBeforeUnmount(() => {
                   </button>
                 </span>
                 <button
-                  v-if="referenceImages.length < MAX_REFERENCE_IMAGES"
+                  v-if="referenceImages.length < maxReferenceImages"
                   type="button"
                   class="draw-generator__upload"
-                  :disabled="uploadingReference || referenceImages.length >= MAX_REFERENCE_IMAGES"
+                  :disabled="uploadingReference || referenceImages.length >= maxReferenceImages"
                   @click="referenceInput?.click()"
                 >
                   <LoadingOutlined v-if="uploadingReference" />
@@ -1579,7 +1626,7 @@ onBeforeUnmount(() => {
               </header>
               <div class="draw-generator__options">
                 <button
-                  v-for="size in ['1K', '2K', '4K']"
+                  v-for="size in availableSizePresets"
                   :key="size"
                   type="button"
                   :class="{ active: selectedSize === size }"

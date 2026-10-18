@@ -4,12 +4,33 @@ import { PrismaService } from '../infrastructure/prisma/prisma.service';
 
 export type ModelCapability = 'chat' | 'embedding' | 'image' | 'video' | 'vision';
 
+export interface ImageCapabilityProfile {
+  maxReferenceImages: number;
+  sizePresets: string[];
+  supportsLayerDecomposition?: boolean;
+  supportsSequentialGeneration?: boolean;
+}
+
+export interface VideoCapabilityProfile {
+  maxDuration: number;
+  resolutions: string[];
+  supportsAudio?: boolean;
+  supportsLastFrame?: boolean;
+  supportsVideoInput?: boolean;
+}
+
+export interface ModelCapabilityProfile {
+  image?: ImageCapabilityProfile;
+  video?: VideoCapabilityProfile;
+}
+
 export interface RegisteredModel {
   alias: string;
   capabilities: ModelCapability[];
   displayName: string;
   baseUrl?: string;
   keyRef?: string;
+  profile?: ModelCapabilityProfile;
   providerCode: string;
   providerModel: string;
 }
@@ -75,6 +96,12 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
     alias: 'jiguang-gpt-image-2.5',
     capabilities: ['image'],
     displayName: 'GPT Image 2.5',
+    profile: {
+      image: {
+        maxReferenceImages: 10,
+        sizePresets: ['1K', '2K', '4K'],
+      },
+    },
     providerCode: 'jiguang',
     providerModel: 'gpt-image-2.5',
   },
@@ -82,6 +109,13 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
     alias: 'doubao-seedream-4-0',
     capabilities: ['image'],
     displayName: 'Seedream 4.0',
+    profile: {
+      image: {
+        maxReferenceImages: 14,
+        sizePresets: ['1K', '2K', '4K'],
+        supportsSequentialGeneration: true,
+      },
+    },
     providerCode: 'volcengine',
     providerModel: 'doubao-seedream-4-0-250828',
   },
@@ -89,6 +123,15 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
     alias: 'xai-grok-imagine-video',
     capabilities: ['video'],
     displayName: 'Grok Imagine Video',
+    profile: {
+      video: {
+        maxDuration: 15,
+        resolutions: ['720P', '1080P'],
+        supportsAudio: false,
+        supportsLastFrame: false,
+        supportsVideoInput: false,
+      },
+    },
     providerCode: 'xai',
     providerModel: 'grok-imagine-video',
   },
@@ -96,6 +139,15 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
     alias: 'xai-grok-imagine-video-1.5',
     capabilities: ['video'],
     displayName: 'Grok Imagine Video 1.5',
+    profile: {
+      video: {
+        maxDuration: 15,
+        resolutions: ['720P', '1080P'],
+        supportsAudio: false,
+        supportsLastFrame: false,
+        supportsVideoInput: false,
+      },
+    },
     providerCode: 'xai',
     providerModel: 'grok-imagine-video-1.5',
   },
@@ -103,10 +155,154 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
     alias: 'doubao-seedance-1-0-pro',
     capabilities: ['video'],
     displayName: 'Seedance 1.0 Pro',
+    profile: {
+      video: {
+        maxDuration: 12,
+        resolutions: ['480P', '720P', '1080P'],
+        supportsLastFrame: true,
+      },
+    },
     providerCode: 'volcengine',
     providerModel: 'doubao-seedance-1-0-pro-250528',
   },
 ];
+
+export function resolveModelCapabilityProfile(input: {
+  alias: string;
+  capabilities: ModelCapability[];
+  providerCode: string;
+  providerModel: string;
+}): ModelCapabilityProfile | undefined {
+  const identity = `${input.alias} ${input.providerModel}`.toLowerCase();
+  const profile: ModelCapabilityProfile = {};
+
+  if (input.capabilities.includes('image')) {
+    const imageProfile = resolveImageCapabilityProfile(identity);
+
+    if (imageProfile) {
+      profile.image = imageProfile;
+    }
+  }
+
+  if (input.capabilities.includes('video')) {
+    const videoProfile = resolveVideoCapabilityProfile(identity);
+
+    if (videoProfile) {
+      profile.video = videoProfile;
+    }
+  }
+
+  return profile.image || profile.video ? profile : undefined;
+}
+
+function resolveImageCapabilityProfile(identity: string): ImageCapabilityProfile | undefined {
+  if (identity.includes('gpt-image')) {
+    return {
+      maxReferenceImages: 10,
+      sizePresets: ['1K', '2K', '4K'],
+    };
+  }
+
+  if (!identity.includes('seedream')) {
+    return undefined;
+  }
+
+  if (/seedream[-_\s]?5(?:[-_\s]?0)?[-_\s]?(pro|flash)/.test(identity)) {
+    return {
+      maxReferenceImages: 10,
+      sizePresets: ['1K', '1.5K', '2K'],
+      supportsLayerDecomposition: true,
+    };
+  }
+
+  if (/seedream[-_\s]?5(?:[-_\s]?0)?[-_\s]?(lite|260128)/.test(identity)) {
+    return {
+      maxReferenceImages: 14,
+      sizePresets: ['2K', '3K', '4K'],
+      supportsSequentialGeneration: true,
+    };
+  }
+
+  if (identity.includes('seedream-4-5') || identity.includes('seedream-4.5')) {
+    return {
+      maxReferenceImages: 14,
+      sizePresets: ['2K', '4K'],
+      supportsSequentialGeneration: true,
+    };
+  }
+
+  if (identity.includes('seedream-4-0') || identity.includes('seedream-4.0')) {
+    return {
+      maxReferenceImages: 14,
+      sizePresets: ['1K', '2K', '4K'],
+      supportsSequentialGeneration: true,
+    };
+  }
+
+  return {
+    maxReferenceImages: 14,
+    sizePresets: ['1K', '1.5K', '2K', '3K', '4K'],
+    supportsSequentialGeneration: true,
+  };
+}
+
+function resolveVideoCapabilityProfile(identity: string): VideoCapabilityProfile | undefined {
+  if (identity.includes('grok')) {
+    return {
+      maxDuration: 15,
+      resolutions: ['720P', '1080P'],
+      supportsAudio: false,
+      supportsLastFrame: false,
+      supportsVideoInput: false,
+    };
+  }
+
+  if (!identity.includes('seedance')) {
+    return undefined;
+  }
+
+  if (identity.includes('seedance-2-5') || identity.includes('seedance-2.5')) {
+    return {
+      maxDuration: 30,
+      resolutions: ['480P', '720P', '1080P'],
+      supportsLastFrame: true,
+      supportsVideoInput: true,
+    };
+  }
+
+  if (/seedance[-_\s]?2[-_\s]?(fast|mini)/.test(identity)) {
+    return {
+      maxDuration: 15,
+      resolutions: ['480P', '720P'],
+      supportsLastFrame: true,
+      supportsVideoInput: true,
+    };
+  }
+
+  if (identity.includes('seedance-2-0') || identity.includes('seedance-2.0')) {
+    return {
+      maxDuration: 15,
+      resolutions: ['480P', '720P', '1080P', '4K'],
+      supportsLastFrame: true,
+      supportsVideoInput: true,
+    };
+  }
+
+  if (identity.includes('seedance-1-5') || identity.includes('seedance-1.5')) {
+    return {
+      maxDuration: 12,
+      resolutions: ['480P', '720P', '1080P'],
+      supportsAudio: true,
+      supportsLastFrame: true,
+    };
+  }
+
+  return {
+    maxDuration: 12,
+    resolutions: ['480P', '720P', '1080P'],
+    supportsLastFrame: true,
+  };
+}
 
 @Injectable()
 export class ModelRegistryService implements OnModuleInit {
@@ -158,17 +354,28 @@ export class ModelRegistryService implements OnModuleInit {
         };
       }
 
-      this.models = records.map((record) => ({
-        alias: record.alias,
-        baseUrl: record.provider.baseUrl,
-        capabilities: record.capabilities.map(
+      this.models = records.map((record) => {
+        const capabilities = record.capabilities.map(
           (capability) => capability.toLowerCase() as ModelCapability,
-        ),
-        displayName: record.displayName,
-        keyRef: record.provider.keyRef,
-        providerCode: record.provider.code,
-        providerModel: record.providerModel,
-      }));
+        );
+        const profile = resolveModelCapabilityProfile({
+          alias: record.alias,
+          capabilities,
+          providerCode: record.provider.code,
+          providerModel: record.providerModel,
+        });
+
+        return {
+          alias: record.alias,
+          baseUrl: record.provider.baseUrl,
+          capabilities,
+          displayName: record.displayName,
+          keyRef: record.provider.keyRef,
+          ...(profile ? { profile } : {}),
+          providerCode: record.provider.code,
+          providerModel: record.providerModel,
+        };
+      });
       this.loadedFromDatabase = true;
 
       return {

@@ -8,7 +8,7 @@
 - 分支：`main`
 - 分支起始提交：`5ced005 docs: mark m1 synchronization complete`
 - 视频链路批次基线：`19af73a feat: connect media workflows and agent history`
-- 当前批次基线：`cd4548c fix: align commerce initial catalog state`
+- 当前批次基线：`e3a71ad fix: keep mobile canvas controls above bottom nav`
 - 画布增强批次基线：`60f470d feat: complete commerce replacement tools`
 - 运行时模型目录批次基线：`136e1f5 feat: add configurable platform modules`
 - 超级对话批次基线：`d87fefd feat: expand newdraw template studio`
@@ -30,6 +30,15 @@
 参考产品其他板块继续保留位置，不进入本批实现。
 
 ## 3. 已实现内容
+
+### 模型能力约束与动态工作台
+
+- 后端模型注册表新增公开的 `profile` 元数据，按 `gpt-image`、`seedream`、`seedance` 和 `grok` 模型族推导产品级能力，只向前端返回尺寸预设、参考图上限、最大时长、分辨率、首尾帧、音频和视频输入等约束；`baseUrl`、`keyRef`、厂商代码和上游模型 ID 继续保持服务端字段
+- AI 绘画页按当前模型动态提供清晰度选项和参考图上限；切换模型时会先校正已选清晰度，并移除超出新上限的参考图。视频页按模型动态提供时长、分辨率和首尾帧模式，模型目录刷新后也会重新校正当前参数
+- 图片任务在积分冻结前校验输入图片总数、尺寸、组图和图层拆分；视频任务同样校验时长、分辨率、首尾帧、音频和视频输入，错误以明确的 `409` 能力错误码返回。未知模型没有 profile，继续沿旧行为，不因新增规则被误限制
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`
+- 浏览器验收通过：`verify-draw-editor.mjs`、`verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-video-tasks.mjs`、`verify-video-studio.mjs`、`verify-video-preview.mjs`；桌面端 `1440x1000` 和移动端 `390x844` 均无横向溢出或页面脚本错误
+- 本批不调用真实 Provider，不读取、输出或提交任何 Key
 
 ### 智能体首页推荐卡密度对齐
 

@@ -267,9 +267,9 @@ describe('file uploads and image tasks', () => {
         referenceFileIds,
         sourceFileId,
       })
-      .expect(400);
+      .expect(409);
 
-    expect(rejectedResponse.body.error.code).toBe('BAD_REQUEST');
+    expect(rejectedResponse.body.error.code).toBe('IMAGE_REFERENCE_LIMIT_EXCEEDED');
   });
 
   it('marks provider failures and refunds the image task points', async () => {

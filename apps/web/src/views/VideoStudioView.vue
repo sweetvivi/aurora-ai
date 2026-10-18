@@ -144,8 +144,9 @@ const showcaseItems: ShowcaseItem[] = [
 ];
 
 const ratios = ['16:9', '9:16', '1:1'];
-const durations = [5, 10, 15];
-const resolutions = ['720P', '1080P'];
+const defaultDurations = [5, 10, 15];
+const durationCandidates = [5, 10, 12, 15, 30];
+const defaultResolutions = ['720P', '1080P'];
 const promptPresets = [
   '镜头缓慢推进，光线自然变化',
   '产品在桌面上平稳旋转',
@@ -187,6 +188,43 @@ const models = computed<VideoModel[]>(() =>
     value: model.alias,
   })),
 );
+const activeVideoProfile = computed(
+  () =>
+    modelCatalog.modelsFor('video').find((model) => model.alias === selectedModel.value)?.profile
+      ?.video,
+);
+const availableModes = computed<VideoModeOption[]>(() =>
+  modes.map((item) =>
+    item.value === 'first-last-frame'
+      ? {
+          ...item,
+          available: activeVideoProfile.value?.supportsLastFrame ?? true,
+        }
+      : item,
+  ),
+);
+const availableDurations = computed(() => {
+  const maximum = activeVideoProfile.value?.maxDuration;
+
+  if (!maximum) {
+    return defaultDurations;
+  }
+
+  const candidates = durationCandidates.filter((duration) => duration <= maximum);
+
+  if (!candidates.includes(maximum)) {
+    candidates.push(maximum);
+  }
+
+  return candidates.sort((left, right) => left - right);
+});
+const availableResolutions = computed(() => {
+  const resolutions = activeVideoProfile.value?.resolutions
+    ?.map((resolution) => resolution.trim().toUpperCase())
+    .filter(Boolean);
+
+  return resolutions?.length ? Array.from(new Set(resolutions)) : defaultResolutions;
+});
 const activeModel = computed(
   () => models.value.find((model) => model.value === selectedModel.value) ?? models.value[0],
 );
@@ -349,7 +387,7 @@ async function consumeRouteContext(): Promise<void> {
 }
 
 function changeMode(nextMode: VideoMode): void {
-  if (modes.find((item) => item.value === nextMode)?.available === false) {
+  if (availableModes.value.find((item) => item.value === nextMode)?.available === false) {
     showNotice('首尾帧能力待接入，当前支持文生视频和单图参考');
     return;
   }
@@ -361,6 +399,34 @@ function changeMode(nextMode: VideoMode): void {
     const [firstFrame] = sourceFrames.value;
     sourceFrames.value.slice(1).forEach((frame) => URL.revokeObjectURL(frame.url));
     sourceFrames.value = firstFrame ? [firstFrame] : [];
+  }
+}
+
+function selectVideoModel(modelAlias: string): void {
+  selectedModel.value = modelAlias;
+  applyActiveModelConstraints();
+}
+
+function applyActiveModelConstraints(): void {
+  const durations = availableDurations.value;
+  const resolutions = availableResolutions.value;
+
+  if (!durations.includes(selectedDuration.value)) {
+    const preferredDuration = [...durations]
+      .reverse()
+      .find((duration) => duration <= selectedDuration.value);
+
+    selectedDuration.value = preferredDuration ?? durations[0] ?? 5;
+  }
+
+  if (!resolutions.includes(selectedResolution.value)) {
+    selectedResolution.value = resolutions.includes('1080P')
+      ? '1080P'
+      : (resolutions.at(-1) ?? '720P');
+  }
+
+  if (mode.value === 'first-last-frame' && activeVideoProfile.value?.supportsLastFrame === false) {
+    changeMode('image-to-video');
   }
 }
 
@@ -429,15 +495,16 @@ function toggleFavorite(taskId: string): void {
 }
 
 function reuseTask(task: VideoWork): void {
+  prompt.value = task.prompt;
+  selectedRatio.value = task.ratio;
+  selectedDuration.value = task.duration;
+  selectedResolution.value = task.resolution;
+  selectVideoModel(task.modelAlias);
+
   if (isVideoMode(task.mode)) {
     changeMode(task.mode);
   }
 
-  prompt.value = task.prompt;
-  selectedModel.value = task.modelAlias;
-  selectedRatio.value = task.ratio;
-  selectedDuration.value = task.duration;
-  selectedResolution.value = task.resolution;
   window.scrollTo({ behavior: 'smooth', top: 0 });
 }
 
@@ -451,7 +518,7 @@ function reuseShowcase(item: ShowcaseItem): void {
     ) ?? models.value[item.variant % models.value.length];
 
   if (model) {
-    selectedModel.value = model.value;
+    selectVideoModel(model.value);
   }
 
   activeGalleryTab.value = 'mine';
@@ -562,12 +629,10 @@ onMounted(() => {
 
 watch(
   () =>
-    modelCatalog
-      .modelsFor('video')
-      .map((model) => model.alias)
-      .join('|'),
+    JSON.stringify(modelCatalog.modelsFor('video').map((model) => [model.alias, model.profile])),
   () => {
     selectedModel.value = modelCatalog.resolveAlias('video', selectedModel.value);
+    applyActiveModelConstraints();
   },
   { immediate: true },
 );
@@ -624,7 +689,7 @@ onBeforeUnmount(() => {
           type="button"
           :class="{ active: selectedModel === model.value }"
           :title="model.label"
-          @click="selectedModel = model.value"
+          @click="selectVideoModel(model.value)"
         >
           <i :style="{ '--model-accent': model.accent }">{{ model.short }}</i>
           <span>{{ model.label }}</span>
@@ -657,7 +722,7 @@ onBeforeUnmount(() => {
           </header>
           <div class="video-mode-grid">
             <button
-              v-for="item in modes"
+              v-for="item in availableModes"
               :key="item.value"
               type="button"
               :class="{ active: mode === item.value }"
@@ -779,7 +844,7 @@ onBeforeUnmount(() => {
             <span>时长</span>
             <div>
               <button
-                v-for="duration in durations"
+                v-for="duration in availableDurations"
                 :key="duration"
                 type="button"
                 :class="{ active: selectedDuration === duration }"
@@ -793,7 +858,7 @@ onBeforeUnmount(() => {
             <span>清晰度</span>
             <div>
               <button
-                v-for="resolution in resolutions"
+                v-for="resolution in availableResolutions"
                 :key="resolution"
                 type="button"
                 :class="{ active: selectedResolution === resolution }"

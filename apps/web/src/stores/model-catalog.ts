@@ -60,16 +60,64 @@ const fallbackModels: ModelCatalogItem[] = [
     alias: 'jiguang-gpt-image-2.5',
     capabilities: ['image'],
     displayName: 'GPT Image 2.5',
+    profile: {
+      image: {
+        maxReferenceImages: 10,
+        sizePresets: ['1K', '2K', '4K'],
+      },
+    },
+  },
+  {
+    alias: 'doubao-seedream-4-0',
+    capabilities: ['image'],
+    displayName: 'Seedream 4.0',
+    profile: {
+      image: {
+        maxReferenceImages: 14,
+        sizePresets: ['1K', '2K', '4K'],
+        supportsSequentialGeneration: true,
+      },
+    },
   },
   {
     alias: 'xai-grok-imagine-video',
     capabilities: ['video'],
     displayName: 'Grok Imagine Video',
+    profile: {
+      video: {
+        maxDuration: 15,
+        resolutions: ['720P', '1080P'],
+        supportsAudio: false,
+        supportsLastFrame: false,
+        supportsVideoInput: false,
+      },
+    },
   },
   {
     alias: 'xai-grok-imagine-video-1.5',
     capabilities: ['video'],
     displayName: 'Grok Imagine Video 1.5',
+    profile: {
+      video: {
+        maxDuration: 15,
+        resolutions: ['720P', '1080P'],
+        supportsAudio: false,
+        supportsLastFrame: false,
+        supportsVideoInput: false,
+      },
+    },
+  },
+  {
+    alias: 'doubao-seedance-1-0-pro',
+    capabilities: ['video'],
+    displayName: 'Seedance 1.0 Pro',
+    profile: {
+      video: {
+        maxDuration: 12,
+        resolutions: ['480P', '720P', '1080P'],
+        supportsLastFrame: true,
+      },
+    },
   },
 ];
 
@@ -140,6 +188,7 @@ export function getFallbackModelItems(): ModelCatalogItem[] {
   return fallbackModels.map((model) => ({
     ...model,
     capabilities: [...model.capabilities],
+    profile: cloneModelProfile(model.profile),
   }));
 }
 
@@ -160,6 +209,7 @@ export function normalizeModels(models: ChatModel[]): ModelCatalogItem[] {
     if (existing) {
       existing.capabilities = Array.from(new Set([...existing.capabilities, ...capabilities]));
       existing.displayName = displayName;
+      existing.profile = mergeModelProfiles(existing.profile, model.profile);
       continue;
     }
 
@@ -167,6 +217,7 @@ export function normalizeModels(models: ChatModel[]): ModelCatalogItem[] {
       alias,
       capabilities: Array.from(new Set(capabilities)),
       displayName,
+      profile: cloneModelProfile(model.profile),
     });
   }
 
@@ -183,4 +234,88 @@ function isSupportedCapability(capability: string): capability is ModelCapabilit
     capability === 'video' ||
     capability === 'vision'
   );
+}
+
+function cloneModelProfile(profile: ChatModel['profile']): ChatModel['profile'] | undefined {
+  if (!profile) {
+    return undefined;
+  }
+
+  return {
+    ...(profile.image
+      ? {
+          image: {
+            ...profile.image,
+            sizePresets: [...profile.image.sizePresets],
+          },
+        }
+      : {}),
+    ...(profile.video
+      ? {
+          video: {
+            ...profile.video,
+            resolutions: [...profile.video.resolutions],
+          },
+        }
+      : {}),
+  };
+}
+
+function mergeModelProfiles(
+  current: ChatModel['profile'],
+  incoming: ChatModel['profile'],
+): ChatModel['profile'] | undefined {
+  if (!current) {
+    return cloneModelProfile(incoming);
+  }
+
+  if (!incoming) {
+    return cloneModelProfile(current);
+  }
+
+  return {
+    ...(current.image || incoming.image
+      ? {
+          image: {
+            maxReferenceImages: Math.max(
+              current.image?.maxReferenceImages ?? 0,
+              incoming.image?.maxReferenceImages ?? 0,
+            ),
+            sizePresets: Array.from(
+              new Set([
+                ...(current.image?.sizePresets ?? []),
+                ...(incoming.image?.sizePresets ?? []),
+              ]),
+            ),
+            supportsLayerDecomposition:
+              current.image?.supportsLayerDecomposition ||
+              incoming.image?.supportsLayerDecomposition,
+            supportsSequentialGeneration:
+              current.image?.supportsSequentialGeneration ||
+              incoming.image?.supportsSequentialGeneration,
+          },
+        }
+      : {}),
+    ...(current.video || incoming.video
+      ? {
+          video: {
+            maxDuration: Math.max(
+              current.video?.maxDuration ?? 0,
+              incoming.video?.maxDuration ?? 0,
+            ),
+            resolutions: Array.from(
+              new Set([
+                ...(current.video?.resolutions ?? []),
+                ...(incoming.video?.resolutions ?? []),
+              ]),
+            ),
+            supportsAudio: current.video?.supportsAudio || incoming.video?.supportsAudio,
+            supportsLastFrame:
+              current.video?.supportsLastFrame || incoming.video?.supportsLastFrame,
+            supportsVideoInput:
+              current.video?.supportsVideoInput || incoming.video?.supportsVideoInput,
+          },
+        }
+      : {}),
+  };
 }

@@ -12,6 +12,7 @@ import type { FileAsset, ImageTask } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { FilesService } from '../files/files.service';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
+import { findImageModelConstraintViolation } from '../models/model-capability.constraints';
 import { ModelRegistryService } from '../models/model-registry.service';
 import { PointsService } from '../points/points.service';
 import { IMAGE_PROVIDER, type ImageProvider } from '../providers/image-provider';
@@ -87,6 +88,17 @@ export class ImageTasksService implements OnModuleInit {
         code: 'IMAGE_MODEL_NOT_FOUND',
         message: '所选模型不支持图片生成',
       });
+    }
+
+    const capabilityViolation = findImageModelConstraintViolation({
+      parameters: taskParameters,
+      profile: model.profile,
+      referenceFileIds,
+      sourceFileId: input.sourceFileId,
+    });
+
+    if (capabilityViolation) {
+      throw new ConflictException(capabilityViolation);
     }
 
     if (input.sourceFileId) {
