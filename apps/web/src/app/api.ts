@@ -943,6 +943,26 @@ export async function fetchConversation(conversationId: string): Promise<Convers
   return response.data.data;
 }
 
+export async function renameConversation(
+  conversationId: string,
+  title: string,
+): Promise<ConversationSummary> {
+  const response = await apiClient.patch<ApiEnvelope<ConversationSummary>>(
+    `/api/v1/conversations/${encodeURIComponent(conversationId)}`,
+    { title },
+  );
+
+  return response.data.data;
+}
+
+export async function deleteConversation(conversationId: string): Promise<{ id: string }> {
+  const response = await apiClient.delete<ApiEnvelope<{ id: string }>>(
+    `/api/v1/conversations/${encodeURIComponent(conversationId)}`,
+  );
+
+  return response.data.data;
+}
+
 export async function streamChat(
   input: {
     content: string;

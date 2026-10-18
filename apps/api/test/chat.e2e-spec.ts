@@ -166,6 +166,47 @@ describe('chat and conversation endpoints', () => {
       id: conversationId,
       messages: [],
     });
+
+    const renameResponse = await request(app.getHttpServer())
+      .patch(`/api/v1/conversations/${conversationId}`)
+      .set('authorization', `Bearer ${accessToken}`)
+      .send({ title: '重命名后的会话' })
+      .expect(200);
+
+    expect(renameResponse.body.data).toMatchObject({
+      id: conversationId,
+      title: '重命名后的会话',
+    });
+
+    const otherUser = await registerUser();
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/conversations/${conversationId}`)
+      .set('authorization', `Bearer ${otherUser.accessToken}`)
+      .send({ title: '越权重命名' })
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/conversations/${conversationId}`)
+      .set('authorization', `Bearer ${otherUser.accessToken}`)
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/conversations/${conversationId}`)
+      .set('authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    const emptyListResponse = await request(app.getHttpServer())
+      .get('/api/v1/conversations')
+      .set('authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(emptyListResponse.body.data.items).toHaveLength(0);
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/conversations/${conversationId}`)
+      .set('authorization', `Bearer ${accessToken}`)
+      .expect(404);
   });
 
   it('sends an owned image attachment and restores it from conversation history', async () => {

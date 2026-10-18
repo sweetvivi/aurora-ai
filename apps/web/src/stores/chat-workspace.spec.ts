@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiMocks = vi.hoisted(() => ({
   clearAuthSession: vi.fn(),
+  deleteConversation: vi.fn(),
   devLogin: vi.fn(),
   emailLogin: vi.fn(),
   emailRegister: vi.fn(),
@@ -13,6 +14,7 @@ const apiMocks = vi.hoisted(() => ({
   getRefreshToken: vi.fn(),
   hasStoredTokens: vi.fn(),
   logout: vi.fn(),
+  renameConversation: vi.fn(),
   setAuthSession: vi.fn(),
   streamChat: vi.fn(),
 }));
@@ -406,5 +408,92 @@ describe('chat workspace store', () => {
       id: 'persisted-attachment',
       sortOrder: 0,
     });
+  });
+
+  it('renames an owned conversation and keeps the current thread selected', async () => {
+    const conversation = {
+      createdAt: '2026-10-18T00:00:00.000Z',
+      id: 'conversation-rename',
+      lastMessageAt: '2026-10-18T00:01:00.000Z',
+      modelAlias: 'openai-gpt-6-astra',
+      title: '旧标题',
+      updatedAt: '2026-10-18T00:01:00.000Z',
+    };
+
+    apiMocks.fetchConversations.mockResolvedValue([conversation]);
+    apiMocks.renameConversation.mockResolvedValue({
+      ...conversation,
+      title: '新标题',
+      updatedAt: '2026-10-18T00:02:00.000Z',
+    });
+
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+
+    const chatStore = useChatWorkspaceStore();
+
+    await chatStore.initialize();
+    await chatStore.renameConversation(conversation.id, '  新标题  ');
+
+    expect(apiMocks.renameConversation).toHaveBeenCalledWith(conversation.id, '新标题');
+    expect(chatStore.conversations[0]?.title).toBe('新标题');
+  });
+
+  it('clears the active thread after deleting the current conversation', async () => {
+    const currentConversation = {
+      createdAt: '2026-10-18T00:00:00.000Z',
+      id: 'conversation-delete-current',
+      lastMessageAt: '2026-10-18T00:01:00.000Z',
+      modelAlias: 'openai-gpt-6-astra',
+      title: '当前会话',
+      updatedAt: '2026-10-18T00:01:00.000Z',
+    };
+    const remainingConversation = {
+      ...currentConversation,
+      id: 'conversation-remaining',
+      title: '保留会话',
+    };
+
+    apiMocks.fetchConversations.mockResolvedValue([currentConversation, remainingConversation]);
+    apiMocks.fetchConversation.mockResolvedValue({
+      ...currentConversation,
+      messages: [
+        {
+          attachments: [],
+          content: '需要删除的消息',
+          createdAt: '2026-10-18T00:01:00.000Z',
+          id: 'message-delete-current',
+          role: 'USER',
+          status: 'COMPLETED',
+        },
+      ],
+      userId: authenticatedUser.id,
+    });
+    apiMocks.deleteConversation.mockResolvedValue({
+      id: currentConversation.id,
+    });
+
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+
+    const chatStore = useChatWorkspaceStore();
+
+    await chatStore.initialize();
+    await chatStore.openConversation(currentConversation.id);
+    await chatStore.deleteConversation(currentConversation.id);
+
+    expect(apiMocks.deleteConversation).toHaveBeenCalledWith(currentConversation.id);
+    expect(chatStore.currentConversationId).toBeNull();
+    expect(chatStore.messages).toEqual([]);
+    expect(chatStore.conversations.map((conversation) => conversation.id)).toEqual([
+      remainingConversation.id,
+    ]);
+    expect(chatStore.status).toBe('ready');
   });
 });

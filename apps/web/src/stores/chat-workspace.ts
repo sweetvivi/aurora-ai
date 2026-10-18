@@ -5,9 +5,11 @@ import {
   type ConversationAttachment,
   type ConversationMessage,
   type ConversationSummary,
+  deleteConversation as deleteConversationRequest,
   fetchConversation,
   fetchConversations,
   fetchModels,
+  renameConversation as renameConversationRequest,
   type ReasoningEffort,
   streamChat,
 } from '@/app/api';
@@ -109,6 +111,49 @@ export const useChatWorkspaceStore = defineStore('chat-workspace', {
     },
     async loadConversations(): Promise<void> {
       this.conversations = await fetchConversations();
+    },
+    async renameConversation(conversationId: string, title: string): Promise<void> {
+      const normalizedTitle = title.trim();
+
+      if (!normalizedTitle) {
+        return;
+      }
+
+      this.error = null;
+
+      try {
+        const conversation = await renameConversationRequest(conversationId, normalizedTitle);
+        const conversationIndex = this.conversations.findIndex(
+          (item) => item.id === conversation.id,
+        );
+
+        if (conversationIndex >= 0) {
+          this.conversations[conversationIndex] = conversation;
+        }
+      } catch (error) {
+        this.error = normalizeChatError(error);
+        throw error;
+      }
+    },
+    async deleteConversation(conversationId: string): Promise<void> {
+      this.error = null;
+
+      try {
+        await deleteConversationRequest(conversationId);
+        this.conversations = this.conversations.filter(
+          (conversation) => conversation.id !== conversationId,
+        );
+
+        if (this.currentConversationId === conversationId) {
+          this.stopStreaming();
+          this.currentConversationId = null;
+          this.messages = [];
+          this.status = 'ready';
+        }
+      } catch (error) {
+        this.error = normalizeChatError(error);
+        throw error;
+      }
     },
     newConversation(): void {
       this.stopStreaming();

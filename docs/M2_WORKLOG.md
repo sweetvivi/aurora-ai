@@ -781,6 +781,24 @@ node outputs/ui-reference/verify-canvas-studio.mjs
 - `verify-canvas-workflow-library.mjs` 使用 Playwright 路由 Mock 覆盖两个云端工作流、重命名请求、新建请求、删除非当前工作流和重新打开，桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出或页面脚本错误
 - 定向 API 测试 20 个文件 79 项、Web 测试 16 个文件 63 项、格式检查、lint、类型检查和生产构建通过；本批不调用真实 Provider、不读取或输出 Key
 
+模型对话会话管理：
+
+```text
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+node outputs/ui-reference/verify-chat-conversation-actions.mjs
+```
+
+- 新增 `PATCH /api/v1/conversations/:conversationId` 和 `DELETE /api/v1/conversations/:conversationId`，两条接口都会先按当前用户和会话 ID 校验归属，越权统一返回 `CONVERSATION_NOT_FOUND`
+- 会话标题会在服务端去除首尾空白，要求非空且最多 80 个字符；删除会话沿用 Prisma 级联关系清理消息、附件关联和聊天请求
+- 历史抽屉新增内联重命名、保存/取消、删除确认和操作错误回传；桌面端操作按钮按 hover、focus、active 显示，触屏设备常显
+- 删除当前打开的会话会停止流式请求、清空当前会话 ID、消息和错误状态，并回到“今天有什么我可以帮你的吗”新对话空态
+- `verify-chat-conversation-actions.mjs` 使用 Edge 和 API 路由 Mock，覆盖打开历史、重命名请求、标题刷新、删除确认、保留其他会话和当前线程清空；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出或页面脚本错误
+- 全量验证通过：API 20 个文件 83 项、Web 16 个文件 66 项，格式检查、lint、前后端类型检查和生产构建均通过；验收不调用真实 Provider、不读取或输出 Key
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥

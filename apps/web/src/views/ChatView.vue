@@ -3,8 +3,11 @@ import {
   AppstoreOutlined,
   BarChartOutlined,
   BulbOutlined,
+  CheckOutlined,
+  CloseOutlined,
   CodeOutlined,
   CopyOutlined,
+  DeleteOutlined,
   DislikeOutlined,
   DownOutlined,
   EditOutlined,
@@ -31,7 +34,7 @@ import MarkdownMessage from '@/components/MarkdownMessage.vue';
 import MessageAttachments from '@/components/MessageAttachments.vue';
 import { useChatWorkspaceStore } from '@/stores/chat-workspace';
 import { useSessionStore } from '@/stores/session';
-import type { ReasoningEffort } from '@/app/api';
+import type { ConversationSummary, ReasoningEffort } from '@/app/api';
 
 const route = useRoute();
 const sessionStore = useSessionStore();
@@ -48,6 +51,10 @@ const composerInput = ref<InstanceType<typeof ChatComposer> | null>(null);
 const historyOpen = ref(false);
 const copiedMessageId = ref('');
 const messageFeedback = ref<Record<string, '' | 'dislike' | 'like'>>({});
+const editingConversationId = ref('');
+const editingConversationTitle = ref('');
+const conversationMutationId = ref('');
+const renameConversationInput = ref<HTMLInputElement | null>(null);
 
 const suggestions = [
   {
@@ -348,6 +355,67 @@ async function openConversation(conversationId: string): Promise<void> {
   await scrollToBottom();
 }
 
+async function startConversationRename(conversation: ConversationSummary): Promise<void> {
+  if (streaming.value) {
+    return;
+  }
+
+  editingConversationId.value = conversation.id;
+  editingConversationTitle.value = conversation.title;
+  await nextTick();
+  renameConversationInput.value?.select();
+}
+
+function cancelConversationRename(): void {
+  editingConversationId.value = '';
+  editingConversationTitle.value = '';
+}
+
+function setRenameConversationInput(element: unknown): void {
+  renameConversationInput.value = element instanceof HTMLInputElement ? element : null;
+}
+
+async function saveConversationTitle(conversation: ConversationSummary): Promise<void> {
+  const title = editingConversationTitle.value.trim();
+
+  if (!title || conversationMutationId.value || title === conversation.title) {
+    if (!title || title === conversation.title) {
+      cancelConversationRename();
+    }
+
+    return;
+  }
+
+  conversationMutationId.value = conversation.id;
+
+  try {
+    await chatStore.renameConversation(conversation.id, title);
+    cancelConversationRename();
+  } catch {
+    // The store exposes the server error through the existing composer alert.
+  } finally {
+    conversationMutationId.value = '';
+  }
+}
+
+async function deleteConversation(conversationId: string): Promise<void> {
+  if (streaming.value || conversationMutationId.value) {
+    return;
+  }
+
+  conversationMutationId.value = conversationId;
+
+  try {
+    await chatStore.deleteConversation(conversationId);
+    prompt.value = '';
+    await scrollToBottom(false);
+  } catch {
+    // The store exposes the server error through the existing composer alert.
+  } finally {
+    conversationMutationId.value = '';
+  }
+}
+
 function startNewConversation(): void {
   chatStore.newConversation();
   prompt.value = '';
@@ -461,19 +529,80 @@ function formatConversationTime(value: string | null): string {
       </label>
 
       <div v-if="filteredConversations.length > 0" class="chat-history__list">
-        <button
+        <div
           v-for="conversation in filteredConversations"
           :key="conversation.id"
-          type="button"
+          class="chat-history__item"
           :class="{ active: conversation.id === chatStore.currentConversationId }"
-          @click="openConversation(conversation.id)"
         >
-          <MessageOutlined />
-          <span>
-            <strong>{{ conversation.title }}</strong>
-            <small>{{ formatConversationTime(conversation.lastMessageAt) }}</small>
-          </span>
-        </button>
+          <div v-if="editingConversationId === conversation.id" class="chat-history__rename">
+            <MessageOutlined />
+            <input
+              :ref="setRenameConversationInput"
+              v-model="editingConversationTitle"
+              maxlength="80"
+              aria-label="会话标题"
+              @keydown.enter.prevent="saveConversationTitle(conversation)"
+              @keydown.esc.prevent="cancelConversationRename"
+            />
+            <button
+              type="button"
+              aria-label="保存会话标题"
+              :disabled="Boolean(conversationMutationId)"
+              @click="saveConversationTitle(conversation)"
+            >
+              <CheckOutlined />
+            </button>
+            <button
+              type="button"
+              aria-label="取消重命名"
+              :disabled="Boolean(conversationMutationId)"
+              @click="cancelConversationRename"
+            >
+              <CloseOutlined />
+            </button>
+          </div>
+
+          <template v-else>
+            <button
+              class="chat-history__item-main"
+              type="button"
+              @click="openConversation(conversation.id)"
+            >
+              <MessageOutlined />
+              <span>
+                <strong>{{ conversation.title }}</strong>
+                <small>{{ formatConversationTime(conversation.lastMessageAt) }}</small>
+              </span>
+            </button>
+            <div class="chat-history__item-actions">
+              <button
+                type="button"
+                aria-label="重命名会话"
+                :disabled="streaming || Boolean(conversationMutationId)"
+                @click="startConversationRename(conversation)"
+              >
+                <EditOutlined />
+              </button>
+              <a-popconfirm
+                title="删除这个会话？"
+                description="会话消息会一并删除，此操作无法撤销。"
+                ok-text="删除"
+                cancel-text="取消"
+                :disabled="streaming || Boolean(conversationMutationId)"
+                @confirm="deleteConversation(conversation.id)"
+              >
+                <button
+                  type="button"
+                  aria-label="删除会话"
+                  :disabled="streaming || Boolean(conversationMutationId)"
+                >
+                  <DeleteOutlined />
+                </button>
+              </a-popconfirm>
+            </div>
+          </template>
+        </div>
       </div>
 
       <div v-else class="chat-history__empty">
@@ -821,35 +950,127 @@ function formatConversationTime(value: string | null): string {
   padding: 0 10px 14px;
 }
 
-.chat-history__list button {
+.chat-history__item {
   display: grid;
+  position: relative;
   min-height: 52px;
   align-items: center;
-  gap: 9px;
-  grid-template-columns: 17px minmax(0, 1fr);
-  padding: 7px 9px;
-  border: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
   border-radius: 8px;
   background: transparent;
   color: #596273;
-  text-align: left;
-  cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
 }
 
-.chat-history__list button:hover,
-.chat-history__list button.active {
+.chat-history__item:hover,
+.chat-history__item:focus-within,
+.chat-history__item.active {
   background: #f1f5ff;
   color: #356fe0;
 }
 
-.chat-history__list button > svg {
+.chat-history__item-main {
+  display: grid;
+  min-width: 0;
+  min-height: 52px;
+  align-items: center;
+  gap: 9px;
+  grid-template-columns: 17px minmax(0, 1fr);
+  padding: 7px 4px 7px 9px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-history__item-main > svg {
   font-size: 14px;
 }
 
-.chat-history__list button > span {
+.chat-history__item-main > span {
   display: grid;
   min-width: 0;
   gap: 4px;
+}
+
+.chat-history__item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 6px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.chat-history__item:hover .chat-history__item-actions,
+.chat-history__item:focus-within .chat-history__item-actions,
+.chat-history__item.active .chat-history__item-actions {
+  opacity: 1;
+}
+
+.chat-history__item-actions button,
+.chat-history__rename button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #7c8593;
+  cursor: pointer;
+}
+
+.chat-history__item-actions button:hover,
+.chat-history__rename button:hover {
+  border-color: #dbe5f8;
+  background: #fff;
+  color: #3979ed;
+}
+
+.chat-history__item-actions button:last-child:hover {
+  border-color: #f1d3cf;
+  color: #cc554d;
+}
+
+.chat-history__item-actions button:disabled,
+.chat-history__rename button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.chat-history__rename {
+  display: grid;
+  min-width: 0;
+  min-height: 52px;
+  align-items: center;
+  gap: 6px;
+  grid-column: 1 / -1;
+  grid-template-columns: 17px minmax(0, 1fr) 26px 26px;
+  padding: 7px 6px 7px 9px;
+}
+
+.chat-history__rename > svg {
+  color: #4c84ff;
+  font-size: 14px;
+}
+
+.chat-history__rename input {
+  width: 100%;
+  min-width: 0;
+  height: 29px;
+  padding: 0 8px;
+  border: 1px solid #9dbdff;
+  border-radius: 6px;
+  outline: 0;
+  background: #fff;
+  color: #3f4653;
+  font-size: 11px;
+  box-shadow: 0 0 0 2px rgb(76 132 255 / 10%);
 }
 
 .chat-history__list strong {
@@ -1444,6 +1665,12 @@ function formatConversationTime(value: string | null): string {
 
   .chat-message__actions {
     flex-wrap: wrap;
+  }
+}
+
+@media (hover: none) {
+  .chat-history__item-actions {
+    opacity: 1;
   }
 }
 </style>

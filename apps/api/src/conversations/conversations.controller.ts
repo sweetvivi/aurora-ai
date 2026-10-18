@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ConversationsService } from './conversations.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { UpdateConversationDto } from './dto/update-conversation.dto';
 
 @Controller('conversations')
 export class ConversationsController {
@@ -22,5 +23,19 @@ export class ConversationsController {
   @Get(':conversationId')
   getDetail(@CurrentUser('id') userId: string, @Param('conversationId') conversationId: string) {
     return this.conversationsService.getDetail(userId, conversationId);
+  }
+
+  @Patch(':conversationId')
+  rename(
+    @CurrentUser('id') userId: string,
+    @Param('conversationId') conversationId: string,
+    @Body() input: UpdateConversationDto,
+  ) {
+    return this.conversationsService.rename(userId, conversationId, input);
+  }
+
+  @Delete(':conversationId')
+  remove(@CurrentUser('id') userId: string, @Param('conversationId') conversationId: string) {
+    return this.conversationsService.remove(userId, conversationId);
   }
 }

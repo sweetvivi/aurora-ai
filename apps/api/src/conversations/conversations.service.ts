@@ -3,6 +3,7 @@ import type { Conversation, Prisma } from '@prisma/client';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
 import { ModelRegistryService } from '../models/model-registry.service';
 import type { CreateConversationDto } from './dto/create-conversation.dto';
+import type { UpdateConversationDto } from './dto/update-conversation.dto';
 
 @Injectable()
 export class ConversationsService {
@@ -102,6 +103,37 @@ export class ConversationsService {
     }
 
     return conversation;
+  }
+
+  async rename(
+    userId: string,
+    conversationId: string,
+    input: UpdateConversationDto,
+  ): Promise<Conversation> {
+    const conversation = await this.getOwnedConversation(userId, conversationId);
+
+    return this.prismaService.conversation.update({
+      data: {
+        title: input.title.trim(),
+      },
+      where: {
+        id: conversation.id,
+      },
+    });
+  }
+
+  async remove(userId: string, conversationId: string): Promise<{ id: string }> {
+    const conversation = await this.getOwnedConversation(userId, conversationId);
+
+    await this.prismaService.conversation.delete({
+      where: {
+        id: conversation.id,
+      },
+    });
+
+    return {
+      id: conversation.id,
+    };
   }
 
   async appendMessage(
