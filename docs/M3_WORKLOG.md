@@ -160,3 +160,15 @@
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build`
 - 全量测试为 API 26 个文件 110 项、Web 18 个文件 79 项
 - `node outputs/ui-reference/verify-admin-modules.mjs` 在桌面端和移动端通过，页面无脚本错误、无横向溢出
+
+## 11. 2026-10-18 AI 绘画模式与上传交互收口
+
+- 新增 `apps/web/src/data/draw-creation-modes.ts`，集中定义文生图、参考图重绘、局部编辑和商品图处理四种模式的参考图要求、提示词占位、说明和提交文案
+- `/draw` 首页创作台支持在当前工作台内切换模式，不再因选择模式跳离页面；选中模式会同步到生成页 URL 的 `mode`
+- 生成页左侧新增模式选择，提交任务时写入 `extraParameters.mode`；文生图允许不上传参考图，其余三种模式必须在提交前提供参考图
+- 参考图上传支持点击选择、拖拽和粘贴，包含缩略图预览、移除、格式校验、数量校验和错误清理；上传成功后不会继续显示旧的“缺少参考图”提示
+- 局部编辑当前把第一张素材作为 `sourceFileId`，其余素材作为 `referenceFileIds`，为后续严格限制单张原图保留兼容路径
+- 新增 `apps/web/src/data/draw-creation-modes.spec.ts`，覆盖模式顺序、模式识别、参考图必填和提示词校验
+- 全量验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、API 26 个文件 110 项、Web 19 个文件 84 项
+- `node outputs/ui-reference/verify-draw-modes.mjs`、`verify-draw-navigation.mjs`、`verify-newdraw-templates.mjs` 和 `verify-draw.mjs` 通过；桌面端 `1440x1000` 与移动端 `390x844` 无脚本错误或横向溢出
+- 本地验收截图：`outputs/ui-reference/draw-modes-desktop.png`、`outputs/ui-reference/draw-modes-mobile.png`

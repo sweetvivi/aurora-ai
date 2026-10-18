@@ -35,6 +35,13 @@ import {
   type DrawEffectTemplate,
 } from '@/data/draw-templates';
 import {
+  DRAW_CREATION_MODES,
+  getDrawCreationModeConfig,
+  isDrawCreationMode,
+  validateDrawCreationInput,
+  type DrawCreationMode,
+} from '@/data/draw-creation-modes';
+import {
   IMAGE_TASK_POINTS_COST,
   useDrawWorkspaceStore,
   type DrawWorkStatus,
@@ -87,7 +94,7 @@ const navigation: NavigationItem[] = [
 const modelAccents = ['#7a5cff', '#ff7043', '#20a66a', '#2f8ddb', '#d05b9a', '#d69a2d'];
 
 const topNavigation = ['做电商', '做视频', '拍写真', '搞设计'];
-const creationModes = ['文生图', '参考图重绘', '局部编辑', '商品图处理'];
+const creationModes = DRAW_CREATION_MODES;
 const ratios = ['智能比例', '1:1', '4:3', '3:4', '16:9', '9:16'];
 const amounts = [1, 2, 3, 4];
 const galleryFilters = [
@@ -387,7 +394,7 @@ const currentModel = ref(modelCatalog.resolveAlias('image'));
 const selectedRatio = ref('智能比例');
 const selectedAmount = ref(1);
 const selectedSize = ref('1K');
-const selectedMode = ref('文生图');
+const selectedMode = ref<DrawCreationMode>('文生图');
 const activeResultTab = ref<'gallery' | 'mine'>('gallery');
 const activeEffectCategory = ref('全部');
 const activeGalleryFilter = ref('全部');
@@ -403,6 +410,7 @@ const detailSubmitting = ref(false);
 const workEditDrafts = ref<Record<string, string>>({});
 const referenceImages = ref<ReferenceImage[]>([]);
 const referenceError = ref('');
+const composerReferenceInput = ref<HTMLInputElement | null>(null);
 const referenceInput = ref<HTMLInputElement | null>(null);
 const templateReferenceInput = ref<HTMLInputElement | null>(null);
 const consumedGenerationToken = ref('');
@@ -470,6 +478,15 @@ const isGeneratingView = computed(() => route.query.view === 'generate');
 const isTemplateView = computed(() => route.name === 'newdraw' || route.query.view === 'templates');
 const generationCost = computed(() => selectedAmount.value * IMAGE_TASK_POINTS_COST);
 const generating = computed(() => workspace.generating || uploadingReference.value);
+const selectedModeConfig = computed(() => getDrawCreationModeConfig(selectedMode.value));
+const selectedModeRequiresReference = computed(() => selectedModeConfig.value.requiresReference);
+const referenceUploadLabel = computed(() =>
+  referenceImages.value.length
+    ? `${referenceImages.value.length} / ${maxReferenceImages.value}`
+    : selectedModeRequiresReference.value
+      ? '上传参考图'
+      : '添加参考图',
+);
 const filteredEffectTemplates = computed(() => {
   if (activeEffectCategory.value === '全部') {
     return effectTemplates;
@@ -602,7 +619,7 @@ function syncGeneratorFromRoute(): void {
     selectedSize.value = routeSize.trim().toUpperCase();
   }
 
-  if (typeof routeMode === 'string' && creationModes.includes(routeMode)) {
+  if (isDrawCreationMode(routeMode)) {
     selectedMode.value = routeMode;
   }
 
@@ -612,7 +629,7 @@ function syncGeneratorFromRoute(): void {
 }
 
 function openGenerator(options: { auto?: boolean; mode?: string } = {}): void {
-  if (options.mode) {
+  if (isDrawCreationMode(options.mode)) {
     selectedMode.value = options.mode;
   }
 
@@ -738,7 +755,7 @@ function openRetouch(operation: string, work?: { id: string; prompt: string }): 
 
 function applyEffectTemplate(template: DrawEffectTemplate): void {
   selectedEffectId.value = template.id;
-  selectedMode.value = template.mode;
+  selectedMode.value = isDrawCreationMode(template.mode) ? template.mode : '文生图';
   prompt.value = template.prompt;
 
   requestAnimationFrame(() => {
@@ -788,7 +805,23 @@ function clearPrompt(): void {
 }
 
 async function startGeneration(): Promise<void> {
-  if (!prompt.value.trim() || generating.value) {
+  if (generating.value) {
+    return;
+  }
+
+  const validationMessage = validateDrawCreationInput({
+    mode: selectedMode.value,
+    prompt: prompt.value,
+    referenceCount: referenceImages.value.length,
+  });
+
+  if (validationMessage) {
+    referenceError.value = validationMessage;
+
+    if (selectedModeRequiresReference.value) {
+      referenceInput.value?.click();
+    }
+
     return;
   }
 
@@ -805,6 +838,7 @@ async function startGeneration(): Promise<void> {
     size: selectedSize.value,
     sourceFileId: referenceImages.value[0]?.assetId,
     extraParameters: {
+      mode: selectedMode.value,
       storage: selectedStorage.value,
     },
   });
@@ -888,16 +922,30 @@ function handleImageTool(item: ToolItem): void {
   openRetouch(destination ?? 'enhance');
 }
 
-function selectCreationMode(mode: string): void {
+function selectCreationMode(mode: DrawCreationMode): void {
   selectedMode.value = mode;
-  openGenerator({ mode });
+  referenceError.value = '';
+
+  if (isGeneratingView.value) {
+    void router.replace({
+      query: {
+        ...route.query,
+        mode,
+      },
+    });
+  }
 }
 
-async function handleReferenceUpload(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement;
-  const files = Array.from(input.files ?? []);
-
+async function uploadReferenceFiles(files: File[]): Promise<void> {
   if (files.length === 0) {
+    return;
+  }
+
+  const imageFiles = files.filter((file) => file.type.startsWith('image/'));
+  const hasIgnoredFiles = imageFiles.length !== files.length;
+
+  if (imageFiles.length === 0) {
+    referenceError.value = '请选择图片文件';
     return;
   }
 
@@ -905,13 +953,20 @@ async function handleReferenceUpload(event: Event): Promise<void> {
 
   if (remaining <= 0) {
     referenceError.value = `最多上传 ${maxReferenceImages.value} 张参考图`;
-    input.value = '';
     return;
   }
 
-  const acceptedFiles = files.slice(0, remaining);
+  const acceptedFiles = imageFiles.slice(0, remaining);
+
+  if (imageFiles.length > remaining) {
+    referenceError.value = `最多上传 ${maxReferenceImages.value} 张参考图`;
+  } else if (hasIgnoredFiles) {
+    referenceError.value = '已忽略非图片文件';
+  } else {
+    referenceError.value = '';
+  }
+
   uploadingReference.value = true;
-  referenceError.value = '';
 
   try {
     const uploaded = await Promise.all(
@@ -937,9 +992,33 @@ async function handleReferenceUpload(event: Event): Promise<void> {
   } catch (error) {
     referenceError.value = error instanceof Error ? error.message : '参考图上传失败，请重试';
   } finally {
-    input.value = '';
     uploadingReference.value = false;
   }
+}
+
+async function handleReferenceUpload(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+
+  await uploadReferenceFiles(Array.from(input.files ?? []));
+  input.value = '';
+}
+
+function handleComposerReferenceDrop(event: DragEvent): void {
+  event.preventDefault();
+  void uploadReferenceFiles(Array.from(event.dataTransfer?.files ?? []));
+}
+
+function handleComposerReferencePaste(event: ClipboardEvent): void {
+  const files = Array.from(event.clipboardData?.files ?? []).filter((file) =>
+    file.type.startsWith('image/'),
+  );
+
+  if (files.length === 0) {
+    return;
+  }
+
+  event.preventDefault();
+  void uploadReferenceFiles(files);
 }
 
 function removeReference(referenceId: string): void {
@@ -950,6 +1029,7 @@ function removeReference(referenceId: string): void {
   }
 
   referenceImages.value = referenceImages.value.filter((item) => item.id !== referenceId);
+  referenceError.value = '';
 }
 
 function applyActiveModelConstraints(): void {
@@ -1118,7 +1198,23 @@ function workStatusLabel(status: DrawWorkStatus): string {
 }
 
 function generate(): void {
-  if (!prompt.value.trim()) {
+  if (generating.value) {
+    return;
+  }
+
+  const validationMessage = validateDrawCreationInput({
+    mode: selectedMode.value,
+    prompt: prompt.value,
+    referenceCount: referenceImages.value.length,
+  });
+
+  if (validationMessage) {
+    referenceError.value = validationMessage;
+
+    if (selectedModeRequiresReference.value) {
+      composerReferenceInput.value?.click();
+    }
+
     return;
   }
 
@@ -1529,6 +1625,24 @@ onBeforeUnmount(() => {
 
         <div class="draw-generator__workspace">
           <aside class="draw-generator__params">
+            <section class="draw-param-section draw-generator__modes">
+              <header>
+                <strong>创作模式</strong>
+                <span>{{ selectedModeConfig.description }}</span>
+              </header>
+              <div>
+                <button
+                  v-for="mode in creationModes"
+                  :key="mode"
+                  type="button"
+                  :class="{ active: selectedMode === mode }"
+                  @click="selectCreationMode(mode)"
+                >
+                  {{ mode }}
+                </button>
+              </div>
+            </section>
+
             <section class="draw-param-section">
               <header>
                 <strong>选择模型</strong>
@@ -1575,13 +1689,9 @@ onBeforeUnmount(() => {
 
             <section class="draw-param-section draw-generator__references">
               <header>
-                <strong>参考图</strong>
+                <strong>{{ selectedModeConfig.referenceLabel }}</strong>
                 <span>
-                  {{
-                    uploadingReference
-                      ? '上传中...'
-                      : `已上传 ${referenceImages.length} / ${maxReferenceImages} 张`
-                  }}
+                  {{ uploadingReference ? '上传中...' : selectedModeConfig.referenceDescription }}
                 </span>
               </header>
               <input
@@ -1613,7 +1723,7 @@ onBeforeUnmount(() => {
                 >
                   <LoadingOutlined v-if="uploadingReference" />
                   <PlusOutlined v-else />
-                  <small>{{ uploadingReference ? '上传中' : '上传参考图' }}</small>
+                  <small>{{ uploadingReference ? '上传中' : referenceUploadLabel }}</small>
                 </button>
               </div>
               <p v-if="referenceError" class="draw-generator__field-error">{{ referenceError }}</p>
@@ -1690,12 +1800,12 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="draw-generator__submit"
-              :disabled="!prompt.trim() || generating || uploadingReference"
+              :disabled="generating || uploadingReference"
               @click="startGeneration"
             >
               <LoadingOutlined v-if="generating" />
               <ThunderboltFilled v-else />
-              {{ generating ? '正在生成图片...' : '立即生成' }}
+              {{ generating ? '正在生成图片...' : selectedModeConfig.submitLabel }}
             </button>
           </aside>
 
@@ -2011,22 +2121,57 @@ onBeforeUnmount(() => {
           </header>
 
           <form class="draw-composer__box" @submit.prevent="generate">
-            <div class="draw-composer__input">
-              <button
-                type="button"
-                class="draw-composer__upload"
-                aria-label="上传参考图"
-                @click="openGenerator({ mode: '参考图重绘' })"
-              >
-                <PlusOutlined />
-                <span>上传</span>
-              </button>
+            <input
+              ref="composerReferenceInput"
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              :disabled="uploadingReference || referenceImages.length >= maxReferenceImages"
+              @change="handleReferenceUpload"
+            />
+            <div class="draw-composer__input" @dragover.prevent @drop="handleComposerReferenceDrop">
+              <div class="draw-composer__attachments">
+                <span
+                  v-for="image in referenceImages"
+                  :key="image.id"
+                  class="draw-composer__reference"
+                >
+                  <img :src="image.url" :alt="image.name" />
+                  <button
+                    type="button"
+                    :aria-label="`移除${image.name}`"
+                    title="移除参考图"
+                    @click="removeReference(image.id)"
+                  >
+                    <CloseOutlined />
+                  </button>
+                </span>
+                <button
+                  v-if="referenceImages.length < maxReferenceImages"
+                  type="button"
+                  class="draw-composer__upload"
+                  aria-label="上传参考图"
+                  :disabled="uploadingReference"
+                  @click="composerReferenceInput?.click()"
+                >
+                  <LoadingOutlined v-if="uploadingReference" />
+                  <PlusOutlined v-else />
+                  <span>{{ uploadingReference ? '上传中' : '上传' }}</span>
+                  <small>{{ referenceImages.length }} / {{ maxReferenceImages }}</small>
+                </button>
+              </div>
               <textarea
                 v-model="prompt"
                 maxlength="500"
-                placeholder="描述画面，可 Ctrl+V 粘贴图片或拖拽上传，输入 @ 引用图片"
+                :placeholder="selectedModeConfig.promptPlaceholder"
+                @paste="handleComposerReferencePaste"
               />
             </div>
+
+            <p v-if="referenceError" class="draw-composer__field-error" role="alert">
+              {{ referenceError }}
+            </p>
 
             <footer class="draw-composer__toolbar">
               <span class="draw-composer__mode-label">
@@ -2069,10 +2214,10 @@ onBeforeUnmount(() => {
               <button
                 class="draw-composer__submit"
                 type="submit"
-                :disabled="!prompt.trim() || generating || uploadingReference"
+                :disabled="generating || uploadingReference"
               >
                 <LoadingOutlined v-if="generating" />
-                {{ generating ? '生成中' : '立即生成' }}
+                {{ generating ? '生成中' : selectedModeConfig.submitLabel }}
               </button>
             </footer>
           </form>
@@ -2095,7 +2240,7 @@ onBeforeUnmount(() => {
           </div>
 
           <p class="draw-composer__model-note">
-            当前模型：{{ selectedModelLabel }} · 支持单张参考图重绘和批量生成
+            当前模型：{{ selectedModelLabel }} · {{ selectedModeConfig.description }}
           </p>
         </section>
 
@@ -3759,6 +3904,31 @@ onBeforeUnmount(() => {
   font-size: 8px;
 }
 
+.draw-generator__modes > div {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.draw-generator__modes button {
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #e5e8ec;
+  border-radius: 7px;
+  background: #fff;
+  color: #697280;
+  font-size: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.draw-generator__modes button.active {
+  border-color: #acd5ca;
+  background: #edf8f4;
+  color: #238268;
+}
+
 .draw-generator__model-grid {
   display: grid;
   gap: 7px;
@@ -5089,8 +5259,17 @@ onBeforeUnmount(() => {
 .draw-composer__input {
   display: grid;
   align-items: start;
-  gap: 12px;
-  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  grid-template-columns: minmax(54px, auto) minmax(0, 1fr);
+}
+
+.draw-composer__attachments {
+  display: flex;
+  max-width: 176px;
+  align-items: flex-start;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .draw-composer__upload {
@@ -5104,6 +5283,41 @@ onBeforeUnmount(() => {
   border-radius: 7px;
   background: #fafbfc;
   color: #7f8997;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.draw-composer__reference {
+  position: relative;
+  display: block;
+  width: 54px;
+  height: 62px;
+  flex: 0 0 54px;
+  overflow: hidden;
+  border: 1px solid #dfe4e9;
+  border-radius: 7px;
+  background: #f7f8fa;
+}
+
+.draw-composer__reference img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.draw-composer__reference button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(23 28 35 / 72%);
+  color: #fff;
   font-size: 8px;
   cursor: pointer;
 }
@@ -5128,6 +5342,12 @@ onBeforeUnmount(() => {
 
 .draw-composer__input textarea::placeholder {
   color: #a1a8b3;
+}
+
+.draw-composer__field-error {
+  margin: 7px 0 0 64px;
+  color: #d75252;
+  font-size: 8px;
 }
 
 .draw-composer__toolbar {
@@ -5861,9 +6081,23 @@ onBeforeUnmount(() => {
     grid-template-columns: 46px minmax(0, 1fr);
   }
 
+  .draw-composer__attachments {
+    max-width: 46px;
+  }
+
   .draw-composer__upload {
     width: 46px;
     height: 56px;
+  }
+
+  .draw-composer__reference {
+    width: 46px;
+    height: 56px;
+    flex-basis: 46px;
+  }
+
+  .draw-composer__field-error {
+    margin-left: 56px;
   }
 
   .draw-composer__toolbar {
