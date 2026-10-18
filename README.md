@@ -65,7 +65,7 @@
 - `node outputs/ui-reference/verify-newdraw-templates.mjs` 通过，`/newdraw` 的 7 分类、17 模板、筛选、回填、示例弹窗、高级设置和顶部跳转在桌面端与移动端均正常；390px 移动端固定创作栏与底部导航保持至少 8px 间距
 - `node outputs/ui-reference/verify-showcase-assets.mjs` 通过，`/newdraw` 的 34 张预览图和图片生成页的 12 张示例图全部加载，无横向溢出
 - `node outputs/ui-reference/verify-commerce-studio.mjs` 通过，电商工具的空状态、必填参数、素材上传、替换/试穿/精修任务、本地建议箱和桌面/移动端布局均正常
-- `node outputs/ui-reference/verify-draw-navigation.mjs` 通过，`/draw` 的三级工具目录、模型/工具搜索、侧栏折叠、工具路由、视频入口和卡片跳转在桌面端与移动端均正常
+- `node outputs/ui-reference/verify-draw-navigation.mjs` 通过，`/draw` 的三级工具目录、模型/工具搜索、侧栏折叠、工具路由、顶部视频入口和卡片跳转在桌面端与移动端均正常；创作类型卡不再混入 AI 视频
 - `node outputs/ui-reference/verify-draw.mjs` 通过，`/draw` 参考图上传、两张 Mock 批量生成、结果展示、下载、收藏、删除和积分结算在桌面端与移动端均正常
 - `node outputs/ui-reference/verify-draw-modes.mjs` 通过，`/draw` 的文生图、参考图重绘、局部编辑和商品图处理模式可在当前工作台切换，参考图要求、提示词、URL 参数和任务参数会同步更新，桌面端与移动端无脚本错误或横向溢出
 - `node outputs/ui-reference/verify-draw-navigation.mjs` 和 `verify-m2-interactions.mjs` 已覆盖视频新窗口，校验 `/video` 独立路由和视频工作台首屏渲染

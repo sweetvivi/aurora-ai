@@ -232,13 +232,6 @@ const creativeTypes: ToolItem[] = [
     tags: ['文生图', '图片重绘', '批量探索'],
   },
   {
-    accent: '#15966e',
-    description: '让图片动起来，生成产品短片和创意镜头。',
-    glyph: '视',
-    label: 'AI 视频',
-    tags: ['图生视频', '文生视频', '视频特效'],
-  },
-  {
     accent: '#e28732',
     description: '完成放大、扩图、擦除、修复和商品图批量处理。',
     glyph: '修',
@@ -668,17 +661,8 @@ function openGenerator(options: { auto?: boolean; mode?: string } = {}): void {
   });
 }
 
-function openVideoStudio(work?: { id: string; prompt: string }): void {
-  const query = new URLSearchParams();
-
-  if (work) {
-    query.set('mode', 'image-to-video');
-    query.set('prompt', work.prompt);
-    query.set('sourceWork', work.id);
-  }
-
-  const videoPath = query.size > 0 ? `/video?${query.toString()}` : '/video';
-  const popup = window.open(videoPath, '_blank');
+function openVideoStudio(): void {
+  const popup = window.open('/video', '_blank');
 
   if (popup) {
     popup.opener = null;
@@ -701,11 +685,6 @@ function handleLibraryTool(item: ToolItem): void {
 }
 
 function handleCreativeTag(item: ToolItem, tag: string): void {
-  if (/视频/.test(tag)) {
-    openVideoStudio();
-    return;
-  }
-
   if (/商品|电商/.test(tag)) {
     void router.push('/commerce');
     return;
@@ -889,11 +868,6 @@ function handleTopNavigation(item: string): void {
 function handleCreativeType(item: ToolItem): void {
   if (item.label === '图片编辑') {
     openRetouch('enhance');
-    return;
-  }
-
-  if (item.label === 'AI 视频') {
-    openVideoStudio();
     return;
   }
 
@@ -1191,17 +1165,6 @@ function editWork(operation: string, workId: string): void {
 
   closeWorkDetail();
   openRetouch(operation, work);
-}
-
-function createVideoFromWork(workId: string): void {
-  const work = workspace.works.find((item) => item.id === workId);
-
-  if (!work || work.status !== 'done') {
-    return;
-  }
-
-  closeWorkDetail();
-  openVideoStudio(work);
 }
 
 function workStatusLabel(status: DrawWorkStatus): string {
@@ -2035,10 +1998,6 @@ onBeforeUnmount(() => {
                     <CloseOutlined />
                     消除
                   </button>
-                  <button type="button" @click="createVideoFromWork(work.id)">
-                    <VideoCameraOutlined />
-                    视频
-                  </button>
                 </footer>
 
                 <footer v-else-if="work.status === 'done'">
@@ -2495,10 +2454,6 @@ onBeforeUnmount(() => {
                   <button type="button" @click="editWork('enhance', activeWorkDetail.id)">
                     <HighlightOutlined />
                     重绘
-                  </button>
-                  <button type="button" @click="createVideoFromWork(activeWorkDetail.id)">
-                    <VideoCameraOutlined />
-                    生成视频
                   </button>
                 </div>
               </section>
@@ -5614,7 +5569,7 @@ onBeforeUnmount(() => {
 .draw-type-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .draw-type-card {
