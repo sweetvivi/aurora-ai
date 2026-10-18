@@ -1535,7 +1535,7 @@ onBeforeUnmount(() => {
         >
           <ThunderboltFilled />
           <span>{{ submitting ? '正在提交' : '立即生成' }}</span>
-          <small>{{ generationCost }} 积分</small>
+          <small class="generation-composer__cost">{{ generationCost }} 积分</small>
         </button>
       </div>
     </footer>
@@ -3638,6 +3638,7 @@ onBeforeUnmount(() => {
 }
 
 .generation-composer__submit {
+  position: relative;
   display: grid;
   min-width: 166px;
   height: 50px;
@@ -3666,11 +3667,21 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.generation-composer__submit small {
-  grid-column: 1 / -1;
-  color: #dff9f0;
+.generation-composer__cost {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  display: inline-flex;
+  height: 16px;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 20%);
+  color: #effff9;
   font-size: 8px;
-  font-weight: 600;
+  font-weight: 750;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 14%);
 }
 
 .generation-composer__submit:disabled {

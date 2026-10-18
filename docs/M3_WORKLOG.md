@@ -223,6 +223,18 @@
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 19 个文件 85 项）、`pnpm build`
 - 本轮只使用 Mock 路由验收，未读取、输出或调用任何真实 Key
 
+## 18. 2026-10-19 图片生成提交按钮积分角标对齐
+
+- 对照参考产品图片生成底部创作条，`N 积分` 是压在“立即生成”按钮右上角的小徽标，而不是按钮内的独立一行
+- 原实现把 `<small>` 作为提交按钮 Grid 的一整行（`grid-column: 1 / -1`），会把按钮撑高并让图标、文案和积分散成上下三块
+- 现在给按钮加 `position: relative`，把积分标签改为绝对定位的 `.generation-composer__cost`：`top: 5px; right: 6px`，白底 20% 透明胶囊、`999px` 圆角、`8px` 字号和 `inset` 描边，按钮恢复图标加文案的单行居中
+- `verify-image-workbench-detail.mjs` 增加 `costVisible` 与 `costInsideSubmit` 两个断言，确认角标可见且 `getBoundingClientRect` 完全落在提交按钮范围内
+- 桌面端 `1440x1000` 实测 `costInsideSubmit: true`、`scrollWidth === clientWidth === 1440`；移动端 `390x844` 实测 `costInsideSubmit: true`、`scrollWidth === clientWidth === 390`，均无横向溢出和页面脚本错误
+- 同一脚本的展开态与智能修图分支同样通过：高级设置展开后 6 个示例可见，修图区 6 个操作项标签无截断
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 19 个文件 85 项）、`pnpm build`
+- 图片生成与图片详情浏览器验收通过：`verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`
+- 本轮只使用 Mock 路由验收，未读取、输出或调用任何真实 Key
+
 ## 16. 2026-10-19 超级智能体会话页正文列宽与输入区对齐
 
 - 用像素测量重新校准参考产品超级智能体会话页：参考截图宽 `1756px`，左侧主边栏边框在 `x=322`，与本地 `320px` 边栏同一缩放比例，说明此前的 `700px` 正文列宽估计偏窄
