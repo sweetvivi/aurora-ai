@@ -4,6 +4,7 @@ import {
   ArrowRightOutlined,
   BarChartOutlined,
   BulbOutlined,
+  ClockCircleOutlined,
   CloseOutlined,
   CodeOutlined,
   CoffeeOutlined,
@@ -910,8 +911,64 @@ function goToPage(page: number): void {
       </button>
 
       <header class="agent-home__heading">
-        <h1>HI，我是Agent助手</h1>
+        <h1>超级智能体，创建你的 APP 或助手</h1>
+        <p>释放 AI 的潜能，通过自定义模型、提示词和界面，打造属于你的智能应用。</p>
       </header>
+
+      <section class="agent-home__builders" aria-label="智能体创建方式">
+        <article class="agent-builder-card agent-builder-card--primary">
+          <div class="agent-builder-preview" aria-hidden="true">
+            <div class="agent-builder-preview__window">
+              <span class="agent-builder-preview__eyebrow">智能体提示词（Prompt）</span>
+              <i />
+              <i />
+              <i />
+              <button type="button" tabindex="-1">AI 优化提示词</button>
+            </div>
+          </div>
+          <div class="agent-builder-card__copy">
+            <span>创建智能体</span>
+            <h2>适用于轻量灵活、自然语言驱动的场景</h2>
+            <ul>
+              <li>支持自定义界面</li>
+              <li>多模型选择</li>
+            </ul>
+            <button type="button" @click="router.push('/agents/create')">
+              <PlusOutlined />
+              立即创建
+            </button>
+          </div>
+        </article>
+
+        <article class="agent-builder-card agent-builder-card--soon">
+          <div class="agent-builder-preview agent-builder-preview--graph" aria-hidden="true">
+            <span class="agent-builder-preview__node agent-builder-preview__node--start">开始</span>
+            <span class="agent-builder-preview__node">规划</span>
+            <span class="agent-builder-preview__node">执行</span>
+            <span class="agent-builder-preview__node">汇总</span>
+            <i class="agent-builder-preview__line agent-builder-preview__line--one" />
+            <i class="agent-builder-preview__line agent-builder-preview__line--two" />
+            <i class="agent-builder-preview__line agent-builder-preview__line--three" />
+          </div>
+          <div class="agent-builder-card__copy">
+            <span>创建多智能体蜂群</span>
+            <h2>适用于多个工具或智能体联动的场景</h2>
+            <ul>
+              <li>任务自动拆解</li>
+              <li>多角色协同执行</li>
+            </ul>
+            <button type="button" class="agent-builder-card__soon-button" disabled>
+              <ClockCircleOutlined />
+              敬请期待
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <div class="agent-home__quick-label">
+        <span>快速开始</span>
+        <i />
+      </div>
 
       <nav class="agent-home__tasks" aria-label="智能体任务类型">
         <button
@@ -2395,7 +2452,7 @@ function goToPage(page: number): void {
 
 .agent-home {
   position: relative;
-  width: min(100%, 1040px);
+  width: min(100%, 1240px);
   margin: 0 auto;
   padding-top: 16px;
 }
@@ -2428,9 +2485,9 @@ function goToPage(page: number): void {
 }
 
 .agent-home__heading h1 {
-  margin: 38px 0 0;
+  margin: 34px 0 0;
   color: #1f2925;
-  font-size: clamp(28px, 2.8vw, 40px);
+  font-size: clamp(32px, 3vw, 46px);
   font-weight: 900;
   letter-spacing: 0;
 }
@@ -2438,15 +2495,303 @@ function goToPage(page: number): void {
 .agent-home__heading p {
   margin: 10px 0 0;
   color: #79847f;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.7;
+}
+
+.agent-home__heading h1 {
+  background: linear-gradient(96deg, #18a86d 0%, #20b678 45%, #283b33 100%);
+  background-clip: text;
+  color: transparent;
+  -webkit-background-clip: text;
+}
+
+.agent-home__builders {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 28px;
+}
+
+.agent-builder-card {
+  display: grid;
+  min-height: 232px;
+  overflow: hidden;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  border: 1px solid #e3ebe7;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgb(33 78 59 / 6%);
+}
+
+.agent-builder-preview {
+  position: relative;
+  display: grid;
+  min-height: 232px;
+  place-items: center;
+  overflow: hidden;
+  padding: 24px;
+  border-right: 1px solid #edf2ef;
+  background: linear-gradient(135deg, rgb(255 255 255 / 58%), transparent 56%), #eef5ff;
+}
+
+.agent-builder-preview::before {
+  position: absolute;
+  width: 170px;
+  height: 170px;
+  border: 1px solid rgb(86 151 232 / 14%);
+  border-radius: 50%;
+  content: '';
+}
+
+.agent-builder-preview__window {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(100%, 220px);
+  min-height: 140px;
+  align-content: start;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #d9e5f4;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 14px 30px rgb(59 94 136 / 13%);
+}
+
+.agent-builder-preview__eyebrow {
+  color: #42556c;
+  font-size: 9px;
+  font-weight: 780;
+}
+
+.agent-builder-preview__window > i {
+  display: block;
+  height: 7px;
+  border-radius: 999px;
+  background: #edf1f6;
+}
+
+.agent-builder-preview__window > i:nth-of-type(1) {
+  width: 88%;
+}
+
+.agent-builder-preview__window > i:nth-of-type(2) {
+  width: 68%;
+}
+
+.agent-builder-preview__window > i:nth-of-type(3) {
+  width: 78%;
+}
+
+.agent-builder-preview__window > button {
+  min-height: 26px;
+  margin-top: 3px;
+  border: 0;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #4f9cf7, #72b8ff);
+  color: #fff;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.agent-builder-card__copy {
+  display: flex;
+  min-width: 0;
+  align-content: start;
+  flex-direction: column;
+  justify-content: center;
+  padding: 26px 24px;
+}
+
+.agent-builder-card__copy > span {
+  color: #232c28;
+  font-size: 19px;
+  font-weight: 880;
+}
+
+.agent-builder-card__copy h2 {
+  max-width: 260px;
+  margin: 10px 0 0;
+  color: #69746e;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.75;
+}
+
+.agent-builder-card__copy ul {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  color: #5b6862;
+  font-size: 10px;
+  list-style: none;
+}
+
+.agent-builder-card__copy li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-builder-card__copy li::before {
+  width: 11px;
+  height: 6px;
+  border-bottom: 2px solid #3a9a58;
+  border-left: 2px solid #3a9a58;
+  content: '';
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+.agent-builder-card__copy > button {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 38px;
+  align-items: center;
+  gap: 6px;
+  margin-top: 18px;
+  padding: 0 16px;
+  border: 1px solid #25a466;
+  border-radius: 7px;
+  background: #28b574;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 7px 16px rgb(39 173 112 / 18%);
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.agent-builder-card__copy > button:hover,
+.agent-builder-card__copy > button:focus-visible {
+  background: #1b9c61;
+  outline: 0;
+  box-shadow: 0 10px 22px rgb(39 173 112 / 24%);
+  transform: translateY(-1px);
+}
+
+.agent-builder-card--soon .agent-builder-preview {
+  background: linear-gradient(135deg, rgb(255 255 255 / 64%), transparent 58%), #eef8ff;
+}
+
+.agent-builder-card__soon-button {
+  border-color: #e5e9e7 !important;
+  background: #fff !important;
+  color: #87918c !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+}
+
+.agent-builder-card__soon-button:hover {
+  transform: none !important;
+}
+
+.agent-builder-preview--graph {
+  background: linear-gradient(135deg, rgb(255 255 255 / 64%), transparent 58%), #edf8ff;
+}
+
+.agent-builder-preview--graph::before {
+  width: 138px;
+  height: 104px;
+  border: 1px solid rgb(82 158 221 / 15%);
+  border-radius: 18px;
+}
+
+.agent-builder-preview__node {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  width: 68px;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid #d8e8f5;
+  border-radius: 6px;
+  background: #fff;
+  color: #3f5b70;
+  font-size: 9px;
+  font-weight: 700;
+  box-shadow: 0 6px 14px rgb(58 113 156 / 10%);
+}
+
+.agent-builder-preview__node--start {
+  top: 50%;
+  left: 16px;
+  border-color: #a9d9c4;
+  color: #1b9b64;
+  transform: translateY(-50%);
+}
+
+.agent-builder-preview__node:nth-of-type(2) {
+  top: 26px;
+  right: 48px;
+}
+
+.agent-builder-preview__node:nth-of-type(3) {
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+}
+
+.agent-builder-preview__node:nth-of-type(4) {
+  right: 48px;
+  bottom: 26px;
+}
+
+.agent-builder-preview__line {
+  position: absolute;
+  z-index: 1;
+  height: 1px;
+  background: #b7d4e7;
+  transform-origin: left center;
+}
+
+.agent-builder-preview__line--one {
+  top: 50%;
+  left: 83px;
+  width: 70px;
+  transform: rotate(-27deg);
+}
+
+.agent-builder-preview__line--two {
+  top: 50%;
+  left: 82px;
+  width: 86px;
+}
+
+.agent-builder-preview__line--three {
+  top: 50%;
+  left: 83px;
+  width: 70px;
+  transform: rotate(27deg);
+}
+
+.agent-home__quick-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0 10px;
+  color: #6f7c75;
+  font-size: 10px;
+  font-weight: 780;
+}
+
+.agent-home__quick-label i {
+  height: 1px;
+  flex: 1;
+  background: #edf1ef;
 }
 
 .agent-home__tasks {
   display: flex;
   justify-content: center;
   gap: 8px;
-  margin-top: 22px;
+  margin-top: 0;
   flex-wrap: wrap;
 }
 
@@ -3234,12 +3579,36 @@ function goToPage(page: number): void {
 }
 
 @media (max-width: 1100px) {
+  .agent-home__builders {
+    gap: 14px;
+  }
+
+  .agent-builder-card {
+    grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.16fr);
+  }
+
+  .agent-builder-card__copy {
+    padding: 22px 18px;
+  }
+
   .agent-showcase__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 860px) {
+  .agent-home__builders {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-builder-card {
+    min-height: 208px;
+  }
+
+  .agent-builder-preview {
+    min-height: 208px;
+  }
+
   .agent-showcase__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3279,18 +3648,70 @@ function goToPage(page: number): void {
 
   .agent-home__heading h1 {
     margin-top: 28px;
-    font-size: 25px;
+    font-size: 26px;
+    line-height: 1.25;
   }
 
   .agent-home__heading p {
-    max-width: 300px;
+    max-width: 340px;
     margin-top: 7px;
     font-size: 10px;
   }
 
+  .agent-home__builders {
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .agent-builder-card {
+    min-height: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .agent-builder-preview {
+    min-height: 158px;
+    padding: 18px;
+    border-right: 0;
+    border-bottom: 1px solid #edf2ef;
+  }
+
+  .agent-builder-preview__window {
+    min-height: 122px;
+  }
+
+  .agent-builder-card__copy {
+    padding: 18px 16px;
+  }
+
+  .agent-builder-card__copy > span {
+    font-size: 16px;
+  }
+
+  .agent-builder-card__copy h2 {
+    max-width: none;
+    margin-top: 7px;
+    font-size: 10px;
+  }
+
+  .agent-builder-card__copy ul {
+    margin-top: 10px;
+    gap: 4px;
+    font-size: 9px;
+  }
+
+  .agent-builder-card__copy > button {
+    min-height: 34px;
+    margin-top: 13px;
+    font-size: 10px;
+  }
+
+  .agent-home__quick-label {
+    margin-top: 18px;
+  }
+
   .agent-home__tasks {
     justify-content: flex-start;
-    margin-top: 17px;
+    margin-top: 0;
     flex-wrap: nowrap;
     overflow-x: auto;
     padding-bottom: 2px;
