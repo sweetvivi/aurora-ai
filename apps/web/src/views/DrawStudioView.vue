@@ -5273,7 +5273,7 @@ onBeforeUnmount(() => {
 }
 
 .draw-main__inner {
-  width: min(100%, 1040px);
+  width: min(100%, 1200px);
   margin: 0 auto;
   padding: 0 41px 60px;
 }

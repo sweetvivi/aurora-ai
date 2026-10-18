@@ -490,3 +490,12 @@
 - 浏览器验收通过：桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
+
+## 42. 2026-10-19 AI 绘画主内容宽度对齐参考产品
+
+- 对照 `AI绘画页面的下半部分.png` 逐行像素测量，参考产品主内容区比本地上限更宽：五列工具卡约 `202px`、两张电商卡约 `537px`，反推内容宽度约 `1060–1120px`；本地 `.draw-main__inner` 上限 `1040px` 减去两侧 `41px` 内边距后只有 `958px`
+- `.draw-main__inner` 的 `max-width` 由 `1040px` 调整为 `1200px`。在 `1513px` 视口下内容宽度约 `1118px`、电商卡约 `553px`、类型卡约 `366px`；在 `1440px` 验收视口下不再触顶，同时保持居中
+- 复核 `draw-top-1513.png` 与 `draw-full-1513.png`：主内容左边界、三张类型卡与两张电商卡的比例和参考产品一致，首屏未出现横向滚动
+- 回归验收通过：`verify-draw-navigation.mjs`、`verify-draw.mjs`、`verify-draw-modes.mjs`、`verify-draw-completion.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
