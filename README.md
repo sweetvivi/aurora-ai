@@ -54,6 +54,7 @@
 - `node outputs/ui-reference/verify-chat-m1.mjs` 通过，对话空态、桌面成功流和移动端错误流保持正常
 - `node outputs/ui-reference/verify-chat-markdown.mjs` 通过，Markdown 标题、列表、表格、代码块复制、安全外链和脚本清理在桌面端与移动端均正常
 - `node outputs/ui-reference/verify-chat-attachments.mjs` 通过，图片上传、预览、发送、消息展示和历史恢复在桌面端与移动端均正常；验收使用 Mock，不调用真实 Provider
+- `node outputs/ui-reference/verify-chat-message-layout.mjs` 通过，用户蓝色内容宽度气泡、助手无气泡正文、消息操作栏、继续追问、点赞、重新生成和无横向溢出在桌面端与移动端均正常
 - `node outputs/ui-reference/verify-group-chat.mjs` 通过，超级对话的 3 模型并发、10 模型上限、停止生成、跨模型共享上下文、自回答去重、单模型重试、桌面端与移动端响应式布局均正常；验收使用 Playwright 路由拦截，不调用真实 Provider
 - `node outputs/ui-reference/verify-catalog-charts.mjs` 通过，6358 条智能体目录、分页/空态、29 类图表、无错误状态和无横向溢出在桌面端与移动端均正常
 - `node outputs/ui-reference/verify-agent-create.mjs` 和 `verify-agent-edit.mjs` 通过，智能体创建、服务端持久化数据回填、编辑保存和桌面/移动端布局均正常

@@ -817,6 +817,22 @@ node outputs/ui-reference/verify-group-chat.mjs
 - Store 单测覆盖首轮不注入、刷新续接、单模型重试、自身回答去重和失败内容隔离；`verify-group-chat.mjs` 在 Edge 桌面端 `1440x1000` 与移动端 `390x844` 下验证实际请求载荷、无横向溢出和无页面脚本错误
 - 本轮自动验收全部使用 Mock 和 Playwright 路由拦截，不调用真实 Provider，不读取或输出 Key
 
+模型对话消息布局：
+
+```text
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+node outputs/ui-reference/verify-chat-message-layout.mjs
+```
+
+- 消息区最大宽度扩展为 940px，用户消息改为右侧蓝色内容宽度气泡，助手消息改为左侧无背景正文，消息操作栏收为正文下方右侧的紧凑图标
+- 修正用户消息纯文本被通用 `.chat-message p` 规则覆盖的问题，用户 Markdown 与纯文本均保持蓝色气泡和白色正文
+- `verify-chat-message-layout.mjs` 使用 Edge、SSE Mock 和 API 路由拦截，覆盖桌面端 `1440x1000` 与移动端 `390x844` 的气泡颜色、内容宽度、助手透明背景、五个操作按钮尺寸、继续追问回填、点赞状态、重新生成请求次数和无横向溢出
+- 全量验证通过：API 20 个文件 83 项、Web 16 个文件 66 项，格式检查、lint、前后端类型检查和生产构建均通过；验收不调用真实 Provider、不读取或输出 Key
+
 ## 5. 密钥和外部调用边界
 
 - 已完成一次真实图片链路低成本验收；验收通过本地 API 和前端完成，没有读取、输出或截图真实密钥

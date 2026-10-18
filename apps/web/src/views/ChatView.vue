@@ -1444,24 +1444,24 @@ function formatConversationTime(value: string | null): string {
 
 .chat-messages {
   display: grid;
-  max-width: 820px;
-  gap: 22px;
+  max-width: 940px;
+  gap: 28px;
   margin: 0 auto;
 }
 
 .chat-message {
   display: grid;
   align-items: start;
-  gap: 11px;
-  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  grid-template-columns: 32px minmax(0, 1fr);
 }
 
 .chat-message > span {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   place-items: center;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #edf3ff;
   color: #4c84ff;
   font-size: 11px;
@@ -1469,7 +1469,7 @@ function formatConversationTime(value: string | null): string {
 }
 
 .chat-message--user {
-  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-columns: minmax(0, 1fr) 32px;
 }
 
 .chat-message--user > span {
@@ -1479,11 +1479,16 @@ function formatConversationTime(value: string | null): string {
   color: #636c7a;
 }
 
-.chat-message--user p {
+.chat-message.chat-message--user p {
   grid-column: 1;
   grid-row: 1;
   justify-self: end;
-  background: #edf3ff;
+  width: fit-content;
+  max-width: min(640px, 82%);
+  border-radius: 12px 12px 4px 12px;
+  background: #1f7ae8;
+  color: #ffffff;
+  text-align: left;
 }
 
 .chat-message--user > .message-attachments {
@@ -1499,27 +1504,37 @@ function formatConversationTime(value: string | null): string {
 
 .chat-message p {
   margin: 0;
-  padding: 12px 14px;
-  border-radius: 11px;
-  background: #f6f7f9;
-  color: #363d48;
-  font-size: 12px;
-  line-height: 1.75;
+  padding: 2px 0;
+  color: #303640;
+  font-size: 13px;
+  line-height: 1.8;
   white-space: pre-wrap;
 }
 
 .chat-message__markdown {
   margin: 0;
-  padding: 12px 14px;
-  border-radius: 11px;
-  background: #f6f7f9;
-  color: #363d48;
-  font-size: 12px;
-  line-height: 1.75;
+  padding: 2px 0;
+  background: transparent;
+  color: #303640;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.chat-message--user .chat-message__markdown {
+  justify-self: end;
+  width: fit-content;
+  max-width: min(640px, 82%);
+  padding: 10px 14px;
+  border-radius: 12px 12px 4px 12px;
+  background: #1f7ae8;
+  color: #ffffff;
+  text-align: left;
 }
 
 .chat-message--failed p {
   border: 1px solid #f1d3cf;
+  border-radius: 10px;
+  padding: 10px 12px;
   background: #fff8f7;
   color: #9d4e48;
 }
@@ -1536,8 +1551,9 @@ function formatConversationTime(value: string | null): string {
   display: flex;
   grid-column: 2;
   align-items: center;
-  gap: 6px;
-  margin-top: 8px;
+  justify-content: flex-end;
+  gap: 3px;
+  margin-top: 4px;
 }
 
 .chat-message--user .chat-message__actions {
@@ -1546,22 +1562,31 @@ function formatConversationTime(value: string | null): string {
 
 .chat-message__actions button {
   display: inline-flex;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 0 8px;
+  padding: 0;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
-  color: #8a93a0;
-  font-size: 9px;
+  color: #8c94a0;
+  font-size: 12px;
   cursor: pointer;
+}
+
+.chat-message--assistant .chat-message__actions button > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .chat-message__actions button:hover,
 .chat-message__actions button.active {
-  border-color: #dbe5f8;
   background: #f5f8ff;
   color: #3979ed;
 }
@@ -1664,7 +1689,18 @@ function formatConversationTime(value: string | null): string {
   }
 
   .chat-message__actions {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  .chat-message__actions button {
+    width: 28px;
+    height: 28px;
+  }
+
+  .chat-message--user p,
+  .chat-message--user .chat-message__markdown {
+    max-width: 86%;
   }
 }
 
