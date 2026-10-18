@@ -478,8 +478,17 @@ function openGenerator(options: { auto?: boolean; mode?: string } = {}): void {
   });
 }
 
-function openVideoStudio(): void {
-  const popup = window.open('/video', '_blank');
+function openVideoStudio(work?: { id: string; prompt: string }): void {
+  const query = new URLSearchParams();
+
+  if (work) {
+    query.set('mode', 'image-to-video');
+    query.set('prompt', work.prompt);
+    query.set('sourceWork', work.id);
+  }
+
+  const videoPath = query.size > 0 ? `/video?${query.toString()}` : '/video';
+  const popup = window.open(videoPath, '_blank');
 
   if (popup) {
     popup.opener = null;
@@ -890,6 +899,17 @@ function editWork(operation: string, workId: string): void {
 
   closeWorkDetail();
   openRetouch(operation, work);
+}
+
+function createVideoFromWork(workId: string): void {
+  const work = workspace.works.find((item) => item.id === workId);
+
+  if (!work || work.status !== 'done') {
+    return;
+  }
+
+  closeWorkDetail();
+  openVideoStudio(work);
 }
 
 function workStatusLabel(status: DrawWorkStatus): string {
@@ -1623,6 +1643,10 @@ onBeforeUnmount(() => {
                     <CloseOutlined />
                     消除
                   </button>
+                  <button type="button" @click="createVideoFromWork(work.id)">
+                    <VideoCameraOutlined />
+                    视频
+                  </button>
                 </footer>
 
                 <footer v-else-if="work.status === 'done'">
@@ -2013,6 +2037,10 @@ onBeforeUnmount(() => {
                   <button type="button" @click="editWork('enhance', activeWorkDetail.id)">
                     <HighlightOutlined />
                     重绘
+                  </button>
+                  <button type="button" @click="createVideoFromWork(activeWorkDetail.id)">
+                    <VideoCameraOutlined />
+                    生成视频
                   </button>
                 </div>
               </section>
