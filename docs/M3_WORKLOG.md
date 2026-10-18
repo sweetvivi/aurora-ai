@@ -395,3 +395,12 @@
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
 - 待用户侧配合：当前 `3006` 端口的 API 未配置真实 LLM Key，日志里 `POST /api/v1/chat/stream` 仍以 `LLM_NOT_CONFIGURED` 结束，因此“真实 Provider 流式对话”的端到端联调无法在本轮完成。按约定，配置 `.env` 与读取 `本地密钥目录` 下的 Key 属于需先说明的操作，本轮没有执行
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分
+
+## 33. 2026-10-19 真实 Provider 流式对话服务端 E2E
+
+- 新增 `apps/api/test/chat-stream-provider.e2e-spec.ts`，覆盖从 `AppModule`、`ChatController`、`ChatService` 到 `OpenAiCompatibleProvider` 的真实 Nest/HTTP/SSE 链路
+- 测试在进程内启动 OpenAI-compatible HTTP stub，通过 SSE 分段返回内容；Stub Provider 与 Model 配置写入临时测试数据并在 `afterAll` 清理，不读取、输出或调用 `本地密钥目录` 中的真实 Key
+- 正常链路覆盖：首个 delta 在流结束前到达、跨 TCP 分片解析、正文拼接、assistant 消息持久化、积分结算，以及上游请求中的 `model`、`temperature`、`reasoning_effort`、`stream` 和 `Authorization`
+- 异常链路覆盖：上游 `401` 映射为 `LLM_AUTH_ERROR`、仅返回 `reasoning_content` 映射为 `LLM_EMPTY_RESPONSE`、上游挂起映射为 `LLM_TIMEOUT`；三种失败均验证 assistant 消息落到失败态且积分退回
+- 专项测试 5 项通过；API 全量 27 个文件 115 项、Web 全量 20 个文件 89 项通过，`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过；构建仅保留既有 Vite 大 chunk 提示
+- 本轮只使用本地 stub 与 Mock，不读取、输出或记录任何 Key/Token/Cookie，不调用真实第三方接口，不消耗参考产品积分，不调用真实视频生成
