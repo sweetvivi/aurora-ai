@@ -382,3 +382,16 @@
 - 浏览器验收复跑：`node outputs/ui-reference/verify-commerce-studio.mjs` 与 `node outputs/ui-reference/measure-commerce.mjs` 均通过；桌面端 `1440x1000` 与移动端 `390x844` 无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或调用任何真实 Key，未消耗参考产品积分
+
+## 32. 2026-10-19 AI 绘画去视频、参考对照复核与全量回归
+
+- 恢复工作前先检查用户目录：`本地密钥目录\说明文件.txt` 仍是 `2026-10-17 18:51`、`ActionsNEW*.png` 最新仍是 `ActionsNEW5.png`、`当前页面截图` 最新仍是 `2026-10-15`、`参考网站截图合集` 最新是 `2026-10-17 17:08` 的 AI 画布系列；本轮没有出现比上次更新的说明或截图，因此按既定顺序继续推进
+- 提交并推送 `32bd95e style: remove video actions from draw studio`（`main`，普通 `git push`，未使用强推）。首次推送遇到 `Connection was reset`，重试后成功
+- 用 `node outputs/ui-reference/capture-modules.mjs` 重新抓取 8 个模块的桌面端与移动端截图，`chat/desktop` 与 `chat/mobile` 的 `clientWidth === scrollWidth` 保持成立
+- 新增 `outputs/ui-reference/measure-agents.mjs`（ignored 目录）用于输出智能体首页关键元素矩形，方便后续继续用测量而不是感觉调样式。实测智能体首页 hero 卡片为 `x=268..1412`（宽 `1144`、高 `234`），与参考产品 `live-reference/agents.png` 测得的 `272..1425` 基本重合，标题居中于 `502..1179`，因此本轮不再改动该区域
+- 复核 `live-reference/chat.png`、`draw.png`、`retouch.png` 与本地截图：模型对话首页的欢迎语两行结构、`模型对话/超级对话` 模式徽标位置、示例提示词四卡与支持图表类型网格、AI 绘画首页的次级边栏与顶部下拉、修图页的空态示例条与右侧工具条均与参考产品同构。为避免无依据的样式改动，本轮只记录结论、不做像素级重排
+- 复核 CI 与迁移一致性：`.github/workflows/ci.yml` 的步骤与本地 `pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm test` 一一对应且全部通过；检查最近三条 `module_display_configs` 相关迁移（`subtitle` 加列、回填、`chat` 路由归一），确认所引用的 `key`、`route`、`subtitle` 列都来自 `20261017193000_add_module_display_configs` 建表迁移，不存在悬挂引用
+- 全量浏览器回归：18 个 Playwright 脚本全部通过，分别是智能体 4 个（`verify-agent-streaming`、`verify-agent-home`、`verify-agent-detail-actions`、`verify-agent-create`）、模型对话 4 个（`verify-chat-m1`、`verify-chat-home-polish`、`verify-chat-message-layout`、`verify-chat-markdown`）、AI 绘画 3 个（`verify-draw-navigation`、`verify-draw-editor`、`verify-draw-modes`）、图片 2 个（`verify-image-generation`、`verify-image-workbench-detail`）、智能修图 1 个（`verify-retouch-history`）、视频 2 个（`verify-video-studio`、`verify-video-tasks`）、AI 画布 1 个（`verify-canvas-studio`）、电商工具 1 个（`verify-commerce-studio`），桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
+- 待用户侧配合：当前 `3006` 端口的 API 未配置真实 LLM Key，日志里 `POST /api/v1/chat/stream` 仍以 `LLM_NOT_CONFIGURED` 结束，因此“真实 Provider 流式对话”的端到端联调无法在本轮完成。按约定，配置 `.env` 与读取 `本地密钥目录` 下的 Key 属于需先说明的操作，本轮没有执行
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分
