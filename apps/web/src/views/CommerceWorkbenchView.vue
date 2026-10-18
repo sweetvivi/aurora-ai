@@ -49,6 +49,14 @@ interface CatalogGroup {
   label: string;
 }
 
+interface CommerceIdeaRecord {
+  createdAt: string;
+  id: string;
+  text: string;
+  toolKey: string;
+  toolLabel: string;
+}
+
 interface CommerceTool {
   accent: string;
   description: string;
@@ -59,6 +67,8 @@ interface CommerceTool {
   previewAfterVariant: number;
   previewBeforeVariant: number;
   prompt: string;
+  retouchModes?: string[];
+  uploadLabels?: Partial<Record<UploadRole, Partial<UploadMeta>>>;
   value: string;
 }
 
@@ -375,7 +385,539 @@ const sourceCatalogGroups: CatalogGroup[] = [
   },
 ];
 
-const sourceCommerceTools = sourceCatalogGroups.flatMap((group) => group.items);
+const extraCommerceTools: CommerceTool[] = [
+  {
+    accent: '#6f62e8',
+    description: '保留商品和服装，替换画面中的模特形象。',
+    form: 'try-on',
+    glyph: '模',
+    icon: UserOutlined,
+    label: 'AI换模特',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '替换画面模特，同时保持商品、服装、姿势和镜头构图一致。',
+    uploadLabels: {
+      clothing: {
+        description: '上传包含原商品和原模特的完整画面',
+        label: '上传原始模特图',
+      },
+      model: {
+        description: '上传希望替换成的模特面部或全身参考',
+        label: '上传目标模特图',
+      },
+    },
+    value: 'ai-model-swap',
+  },
+  {
+    accent: '#d66e8f',
+    description: '仅替换人物面部，并保持身材、服装和场景不变。',
+    form: 'try-on',
+    glyph: '脸',
+    icon: UserOutlined,
+    label: '模特脸型替换',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '替换模特面部特征，保持发型、肤色过渡、服装和背景自然一致。',
+    uploadLabels: {
+      clothing: {
+        description: '上传需要保留服装和姿态的原人物图',
+        label: '上传原人物图',
+      },
+      model: {
+        description: '上传目标面部参考，建议正脸且光线均匀',
+        label: '上传面部参考图',
+      },
+    },
+    value: 'model-face-swap',
+  },
+  {
+    accent: '#4e8fd8',
+    description: '迁移目标姿势，同时保留商品与模特身份特征。',
+    form: 'try-on',
+    glyph: '姿',
+    icon: UserOutlined,
+    label: '模特姿态迁移',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '将原模特迁移到目标姿态，保持人物身份、服装商品和场景真实。',
+    uploadLabels: {
+      clothing: {
+        description: '上传包含原模特和服装商品的原图',
+        label: '上传原模特图',
+      },
+      model: {
+        description: '上传目标姿势或动作参考图',
+        label: '上传姿势参考图',
+      },
+    },
+    value: 'model-pose-transfer',
+  },
+  {
+    accent: '#d68145',
+    description: '将鞋款自然穿到模特脚上，匹配腿部比例和光线。',
+    form: 'try-on',
+    glyph: '鞋',
+    icon: AppstoreOutlined,
+    label: '鞋子上脚',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '将鞋子自然穿到模特脚上，保持鞋型、材质、透视和腿部结构准确。',
+    uploadLabels: {
+      clothing: {
+        description: '上传鞋款正面、侧面或四分之三角度图片',
+        label: '上传鞋子图片',
+      },
+      model: {
+        description: '上传腿部、脚部或完整穿搭参考图',
+        label: '上传上脚参考图',
+      },
+    },
+    value: 'shoe-on-foot',
+  },
+  {
+    accent: '#479478',
+    description: '生成适合鞋类详情页的侧面行走展示图。',
+    form: 'retouch',
+    glyph: '行',
+    icon: PictureOutlined,
+    label: '鞋履行走展示',
+    previewAfterVariant: 1,
+    previewBeforeVariant: 5,
+    prompt: '生成鞋履自然行走展示图，保持鞋底结构、鞋面材质和品牌细节准确。',
+    retouchModes: ['侧面行走展示', '动态行走展示', '鞋底结构展示', '棚拍行走展示'],
+    uploadLabels: {
+      product: {
+        description: '上传需要展示的鞋款图片',
+        label: '上传鞋子图片',
+      },
+    },
+    value: 'shoe-walking-showcase',
+  },
+  {
+    accent: '#b98c3d',
+    description: '强化鞋面纹理、缝线和材质细节。',
+    form: 'retouch',
+    glyph: '细',
+    icon: PictureOutlined,
+    label: '鞋款细节精修',
+    previewAfterVariant: 4,
+    previewBeforeVariant: 1,
+    prompt: '精修鞋款纹理、缝线、材质反光和轮廓，保持颜色与版型不变。',
+    retouchModes: ['鞋面细节精修', '鞋底结构增强', '鞋款质感强化', '鞋类高清放大'],
+    uploadLabels: {
+      product: {
+        description: '上传需要精修的鞋款图片',
+        label: '上传鞋子图片',
+      },
+    },
+    value: 'shoe-detail-retouch',
+  },
+  {
+    accent: '#734fd6',
+    description: '根据一套服装自动生成完整模特上身穿搭。',
+    form: 'try-on',
+    glyph: '穿',
+    icon: UserOutlined,
+    label: '一键全套穿搭',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '自动组合整套服饰并生成自然模特穿搭，保持每件商品的版型和颜色。',
+    value: 'one-click-outfit',
+  },
+  {
+    accent: '#338da3',
+    description: '将多件服装组合成简洁的商品平铺图。',
+    form: 'retouch',
+    glyph: '铺',
+    icon: AppstoreOutlined,
+    label: '服装平铺搭配',
+    previewAfterVariant: 1,
+    previewBeforeVariant: 5,
+    prompt: '将服饰组合成电商平铺搭配图，统一比例、光线和背景风格。',
+    retouchModes: ['上下装平铺搭配', '叠穿层次平铺', '多品类组合平铺', '杂志式留白平铺'],
+    uploadLabels: {
+      product: {
+        description: '上传需要组合展示的服装主图',
+        label: '上传服装主图',
+      },
+    },
+    value: 'outfit-flatlay',
+  },
+  {
+    accent: '#d75a69',
+    description: '快速调整整套服装或单品的颜色方案。',
+    form: 'retouch',
+    glyph: '色',
+    icon: BgColorsOutlined,
+    label: '穿搭换色',
+    previewAfterVariant: 6,
+    previewBeforeVariant: 2,
+    prompt: '调整服装颜色和配色方案，保留面料纹理、褶皱和原始版型。',
+    retouchModes: ['整套换色', '上装换色', '下装换色', '配饰换色'],
+    uploadLabels: {
+      product: {
+        description: '上传需要调整颜色的服饰图片',
+        label: '上传服饰图片',
+      },
+    },
+    value: 'outfit-color-change',
+  },
+  {
+    accent: '#7056cc',
+    description: '按人物尺寸调整服装比例，生成自然合身效果。',
+    form: 'try-on',
+    glyph: '合',
+    icon: UserOutlined,
+    label: '自定义合身试衣',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '根据人物比例调整服装合身度，保持面料、图案和背景真实。',
+    uploadLabels: {
+      clothing: {
+        description: '上传需要试穿的商品服饰图片',
+        label: '上传试穿服饰',
+      },
+      model: {
+        description: '上传人物正面全身照或身材参考图',
+        label: '上传人物参考图',
+      },
+    },
+    value: 'custom-fit',
+  },
+  {
+    accent: '#3e9f6a',
+    description: '调整服装尺码感，同时保留款式和设计细节。',
+    form: 'retouch',
+    glyph: '尺',
+    icon: PictureOutlined,
+    label: '服装尺码调整',
+    previewAfterVariant: 4,
+    previewBeforeVariant: 1,
+    prompt: '调整服装尺码和宽松程度，保持款式结构、面料和图案细节一致。',
+    retouchModes: ['更修身', '更宽松', '调整肩宽', '调整衣长'],
+    value: 'garment-size-adjust',
+  },
+  {
+    accent: '#3b7ad1',
+    description: '生成服装在真实模特身上的穿搭细节图。',
+    form: 'try-on',
+    glyph: '搭',
+    icon: UserOutlined,
+    label: '穿搭细节生成',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '生成真实自然的服装穿搭细节图，突出面料、版型和搭配层次。',
+    value: 'garment-detail-wear',
+  },
+  {
+    accent: '#d7a132',
+    description: '将首饰自然佩戴到指定模特身上，匹配肤色与光线。',
+    form: 'try-on',
+    glyph: '饰',
+    icon: StarOutlined,
+    label: '首饰佩戴图',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '将首饰自然佩戴到模特身上，保持金属质感、宝石颜色和人物结构准确。',
+    uploadLabels: {
+      clothing: {
+        description: '上传项链、耳饰或戒指等首饰商品图',
+        label: '上传首饰商品图',
+      },
+      model: {
+        description: '上传需要佩戴首饰的人物参考图',
+        label: '上传佩戴人物图',
+      },
+    },
+    value: 'jewelry-wear',
+  },
+  {
+    accent: '#4f78b9',
+    description: '生成腕表、手链等手部佩戴展示图。',
+    form: 'try-on',
+    glyph: '表',
+    icon: ClockCircleOutlined,
+    label: '腕表佩戴图',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '将腕表或手链自然佩戴到手腕，保持表盘、材质和手部结构准确。',
+    uploadLabels: {
+      clothing: {
+        description: '上传腕表或手链商品图',
+        label: '上传腕表商品图',
+      },
+      model: {
+        description: '上传手腕姿势和光线合适的参考图',
+        label: '上传手腕参考图',
+      },
+    },
+    value: 'watch-wear',
+  },
+  {
+    accent: '#b55e8e',
+    description: '生成箱包上肩、手提或斜挎的真实佩戴效果。',
+    form: 'try-on',
+    glyph: '包',
+    icon: ShoppingCartOutlined,
+    label: '箱包佩戴图',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '生成箱包真实佩戴图，保持包型、肩带结构、人物姿态和环境自然。',
+    uploadLabels: {
+      clothing: {
+        description: '上传需要佩戴展示的包袋商品图',
+        label: '上传箱包商品图',
+      },
+      model: {
+        description: '上传人物和穿搭参考图',
+        label: '上传人物穿搭图',
+      },
+    },
+    value: 'bag-wear',
+  },
+  {
+    accent: '#ef4f7a',
+    description: '生成高点击感的小红书风格商品封面。',
+    form: 'retouch',
+    glyph: '红',
+    icon: StarOutlined,
+    label: '小红书封面生成',
+    previewAfterVariant: 6,
+    previewBeforeVariant: 2,
+    prompt: '生成小红书风格商品封面，突出主体、文字留白和社交平台审美。',
+    retouchModes: ['种草封面', '测评封面', '好物分享封面', '新品推荐封面'],
+    value: 'xhs-cover',
+  },
+  {
+    accent: '#d78070',
+    description: '把商品融入生活方式场景，适合种草内容。',
+    form: 'background',
+    glyph: '生',
+    icon: BgColorsOutlined,
+    label: '小红书生活场景',
+    previewAfterVariant: 1,
+    previewBeforeVariant: 5,
+    prompt: '生成自然生活方式场景，突出商品使用氛围并保留真实质感。',
+    value: 'xhs-lifestyle',
+  },
+  {
+    accent: '#aa65cf',
+    description: '生成带评价感和使用感受的商品图文素材。',
+    form: 'background',
+    glyph: '记',
+    icon: AppstoreOutlined,
+    label: '小红书种草笔记图',
+    previewAfterVariant: 3,
+    previewBeforeVariant: 5,
+    prompt: '生成适合小红书种草笔记的商品场景图，保持画面真实、自然、有分享感。',
+    value: 'xhs-product-note',
+  },
+  {
+    accent: '#4f7fd5',
+    description: '统一修复商品图的光线、颜色、材质和清晰度。',
+    form: 'retouch',
+    glyph: '精',
+    icon: ExperimentOutlined,
+    label: '商品精修',
+    previewAfterVariant: 4,
+    previewBeforeVariant: 1,
+    prompt: '精修商品图，统一光线、颜色、材质和清晰度，保持品牌信息准确。',
+    retouchModes: ['全图精修', '光影统一', '材质强化', '瑕疵修复'],
+    uploadLabels: {
+      product: {
+        description: '上传需要精修的商品图片',
+        label: '上传待精修商品图',
+      },
+    },
+    value: 'product-retouch',
+  },
+  {
+    accent: '#be6d44',
+    description: '修正商品色差、白平衡和整体色彩风格。',
+    form: 'retouch',
+    glyph: '彩',
+    icon: BgColorsOutlined,
+    label: '商品色彩校正',
+    previewAfterVariant: 6,
+    previewBeforeVariant: 2,
+    prompt: '校正商品颜色、白平衡和肤色环境，避免改变商品真实颜色。',
+    retouchModes: ['白平衡校正', '去除偏色', '统一色调', '提升色彩层次'],
+    value: 'product-color-correct',
+  },
+  {
+    accent: '#3e9c8f',
+    description: '增强商品细节、边缘和材质清晰度。',
+    form: 'retouch',
+    glyph: '细',
+    icon: PictureOutlined,
+    label: '商品细节增强',
+    previewAfterVariant: 4,
+    previewBeforeVariant: 1,
+    prompt: '增强商品细节、边缘和材质清晰度，避免过度锐化和结构变形。',
+    retouchModes: ['细节增强', '边缘锐化', '材质清晰度', '轻微降噪'],
+    value: 'product-detail-enhance',
+  },
+  {
+    accent: '#3678d9',
+    description: '一键生成符合电商平台规范的商品主图。',
+    form: 'retouch',
+    glyph: '主',
+    icon: ShoppingCartOutlined,
+    label: '平台主图优化',
+    previewAfterVariant: 0,
+    previewBeforeVariant: 1,
+    prompt: '优化商品主图构图、主体比例、留白和清晰度，适配主流电商平台。',
+    retouchModes: ['淘宝主图', '京东主图', '拼多多主图', '通用平台主图'],
+    value: 'platform-main-image',
+  },
+  {
+    accent: '#36a26f',
+    description: '生成干净白底主图，并保留自然边缘和阴影。',
+    form: 'retouch',
+    glyph: '白',
+    icon: AppstoreOutlined,
+    label: '白底主图生成',
+    previewAfterVariant: 1,
+    previewBeforeVariant: 5,
+    prompt: '生成干净白底商品主图，保留自然边缘、轻微阴影和真实商品颜色。',
+    retouchModes: ['纯白底主图', '浅灰底主图', '透明边缘白底', '自然投影白底'],
+    value: 'white-background-main',
+  },
+  {
+    accent: '#8271d4',
+    description: '调整主图主体位置和留白，方便后续添加卖点文字。',
+    form: 'retouch',
+    glyph: '排',
+    icon: AppstoreOutlined,
+    label: '主图版式优化',
+    previewAfterVariant: 3,
+    previewBeforeVariant: 1,
+    prompt: '优化商品主图版式，调整主体位置和留白，为标题卖点预留空间。',
+    retouchModes: ['居中构图', '左右留白', '上下留白', '卖点区留白'],
+    value: 'main-image-layout',
+  },
+  {
+    accent: '#5b77d5',
+    description: '将多个商品素材合成为真实统一的商业场景。',
+    form: 'background',
+    glyph: '合',
+    icon: BgColorsOutlined,
+    label: '商品场景合成',
+    previewAfterVariant: 1,
+    previewBeforeVariant: 5,
+    prompt: '将商品与场景素材自然合成，统一透视、比例、颜色、光线和阴影。',
+    value: 'scene-composition',
+  },
+  {
+    accent: '#d55460',
+    description: '生成节庆、促销和节点主题的商品场景。',
+    form: 'background',
+    glyph: '节',
+    icon: StarOutlined,
+    label: '节日营销场景',
+    previewAfterVariant: 3,
+    previewBeforeVariant: 5,
+    prompt: '生成具有节日营销氛围的商品场景，保持商品主体清晰且品牌信息准确。',
+    value: 'festival-scene',
+  },
+  {
+    accent: '#3d9c84',
+    description: '生成真实自然的家居、户外或生活方式场景。',
+    form: 'background',
+    glyph: '生',
+    icon: AppstoreOutlined,
+    label: '生活方式场景',
+    previewAfterVariant: 1,
+    previewBeforeVariant: 5,
+    prompt: '生成真实自然的生活方式场景，并让商品融入环境光线和空间关系。',
+    value: 'lifestyle-scene',
+  },
+  {
+    accent: '#8a62cf',
+    description: '根据商品风格自动推荐并生成完整穿搭。',
+    form: 'try-on',
+    glyph: '搭',
+    icon: UserOutlined,
+    label: 'AI服装搭配',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '根据商品风格生成完整穿搭，保持所有服饰商品的比例和颜色准确。',
+    value: 'outfit-matching',
+  },
+  {
+    accent: '#d17e43',
+    description: '提取商品主色并生成协调的上下装配色。',
+    form: 'try-on',
+    glyph: '配',
+    icon: BgColorsOutlined,
+    label: '穿搭配色设计',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '根据商品主色生成协调的穿搭配色，保持服装款式和面料真实。',
+    value: 'outfit-color-matching',
+  },
+  {
+    accent: '#438fca',
+    description: '为已有穿搭自动匹配合适的鞋包和配饰。',
+    form: 'try-on',
+    glyph: '品',
+    icon: StarOutlined,
+    label: '鞋包配饰搭配',
+    previewAfterVariant: 2,
+    previewBeforeVariant: 1,
+    prompt: '为现有穿搭搭配鞋包和配饰，统一风格、颜色和场景氛围。',
+    value: 'accessory-matching',
+  },
+  {
+    accent: '#69788c',
+    description: '批量统一多张商品图的背景、尺寸、光线和风格。',
+    form: 'retouch',
+    glyph: '批',
+    icon: AppstoreOutlined,
+    label: '批量商品图处理',
+    previewAfterVariant: 3,
+    previewBeforeVariant: 5,
+    prompt: '批量统一商品图背景、尺寸、光线和颜色风格，保持每件商品细节准确。',
+    retouchModes: ['统一背景', '统一尺寸', '统一光线', '全流程批量'],
+    uploadLabels: {
+      product: {
+        description: '上传需要批量处理的商品图，当前入口按单图任务处理',
+        label: '上传待处理商品图',
+      },
+    },
+    value: 'batch-commerce',
+  },
+  {
+    accent: '#a06bcf',
+    description: '生成适合活动页和社媒投放的商品海报构图。',
+    form: 'background',
+    glyph: '报',
+    icon: PictureOutlined,
+    label: '商业海报构图',
+    previewAfterVariant: 6,
+    previewBeforeVariant: 2,
+    prompt: '生成商业海报式商品构图，保留标题留白并统一视觉重点和营销氛围。',
+    value: 'poster-layout',
+  },
+  {
+    accent: '#547c9d',
+    description: '清理商品图中的水印、杂物和干扰元素。',
+    form: 'retouch',
+    glyph: '清',
+    icon: DeleteOutlined,
+    label: '商品图清理',
+    previewAfterVariant: 4,
+    previewBeforeVariant: 1,
+    prompt: '清理商品图杂物、水印和干扰元素，保持主体结构和背景自然。',
+    retouchModes: ['去除水印', '清理杂物', '去除瑕疵', '净化背景'],
+    value: 'commerce-cleanup',
+  },
+];
+
+const sourceCommerceTools = [
+  ...sourceCatalogGroups.flatMap((group) => group.items),
+  ...extraCommerceTools,
+];
 const sourceToolByValue = new Map(sourceCommerceTools.map((tool) => [tool.value, tool]));
 
 function pickTools(...values: string[]): CommerceTool[] {
@@ -426,7 +968,7 @@ const catalogGroups: CatalogGroup[] = [
   },
   {
     label: 'AI换模特',
-    items: [],
+    items: pickTools('ai-model-swap', 'model-face-swap', 'model-pose-transfer'),
   },
   {
     label: '商品抠图',
@@ -434,43 +976,43 @@ const catalogGroups: CatalogGroup[] = [
   },
   {
     label: '鞋子上脚',
-    items: [],
+    items: pickTools('shoe-on-foot', 'shoe-walking-showcase', 'shoe-detail-retouch'),
   },
   {
     label: '一键穿搭',
-    items: [],
+    items: pickTools('one-click-outfit', 'outfit-flatlay', 'outfit-color-change'),
   },
   {
     label: '自定义试衣',
-    items: [],
+    items: pickTools('custom-fit', 'garment-size-adjust', 'garment-detail-wear'),
   },
   {
     label: '穿戴图生成',
-    items: [],
+    items: pickTools('jewelry-wear', 'watch-wear', 'bag-wear'),
   },
   {
     label: '小红书风格',
-    items: [],
+    items: pickTools('xhs-cover', 'xhs-lifestyle', 'xhs-product-note'),
   },
   {
     label: '产品精修',
-    items: [],
+    items: pickTools('product-retouch', 'product-color-correct', 'product-detail-enhance'),
   },
   {
     label: '商品主图优化',
-    items: [],
+    items: pickTools('platform-main-image', 'white-background-main', 'main-image-layout'),
   },
   {
     label: '场景合成',
-    items: [],
+    items: pickTools('scene-composition', 'festival-scene', 'lifestyle-scene'),
   },
   {
     label: '服装搭配',
-    items: [],
+    items: pickTools('outfit-matching', 'outfit-color-matching', 'accessory-matching'),
   },
   {
     label: '其他',
-    items: [],
+    items: pickTools('batch-commerce', 'poster-layout', 'commerce-cleanup'),
   },
 ];
 
@@ -636,6 +1178,11 @@ const expandedGroupLabels = ref<string[]>([]);
 const previewSide = ref<PreviewSide>('after');
 const historyOpen = ref(false);
 const helpOpen = ref(false);
+const ideaOpen = ref(false);
+const ideaSaved = ref(false);
+const ideaText = ref('');
+const ideaError = ref('');
+const ideaRecords = ref<CommerceIdeaRecord[]>([]);
 const prompt = ref('');
 const uploadError = ref('');
 const uploadingRole = ref<UploadRole | null>(null);
@@ -681,6 +1228,25 @@ const activeToolGroup = computed(
     ) ?? null,
 );
 const displayTool = computed<CommerceTool>(() => activeTool.value ?? emptyDisplayTool);
+const activeUploadMeta = computed<Record<UploadRole, UploadMeta>>(() => {
+  const result = { ...uploadMeta };
+  const overrides = displayTool.value.uploadLabels;
+
+  if (!overrides) {
+    return result;
+  }
+
+  for (const role of Object.keys(result) as UploadRole[]) {
+    const override = overrides[role];
+
+    if (override) {
+      result[role] = { ...result[role], ...override };
+    }
+  }
+
+  return result;
+});
+const activeRetouchModes = computed(() => displayTool.value.retouchModes ?? retouchModes);
 const filteredGroups = computed(() => {
   const keyword = searchQuery.value.trim().toLowerCase();
 
@@ -752,7 +1318,7 @@ const requiredUploads = computed<UploadRole[]>(() => {
 const missingUploadLabels = computed(() =>
   requiredUploads.value
     .filter((role) => !imageUploads.value[role])
-    .map((role) => uploadMeta[role].label.replace('上传', '')),
+    .map((role) => activeUploadMeta.value[role].label.replace('上传', '')),
 );
 const missingParameterLabels = computed(() => {
   const missing: string[] = [];
@@ -1089,6 +1655,70 @@ function setPromptPreset(value: string): void {
   prompt.value = prompt.value.trim() ? `${prompt.value.trim()}；${value}` : value;
 }
 
+function loadIdeaRecords(): void {
+  try {
+    const stored = window.localStorage.getItem('aurora.commerce.ideas');
+
+    if (!stored) {
+      return;
+    }
+
+    const parsed: unknown = JSON.parse(stored);
+
+    if (!Array.isArray(parsed)) {
+      return;
+    }
+
+    ideaRecords.value = parsed.filter(
+      (record): record is CommerceIdeaRecord =>
+        typeof record === 'object' &&
+        record !== null &&
+        typeof record.id === 'string' &&
+        typeof record.text === 'string' &&
+        typeof record.createdAt === 'string' &&
+        typeof record.toolKey === 'string' &&
+        typeof record.toolLabel === 'string',
+    );
+  } catch {
+    ideaRecords.value = [];
+  }
+}
+
+function saveIdea(): void {
+  const text = ideaText.value.trim();
+
+  if (text.length < 4) {
+    ideaError.value = '请至少输入 4 个字，方便我们理解你的需求。';
+    ideaSaved.value = false;
+    return;
+  }
+
+  const record: CommerceIdeaRecord = {
+    createdAt: new Date().toISOString(),
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    text,
+    toolKey: displayTool.value.value,
+    toolLabel: displayTool.value.label,
+  };
+
+  ideaRecords.value = [record, ...ideaRecords.value].slice(0, 50);
+
+  try {
+    window.localStorage.setItem('aurora.commerce.ideas', JSON.stringify(ideaRecords.value));
+    ideaError.value = '';
+    ideaSaved.value = true;
+  } catch {
+    ideaError.value = '本地存储不可用，建议内容尚未保存。';
+    ideaSaved.value = false;
+  }
+}
+
+function closeIdeaDialog(): void {
+  ideaOpen.value = false;
+  ideaSaved.value = false;
+  ideaError.value = '';
+}
+
 function openUpload(role: UploadRole): void {
   pendingUploadRole.value = role;
   uploadInput.value?.click();
@@ -1395,6 +2025,7 @@ function workStatusLabel(status: DrawWorkStatus): string {
 }
 
 onMounted(() => {
+  loadIdeaRecords();
   void modelCatalog.load();
   void workspace.initialize();
 });
@@ -1448,15 +2079,21 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <label class="commerce-mobile-picker">
+    <div class="commerce-mobile-picker">
       <span>选择电商工具</span>
-      <select :value="selectedToolKey" @change="handleMobileToolChange">
-        <option value="" disabled>请选择智能体</option>
-        <option v-for="tool in commerceTools" :key="tool.value" :value="tool.value">
-          {{ tool.label }}
-        </option>
-      </select>
-    </label>
+      <div class="commerce-mobile-picker__row">
+        <select :value="selectedToolKey" @change="handleMobileToolChange">
+          <option value="" disabled>请选择智能体</option>
+          <option v-for="tool in commerceTools" :key="tool.value" :value="tool.value">
+            {{ tool.label }}
+          </option>
+        </select>
+        <button type="button" @click="ideaOpen = true">
+          <BulbOutlined />
+          提交想法
+        </button>
+      </div>
+    </div>
 
     <div class="commerce-workbench__body">
       <aside class="commerce-catalog commerce-panel">
@@ -1538,7 +2175,7 @@ onBeforeUnmount(() => {
             <strong>有想法？</strong>
             <small>分享你的商品视觉需求</small>
           </div>
-          <button type="button" disabled>提交想法</button>
+          <button type="button" @click="ideaOpen = true">提交想法</button>
         </div>
       </aside>
 
@@ -1623,8 +2260,10 @@ onBeforeUnmount(() => {
             <button v-else type="button" @click="openUpload('product')">
               <LoadingOutlined v-if="isUploading('product')" />
               <UploadOutlined v-else />
-              <strong>{{ isUploading('product') ? '正在上传' : uploadMeta.product.label }}</strong>
-              <small>{{ uploadMeta.product.description }}</small>
+              <strong>{{
+                isUploading('product') ? '正在上传' : activeUploadMeta.product.label
+              }}</strong>
+              <small>{{ activeUploadMeta.product.description }}</small>
               <em>0 / 1</em>
             </button>
           </div>
@@ -1646,9 +2285,9 @@ onBeforeUnmount(() => {
               <LoadingOutlined v-if="isUploading('background')" />
               <UploadOutlined v-else />
               <strong>{{
-                isUploading('background') ? '正在上传' : uploadMeta.background.label
+                isUploading('background') ? '正在上传' : activeUploadMeta.background.label
               }}</strong>
-              <small>{{ uploadMeta.background.description }}</small>
+              <small>{{ activeUploadMeta.background.description }}</small>
               <em>0 / 1</em>
             </button>
           </div>
@@ -1758,9 +2397,9 @@ onBeforeUnmount(() => {
               <LoadingOutlined v-if="isUploading('clothing')" />
               <UploadOutlined v-else />
               <strong>{{
-                isUploading('clothing') ? '正在上传' : uploadMeta.clothing.label
+                isUploading('clothing') ? '正在上传' : activeUploadMeta.clothing.label
               }}</strong>
-              <small>{{ uploadMeta.clothing.description }}</small>
+              <small>{{ activeUploadMeta.clothing.description }}</small>
               <em>0 / 1</em>
             </button>
           </div>
@@ -1781,8 +2420,10 @@ onBeforeUnmount(() => {
             <button v-else type="button" @click="openUpload('pattern')">
               <LoadingOutlined v-if="isUploading('pattern')" />
               <UploadOutlined v-else />
-              <strong>{{ isUploading('pattern') ? '正在上传' : uploadMeta.pattern.label }}</strong>
-              <small>{{ uploadMeta.pattern.description }}</small>
+              <strong>{{
+                isUploading('pattern') ? '正在上传' : activeUploadMeta.pattern.label
+              }}</strong>
+              <small>{{ activeUploadMeta.pattern.description }}</small>
               <em>0 / 1</em>
             </button>
           </div>
@@ -1839,8 +2480,10 @@ onBeforeUnmount(() => {
             <button v-else type="button" @click="openUpload('product')">
               <LoadingOutlined v-if="isUploading('product')" />
               <UploadOutlined v-else />
-              <strong>{{ isUploading('product') ? '正在上传' : uploadMeta.product.label }}</strong>
-              <small>{{ uploadMeta.product.description }}</small>
+              <strong>{{
+                isUploading('product') ? '正在上传' : activeUploadMeta.product.label
+              }}</strong>
+              <small>{{ activeUploadMeta.product.description }}</small>
               <em>0 / 1</em>
             </button>
           </div>
@@ -1903,7 +2546,9 @@ onBeforeUnmount(() => {
             <span>处理方式 <em>*</em></span>
             <select v-model="retouchMode">
               <option value="" disabled>请选择处理方式</option>
-              <option v-for="mode in retouchModes" :key="mode" :value="mode">{{ mode }}</option>
+              <option v-for="mode in activeRetouchModes" :key="mode" :value="mode">
+                {{ mode }}
+              </option>
             </select>
           </label>
 
@@ -1937,8 +2582,10 @@ onBeforeUnmount(() => {
             <button v-else type="button" @click="openUpload('product')">
               <LoadingOutlined v-if="isUploading('product')" />
               <UploadOutlined v-else />
-              <strong>{{ isUploading('product') ? '正在上传' : uploadMeta.product.label }}</strong>
-              <small>{{ uploadMeta.product.description }}</small>
+              <strong>{{
+                isUploading('product') ? '正在上传' : activeUploadMeta.product.label
+              }}</strong>
+              <small>{{ activeUploadMeta.product.description }}</small>
               <em>0 / 1</em>
             </button>
           </div>
@@ -2016,9 +2663,9 @@ onBeforeUnmount(() => {
               <LoadingOutlined v-if="isUploading('clothing')" />
               <UploadOutlined v-else />
               <strong>{{
-                isUploading('clothing') ? '正在上传' : uploadMeta.clothing.label
+                isUploading('clothing') ? '正在上传' : activeUploadMeta.clothing.label
               }}</strong>
-              <small>{{ uploadMeta.clothing.description }}</small>
+              <small>{{ activeUploadMeta.clothing.description }}</small>
               <em>0 / 1</em>
             </button>
           </div>
@@ -2039,8 +2686,10 @@ onBeforeUnmount(() => {
             <button v-else type="button" @click="openUpload('model')">
               <LoadingOutlined v-if="isUploading('model')" />
               <UploadOutlined v-else />
-              <strong>{{ isUploading('model') ? '正在上传' : uploadMeta.model.label }}</strong>
-              <small>{{ uploadMeta.model.description }}</small>
+              <strong>{{
+                isUploading('model') ? '正在上传' : activeUploadMeta.model.label
+              }}</strong>
+              <small>{{ activeUploadMeta.model.description }}</small>
               <em>0 / 1</em>
             </button>
           </div>
@@ -2351,6 +3000,67 @@ onBeforeUnmount(() => {
     </div>
 
     <div
+      v-if="ideaOpen"
+      class="commerce-overlay commerce-overlay--center"
+      @click.self="closeIdeaDialog"
+    >
+      <section
+        class="commerce-idea-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="提交电商工具想法"
+      >
+        <header>
+          <div>
+            <BulbOutlined />
+            <span>
+              <strong>提交想法</strong>
+              <small>告诉我们你希望增加的电商视觉能力</small>
+            </span>
+          </div>
+          <button type="button" aria-label="关闭建议箱" @click="closeIdeaDialog">
+            <CloseOutlined />
+          </button>
+        </header>
+        <div class="commerce-idea-dialog__body">
+          <label class="commerce-field">
+            <span>需求描述</span>
+            <textarea
+              v-model="ideaText"
+              maxlength="600"
+              placeholder="例如：希望支持把平铺服装自动生成四种不同平台的模特展示图。"
+              @input="
+                ideaSaved = false;
+                ideaError = '';
+              "
+            />
+          </label>
+          <div class="commerce-idea-dialog__meta">
+            <span>
+              当前工具：<strong>{{ displayTool.label }}</strong>
+            </span>
+            <em>{{ ideaText.length }} / 600</em>
+          </div>
+          <p class="commerce-idea-dialog__privacy">
+            <InfoCircleOutlined />
+            内容只保存在当前浏览器本地建议箱，不会自动上传到服务器。
+          </p>
+          <p v-if="ideaError" class="commerce-idea-dialog__error" role="alert">
+            {{ ideaError }}
+          </p>
+          <p v-if="ideaSaved" class="commerce-idea-dialog__success" role="status">
+            <CheckCircleOutlined />
+            已保存到本地建议箱（共 {{ ideaRecords.length }} 条）。
+          </p>
+        </div>
+        <footer>
+          <button type="button" @click="closeIdeaDialog">取消</button>
+          <button type="button" :disabled="!ideaText.trim()" @click="saveIdea">保存到本地</button>
+        </footer>
+      </section>
+    </div>
+
+    <div
       v-if="helpOpen"
       class="commerce-overlay commerce-overlay--center"
       @click.self="helpOpen = false"
@@ -2370,7 +3080,7 @@ onBeforeUnmount(() => {
             <span>01</span>
             <div>
               <strong>先选择左侧工具</strong>
-              <p>当前优先开放智能背景融合和服饰图案替换设计师，其余入口暂时保留。</p>
+              <p>左侧已按参考产品整理商品替换、换背景、试衣、穿搭、精修和场景等常用分类。</p>
             </div>
           </article>
           <article>
@@ -2456,7 +3166,7 @@ onBeforeUnmount(() => {
 .commerce-workbench__brand small {
   overflow: hidden;
   color: #8c97a3;
-  font-size: 8px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2467,7 +3177,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 7px;
   color: #8b96a4;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .commerce-workbench__breadcrumb :deep(svg) {
@@ -2478,7 +3188,7 @@ onBeforeUnmount(() => {
 .commerce-workbench__breadcrumb strong {
   overflow: hidden;
   color: #4d5967;
-  font-size: 9px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2499,7 +3209,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   background: transparent;
   color: #6f7b89;
-  font-size: 9px;
+  font-size: 11px;
   cursor: pointer;
 }
 
@@ -2518,8 +3228,8 @@ onBeforeUnmount(() => {
   align-items: start;
   gap: 10px;
   grid-template-columns:
-    minmax(190px, 0.82fr) minmax(285px, 1.18fr) minmax(380px, 1.72fr)
-    minmax(190px, 0.78fr);
+    minmax(245px, 0.95fr) minmax(215px, 0.78fr) minmax(385px, 1.62fr)
+    minmax(285px, 1.08fr);
 }
 
 .commerce-panel {
@@ -2555,12 +3265,12 @@ onBeforeUnmount(() => {
 }
 
 .commerce-panel__header strong {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .commerce-panel__header > span {
   color: #9aa4af;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .commerce-catalog {
@@ -2595,7 +3305,7 @@ onBeforeUnmount(() => {
   outline: 0;
   background: transparent;
   color: #4d5967;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .commerce-catalog__search input::placeholder {
@@ -2646,12 +3356,12 @@ onBeforeUnmount(() => {
 }
 
 .commerce-catalog__all strong {
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .commerce-catalog__all small {
   color: #9aa5b1;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .commerce-catalog__all :deep(svg:last-child),
@@ -2685,7 +3395,7 @@ onBeforeUnmount(() => {
   border-radius: 5px;
   background: transparent;
   color: #768291;
-  font-size: 8px;
+  font-size: 10px;
   text-align: left;
   cursor: pointer;
 }
@@ -2710,7 +3420,7 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: #f0f3f7;
   color: #99a4b0;
-  font-size: 6px;
+  font-size: 8px;
 }
 
 .commerce-catalog__group-toggle :deep(svg) {
@@ -2734,7 +3444,7 @@ onBeforeUnmount(() => {
   height: 34px;
   place-items: center;
   color: #a0a9b4;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .commerce-catalog__item {
@@ -2784,7 +3494,7 @@ onBeforeUnmount(() => {
 
 .commerce-catalog__item > span {
   overflow: hidden;
-  font-size: 8px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2794,7 +3504,7 @@ onBeforeUnmount(() => {
   border-radius: 3px;
   background: #f1f3f5;
   color: #9aa3ad;
-  font-size: 6px;
+  font-size: 8px;
   font-style: normal;
   white-space: nowrap;
 }
@@ -2814,11 +3524,11 @@ onBeforeUnmount(() => {
 
 .commerce-catalog__empty strong {
   color: #697584;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .commerce-catalog__empty span {
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .commerce-catalog__idea {
@@ -2850,12 +3560,12 @@ onBeforeUnmount(() => {
 
 .commerce-catalog__idea strong {
   color: #425166;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .commerce-catalog__idea small {
   color: #8a96a5;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .commerce-catalog__idea button {
@@ -2865,7 +3575,7 @@ onBeforeUnmount(() => {
   border-radius: 5px;
   background: #2c76f0;
   color: #fff;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .commerce-catalog__idea button:disabled {
@@ -2893,7 +3603,7 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   background: transparent;
   color: #87929e;
-  font-size: 7px;
+  font-size: 9px;
   cursor: pointer;
 }
 
@@ -2916,7 +3626,7 @@ onBeforeUnmount(() => {
 .commerce-field > label,
 .commerce-field > span {
   color: #4d5967;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 720;
 }
 
@@ -2934,7 +3644,7 @@ onBeforeUnmount(() => {
   outline: 0;
   background: #fff;
   color: #4c5866;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .commerce-field select {
@@ -2971,7 +3681,7 @@ onBeforeUnmount(() => {
   border-radius: 5px;
   background: #fff;
   color: #627080;
-  font-size: 8px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
@@ -3022,20 +3732,20 @@ onBeforeUnmount(() => {
 }
 
 .commerce-upload > button strong {
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .commerce-upload > button small {
   max-width: 220px;
   color: #9ba5b0;
-  font-size: 7px;
+  font-size: 9px;
   line-height: 1.5;
   text-align: center;
 }
 
 .commerce-upload > button em {
   color: #a8b1bb;
-  font-size: 7px;
+  font-size: 9px;
   font-style: normal;
 }
 
@@ -3078,7 +3788,7 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   background: rgb(255 255 255 / 88%);
   color: #657281;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .commerce-presets {
@@ -3088,7 +3798,7 @@ onBeforeUnmount(() => {
 
 .commerce-presets > span {
   color: #788491;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .commerce-presets > div {
@@ -3107,7 +3817,7 @@ onBeforeUnmount(() => {
   border-radius: 5px;
   background: #fff;
   color: #687584;
-  font-size: 7px;
+  font-size: 9px;
   cursor: pointer;
 }
 
@@ -3140,19 +3850,19 @@ onBeforeUnmount(() => {
 
 .commerce-editor__placeholder strong {
   color: #4a5664;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .commerce-editor__placeholder p {
   max-width: 280px;
   margin: 0;
-  font-size: 8px;
+  font-size: 10px;
   line-height: 1.6;
 }
 
 .commerce-editor__placeholder small {
   color: #a1abb5;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .commerce-editor__error {
@@ -3166,7 +3876,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   background: #fff5f4;
   color: #a74239;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .commerce-editor__error button {
@@ -3207,12 +3917,12 @@ onBeforeUnmount(() => {
 
 .commerce-editor__footer strong {
   color: #6f5327;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .commerce-editor__footer small {
   color: #9a8a72;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .commerce-editor__suggestion {
@@ -3225,7 +3935,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   background: #fffbf1;
   color: #a86e1f;
-  font-size: 7px;
+  font-size: 9px;
   line-height: 1.45;
 }
 
@@ -3245,7 +3955,7 @@ onBeforeUnmount(() => {
   border-radius: 7px;
   background: #2c76f0;
   color: #fff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 780;
   cursor: pointer;
 }
@@ -3349,7 +4059,7 @@ onBeforeUnmount(() => {
 
 .commerce-preview__caption span {
   color: rgb(255 255 255 / 80%);
-  font-size: 8px;
+  font-size: 10px;
   line-height: 1.5;
 }
 
@@ -3402,21 +4112,21 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 4px;
   color: #2a9b6b;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
 }
 
 .commerce-preview__status strong {
   overflow: hidden;
   color: #52606f;
-  font-size: 8px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .commerce-preview__status small {
   color: #9aa4af;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .commerce-recommended {
@@ -3429,7 +4139,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   margin-bottom: 8px;
   color: #596676;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 760;
 }
 
@@ -3492,7 +4202,7 @@ onBeforeUnmount(() => {
 .commerce-recommended strong {
   overflow: hidden;
   color: #4e5b69;
-  font-size: 8px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3501,7 +4211,7 @@ onBeforeUnmount(() => {
   display: -webkit-box;
   overflow: hidden;
   color: #929ca7;
-  font-size: 7px;
+  font-size: 9px;
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -3536,7 +4246,7 @@ onBeforeUnmount(() => {
 .commerce-info__title strong {
   overflow: hidden;
   color: #354351;
-  font-size: 11px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3549,13 +4259,13 @@ onBeforeUnmount(() => {
 .commerce-info section h2 {
   margin: 0 0 8px;
   color: #455362;
-  font-size: 10px;
+  font-size: 13px;
 }
 
 .commerce-info section p {
   margin: 0;
   color: #737f8d;
-  font-size: 8px;
+  font-size: 10px;
   line-height: 1.75;
 }
 
@@ -3574,7 +4284,7 @@ onBeforeUnmount(() => {
   gap: 7px;
   grid-template-columns: 20px minmax(0, 1fr);
   color: #6f7b89;
-  font-size: 8px;
+  font-size: 10px;
   line-height: 1.5;
 }
 
@@ -3586,7 +4296,7 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   background: #eef4ff;
   color: #2c76f0;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 800;
 }
 
@@ -3624,12 +4334,12 @@ onBeforeUnmount(() => {
 
 .commerce-info__notice strong {
   color: #4c5c71;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .commerce-info__notice small {
   color: #8492a5;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .commerce-info__support {
@@ -3660,12 +4370,12 @@ onBeforeUnmount(() => {
 
 .commerce-info__support strong {
   color: #4e5b69;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .commerce-info__support small {
   color: #929ca7;
-  font-size: 7px;
+  font-size: 9px;
 }
 
 .commerce-info__support button {
@@ -3675,7 +4385,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   background: #2c76f0;
   color: #fff;
-  font-size: 8px;
+  font-size: 10px;
   cursor: pointer;
 }
 
@@ -4022,6 +4732,174 @@ onBeforeUnmount(() => {
   line-height: 1.6;
 }
 
+.commerce-idea-dialog {
+  width: min(560px, calc(100vw - 28px));
+  overflow: hidden;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgb(23 33 45 / 24%);
+}
+
+.commerce-idea-dialog > header {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 17px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.commerce-idea-dialog > header > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.commerce-idea-dialog > header :deep(svg) {
+  color: #2c76f0;
+  font-size: 17px;
+}
+
+.commerce-idea-dialog > header span {
+  display: grid;
+  gap: 3px;
+}
+
+.commerce-idea-dialog > header strong {
+  color: #374553;
+  font-size: 13px;
+}
+
+.commerce-idea-dialog > header small {
+  color: #98a2ad;
+  font-size: 9px;
+}
+
+.commerce-idea-dialog > header button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid #e2e7ec;
+  border-radius: 6px;
+  background: #fff;
+  color: #73808f;
+  cursor: pointer;
+}
+
+.commerce-idea-dialog__body {
+  display: grid;
+  gap: 11px;
+  padding: 17px;
+}
+
+.commerce-idea-dialog__body .commerce-field textarea {
+  min-height: 132px;
+}
+
+.commerce-idea-dialog__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #8a96a4;
+  font-size: 9px;
+}
+
+.commerce-idea-dialog__meta strong {
+  color: #596879;
+  font-weight: 760;
+}
+
+.commerce-idea-dialog__meta em {
+  color: #a2acb7;
+  font-size: 8px;
+  font-style: normal;
+}
+
+.commerce-idea-dialog__privacy,
+.commerce-idea-dialog__error,
+.commerce-idea-dialog__success {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 7px;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.commerce-idea-dialog__privacy {
+  border: 1px solid #dce7fa;
+  background: #f5f8ff;
+  color: #71809a;
+}
+
+.commerce-idea-dialog__privacy :deep(svg),
+.commerce-idea-dialog__success :deep(svg) {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.commerce-idea-dialog__privacy :deep(svg) {
+  color: #2c76f0;
+}
+
+.commerce-idea-dialog__error {
+  border: 1px solid #f1c8c4;
+  background: #fff5f4;
+  color: #a74239;
+}
+
+.commerce-idea-dialog__success {
+  border: 1px solid #bfe6cf;
+  background: #f1fbf5;
+  color: #23794f;
+}
+
+.commerce-idea-dialog__success :deep(svg) {
+  color: #21a064;
+}
+
+.commerce-idea-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 13px 17px;
+  border-top: 1px solid #edf0f3;
+  background: #fafbfd;
+}
+
+.commerce-idea-dialog > footer button {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid #dfe4ea;
+  border-radius: 6px;
+  background: #fff;
+  color: #657281;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.commerce-idea-dialog > footer button:last-child {
+  border-color: #2c76f0;
+  background: #2c76f0;
+  color: #fff;
+  font-weight: 760;
+}
+
+.commerce-idea-dialog > footer button:last-child:disabled {
+  border-color: #d7dde5;
+  background: #d7dde5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 1380px) {
   .commerce-workbench {
     padding-right: 14px;
@@ -4089,6 +4967,13 @@ onBeforeUnmount(() => {
     font-weight: 740;
   }
 
+  .commerce-mobile-picker__row {
+    display: grid;
+    align-items: center;
+    gap: 7px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
   .commerce-mobile-picker select {
     width: 100%;
     height: 36px;
@@ -4099,6 +4984,21 @@ onBeforeUnmount(() => {
     background: #fff;
     color: #4e5b69;
     font-size: 9px;
+  }
+
+  .commerce-mobile-picker__row button {
+    display: inline-flex;
+    height: 36px;
+    align-items: center;
+    gap: 5px;
+    padding: 0 11px;
+    border: 0;
+    border-radius: 7px;
+    background: #2c76f0;
+    color: #fff;
+    font-size: 9px;
+    white-space: nowrap;
+    cursor: pointer;
   }
 
   .commerce-workbench__body {
@@ -4163,6 +5063,14 @@ onBeforeUnmount(() => {
 
   .commerce-workbench__actions button :deep(svg) {
     font-size: 13px;
+  }
+
+  .commerce-mobile-picker__row {
+    grid-template-columns: 1fr;
+  }
+
+  .commerce-mobile-picker__row button {
+    justify-content: center;
   }
 
   .commerce-choice-grid--clothing {
