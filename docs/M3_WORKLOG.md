@@ -510,3 +510,11 @@
 - 回归验收通过：`verify-agent-home.mjs`、`verify-agent-create.mjs`、`measure-agents.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
+
+## 44. 2026-10-19 智能修图工作台全宽比例对齐
+
+- 对照 `outputs/ui-reference/live-reference/retouch.png`，参考产品在 `1440px` 视口下主画布约 `x=255 w=808`、右侧会话栏约 `x=1083 w=355`；本地原布局为画布 `x=260 w=790`、会话栏 `x=1070 w=350`
+- `ImageToolWorkbenchView.vue` 的 `.retouch-studio` 网格右列由 `350px` 调整为 `355px`，页边距由四边 `20px` 调整为左 `15px`、右 `2px`，让主画布和会话栏分别回到 `x=255 w=808` 与 `x=1083 w=355`
+- 移动端断点继续沿用原有 `14px` 页边距与单列布局，不发生桌面端比例外溢；`verify-image-workbench-detail.mjs` 桌面端 `1440x1000` 与移动端 `390x844` 全部通过，现有会话栏 `356px` 上限断言继续覆盖 `355px` 实测宽度，无横向滚动、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成

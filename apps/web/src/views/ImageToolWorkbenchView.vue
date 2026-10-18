@@ -3707,10 +3707,10 @@ onBeforeUnmount(() => {
 .retouch-studio {
   display: grid;
   min-height: calc(100vh - 56px);
-  grid-template-columns: minmax(0, 1fr) 350px;
+  grid-template-columns: minmax(0, 1fr) 355px;
   gap: 20px;
   overflow-x: hidden;
-  padding: 20px;
+  padding: 15px 2px 15px 15px;
   background: radial-gradient(circle at 42% 20%, rgb(58 75 139 / 12%), transparent 34%), #080b14;
   color: #f4f6ff;
 }
