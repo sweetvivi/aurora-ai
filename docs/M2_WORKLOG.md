@@ -1010,6 +1010,21 @@ node outputs/ui-reference/verify-commerce-studio.mjs
 - 超级对话当前每个模型使用独立会话，已通过临时 `systemPrompt` 共享其他模型已完成回答，但尚未实现统一批量服务端请求；浏览器本地已支持按用户恢复最近 20 轮并续接各模型会话
 - 超级对话会按选中模型数量分别计费，发起前已显示模型数量与费用关系；后续若继续扩展批量接口，仍需保持逐模型成本、失败隔离和会话恢复语义
 
+智能体首页模板流对齐：
+
+```text
+pnpm exec prettier --write apps/web/src/views/AgentsView.vue
+pnpm typecheck
+node outputs/ui-reference/verify-agent-home.mjs
+```
+
+- 登录态参考产品当前仍为“HI，我是Agent助手”推荐入口，不是纯目录首页；本轮未推翻已有创建、详情、历史和目录能力
+- 推荐区改为参考产品式任务模板卡：左侧长标题与“做同款”，右侧迷你结果预览；桌面端四列，移动端两列
+- 创作框最大宽度从 `900px` 收紧到 `768px`，去掉参考产品不存在的副标题，压缩推荐区标题占位
+- `verify-agent-home.mjs` 现在会在首次加载后输出主页面截图 `m2-agents-desktop.png` 和 `m2-agents-mobile.png`
+- 桌面端 `1440x1000` 与移动端 `390x844` 均通过：历史分组、场景切换、PPT 意图直达、无横向溢出、无页面脚本错误
+- 验收只使用本地 Mock 数据，不调用真实 Provider，不读取或输出 Key
+
 首页发现工作台本批验证：
 
 ```text

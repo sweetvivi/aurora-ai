@@ -43,6 +43,13 @@ interface CategoryItem {
   label: string;
 }
 
+interface LandingTemplate {
+  id: string;
+  prompt: string;
+  targetId: string;
+  title: string;
+}
+
 const router = useRouter();
 const workspace = useAgentWorkspaceStore();
 const activeTab = ref<CatalogTab>('official');
@@ -207,6 +214,323 @@ const landingAgentMap: Record<string, string[]> = {
   ],
 };
 
+const landingTemplateCatalog: Record<string, LandingTemplate[]> = {
+  探索: [
+    {
+      id: 'weekend-guide',
+      prompt: '制作一份城市青年周末微度假图文指南，包含路线、预算、拍照点和注意事项。',
+      targetId: 'social-media-editor',
+      title: '城市青年周末微度假图文指南',
+    },
+    {
+      id: 'sci-fi-romance',
+      prompt: '创作一部未来科技小说，融合爽文节奏和浪漫情感线。',
+      targetId: 'story-world-builder',
+      title: '未来科技小说融合爽文言情',
+    },
+    {
+      id: 'diet-copy',
+      prompt: '写一篇减肥饮食干货文案，并给出可直接执行的食谱结构。',
+      targetId: 'growth-copywriter',
+      title: '写减肥饮食干货文案引领食谱',
+    },
+    {
+      id: 'appliance-marketing',
+      prompt: '为数码家电达人设计一套营销方案，包含内容选题、节奏和转化路径。',
+      targetId: 'growth-copywriter',
+      title: '数码家电达人营销方案设计',
+    },
+    {
+      id: 'study-note',
+      prompt: '创作一篇学习方法对比小红书笔记，突出真实体验和可执行建议。',
+      targetId: 'social-media-editor',
+      title: '创作学习方法对比小红书笔记',
+    },
+    {
+      id: 'breakfast-note',
+      prompt: '写一篇30元一周早餐小红书笔记，包含采购清单、做法和配图建议。',
+      targetId: 'social-media-editor',
+      title: '写30元一周早餐小红书笔记',
+    },
+    {
+      id: 'office-software-research',
+      prompt: '调研2025年职场新人对办公软件的需求，并输出结构化研究报告。',
+      targetId: 'research-scout',
+      title: '2025 年职场新人办公软件需求调研',
+    },
+    {
+      id: 'home-robot-research',
+      prompt: '调研家用智能机器人市场，整理主要产品、用户需求和竞争格局。',
+      targetId: 'research-scout',
+      title: '家用智能机器人市场调研',
+    },
+    {
+      id: 'fitness-market-research',
+      prompt: '整理2021-2025线上健身市场数据，形成趋势、竞争和机会分析。',
+      targetId: 'data-analyst',
+      title: '2021-2025线上健身市场调研',
+    },
+    {
+      id: 'senior-care-opportunity',
+      prompt: '调研智能化养老服务市场机遇，输出结论、证据和商业建议。',
+      targetId: 'research-scout',
+      title: '调研智能化养老服务市场机遇',
+    },
+    {
+      id: 'douyin-ai-monetization',
+      prompt: '调研抖音AI赛道博主变现方式，比较门槛、收益和可复制性。',
+      targetId: 'research-scout',
+      title: '抖音AI赛道博主变现调研',
+    },
+    {
+      id: 'xiaohongshu-trend-web',
+      prompt: '调研小红书热点赛道，并将调研结果制作成一个可浏览网页。',
+      targetId: 'product-designer',
+      title: '小红书热点赛道调研及网页制作',
+    },
+    {
+      id: 'guochao-apparel',
+      prompt: '完成国潮服装市场调研与报告，包含用户画像、产品和渠道分析。',
+      targetId: 'research-scout',
+      title: '国潮服装市场调研与报告',
+    },
+    {
+      id: 'metaverse-consumption',
+      prompt: '调研元宇宙消费模式，并整理市场机会、风险和案例。',
+      targetId: 'research-scout',
+      title: '元宇宙消费模式调研及报告',
+    },
+    {
+      id: 'trend-toy-web',
+      prompt: '撰写中国潮玩市场调研报告，并制作配套的专题网页。',
+      targetId: 'product-designer',
+      title: '撰写中国潮玩市场调研报告并制网页',
+    },
+    {
+      id: 'duolingo-analysis',
+      prompt: '完成多邻国深度分析，并输出结构清晰、证据完整的研究报告。',
+      targetId: 'product-reviewer',
+      title: '多邻国深度分析结构化报告',
+    },
+    {
+      id: 'trigonometry-summary',
+      prompt: '撰写高中三角函数教学总结，梳理重点、难点和典型例题。',
+      targetId: 'classroom-designer',
+      title: '高中三角函数教学总结撰写',
+    },
+    {
+      id: 'onboarding-plan',
+      prompt: '规划一份新员工入职培训方案，包含课程、导师和验收机制。',
+      targetId: 'document-editor',
+      title: '规划新员工入职培训方案',
+    },
+  ],
+  做报告: [
+    {
+      id: 'industry-report',
+      prompt: '围绕指定行业完成一份可交付的市场研究报告。',
+      targetId: 'research-scout',
+      title: '行业趋势与竞争格局研究报告',
+    },
+    {
+      id: 'user-insight-report',
+      prompt: '整理用户访谈和问卷信息，输出用户洞察报告。',
+      targetId: 'data-analyst',
+      title: '用户需求洞察与画像分析报告',
+    },
+    {
+      id: 'weekly-report',
+      prompt: '把本周工作记录整理成结构清晰的管理周报。',
+      targetId: 'document-editor',
+      title: '项目进展与风险汇报周报',
+    },
+    {
+      id: 'competitor-teardown',
+      prompt: '分析主要竞品的功能、定位、增长策略和差异化机会。',
+      targetId: 'product-reviewer',
+      title: '核心竞品深度拆解分析',
+    },
+    {
+      id: 'ppt-outline',
+      prompt: '根据主题生成一份完整演示文稿大纲和逐页内容。',
+      targetId: 'official-05-0001',
+      title: '商业汇报 PPT 大纲与讲稿',
+    },
+  ],
+  写文档: [
+    {
+      id: 'product-prd',
+      prompt: '撰写一份完整的产品需求文档，覆盖目标、流程、规则和验收标准。',
+      targetId: 'document-editor',
+      title: '产品需求文档与验收标准',
+    },
+    {
+      id: 'meeting-minutes',
+      prompt: '把会议记录整理为结论、负责人、截止时间和风险清单。',
+      targetId: 'meeting-notes',
+      title: '会议纪要、行动项与风险清单',
+    },
+    {
+      id: 'project-plan',
+      prompt: '制定一份项目执行计划，包含里程碑、依赖、人员和风险预案。',
+      targetId: 'document-editor',
+      title: '项目执行计划与里程碑安排',
+    },
+    {
+      id: 'policy-writing',
+      prompt: '起草一份规范、清晰、可直接发布的内部制度文档。',
+      targetId: 'legal-writing-coach',
+      title: '企业制度与流程规范文档',
+    },
+  ],
+  简历制作: [
+    {
+      id: 'resume-optimize',
+      prompt: '根据目标岗位优化简历，强化成果、量化指标和岗位匹配度。',
+      targetId: 'career-copywriter',
+      title: '目标岗位简历优化与亮点提炼',
+    },
+    {
+      id: 'interview-plan',
+      prompt: '生成面试准备清单、常见问题和针对性回答框架。',
+      targetId: 'career-copywriter',
+      title: '面试问题预测与回答框架',
+    },
+    {
+      id: 'career-switch',
+      prompt: '分析转岗可行性，并制定能力补齐和求职行动方案。',
+      targetId: 'career-copywriter',
+      title: '跨行业转岗求职行动方案',
+    },
+  ],
+  自媒体创作: [
+    {
+      id: 'xiaohongshu-series',
+      prompt: '围绕垂直主题规划一个月的小红书内容选题和发布节奏。',
+      targetId: 'social-media-editor',
+      title: '小红书月度选题与发布计划',
+    },
+    {
+      id: 'short-video-script',
+      prompt: '创作一条短视频脚本，包含钩子、分镜、口播和行动号召。',
+      targetId: 'social-media-editor',
+      title: '爆款短视频脚本与分镜设计',
+    },
+    {
+      id: 'account-positioning',
+      prompt: '梳理账号定位、受众、内容支柱和差异化表达方式。',
+      targetId: 'growth-copywriter',
+      title: '个人账号定位与内容策略',
+    },
+    {
+      id: 'hot-topic-plan',
+      prompt: '结合近期热点策划一组可连续发布的内容选题。',
+      targetId: 'growth-copywriter',
+      title: '热点借势内容选题策划',
+    },
+  ],
+  市场调研: [
+    {
+      id: 'market-entry',
+      prompt: '评估目标市场进入机会，分析规模、竞争、渠道和风险。',
+      targetId: 'research-scout',
+      title: '新市场进入机会调研',
+    },
+    {
+      id: 'consumer-survey',
+      prompt: '设计消费者调研问卷，并输出分析框架和关键结论模板。',
+      targetId: 'data-analyst',
+      title: '消费者需求调研与分析',
+    },
+    {
+      id: 'pricing-research',
+      prompt: '分析竞品价格、价值锚点和用户支付意愿，形成定价建议。',
+      targetId: 'data-analyst',
+      title: '竞品价格与用户支付意愿调研',
+    },
+  ],
+  教学设计: [
+    {
+      id: 'lesson-plan',
+      prompt: '围绕教学目标设计一节课的完整教案和课堂活动。',
+      targetId: 'classroom-designer',
+      title: '单节课教学设计与课堂活动',
+    },
+    {
+      id: 'training-plan',
+      prompt: '设计一套企业培训方案，包含课程、练习、考核和反馈机制。',
+      targetId: 'classroom-designer',
+      title: '企业培训课程与考核方案',
+    },
+    {
+      id: 'study-assessment',
+      prompt: '根据知识点设计分层练习、评测题和学习反馈方案。',
+      targetId: 'study-planner',
+      title: '分层练习与学习效果评估',
+    },
+  ],
+  学习研究: [
+    {
+      id: 'study-roadmap',
+      prompt: '根据目标制定可执行的学习路线、阶段任务和复盘节奏。',
+      targetId: 'study-planner',
+      title: '系统学习路线与阶段计划',
+    },
+    {
+      id: 'paper-reading',
+      prompt: '提炼论文的核心问题、方法、实验、结论和局限。',
+      targetId: 'research-mentor',
+      title: '论文精读与核心观点提炼',
+    },
+    {
+      id: 'knowledge-map',
+      prompt: '把复杂知识整理成结构清晰、便于复习的知识图谱。',
+      targetId: 'research-mentor',
+      title: '复杂知识图谱与复习提纲',
+    },
+  ],
+  营销策划: [
+    {
+      id: 'campaign-plan',
+      prompt: '制定完整营销活动方案，包含目标、人群、创意、渠道和预算。',
+      targetId: 'growth-copywriter',
+      title: '整合营销活动全案策划',
+    },
+    {
+      id: 'brand-positioning',
+      prompt: '梳理品牌定位、核心价值、传播主张和视觉方向。',
+      targetId: 'brand-designer',
+      title: '品牌定位与传播策略',
+    },
+    {
+      id: 'launch-plan',
+      prompt: '为新产品制定上市节奏、传播内容和效果复盘指标。',
+      targetId: 'growth-copywriter',
+      title: '新产品上市推广计划',
+    },
+  ],
+  做播客: [
+    {
+      id: 'podcast-outline',
+      prompt: '围绕主题设计一期播客的节目结构、问题和嘉宾提纲。',
+      targetId: 'social-media-editor',
+      title: '播客单期提纲与访谈问题',
+    },
+    {
+      id: 'podcast-series',
+      prompt: '规划一季播客的定位、选题、嘉宾和更新节奏。',
+      targetId: 'social-media-editor',
+      title: '播客栏目策划与选题排期',
+    },
+    {
+      id: 'podcast-copy',
+      prompt: '撰写节目标题、简介、shownotes 和多平台推广文案。',
+      targetId: 'growth-copywriter',
+      title: '播客节目文案与多平台推广',
+    },
+  ],
+};
+
 const catalogById = new Map(
   [...agentCatalog, ...workspace.customAgents].map((agent) => [agent.id, agent]),
 );
@@ -302,6 +626,21 @@ const landingAgents = computed(() =>
     .map((id) => catalogById.get(id))
     .filter((agent): agent is AgentCatalogItem => Boolean(agent)),
 );
+
+const visibleLandingTemplates = computed<LandingTemplate[]>(() => {
+  const configured = landingTemplateCatalog[landingCategory.value];
+
+  if (configured?.length) {
+    return configured;
+  }
+
+  return landingAgents.value.map((agent) => ({
+    id: `${landingCategory.value}-${agent.id}`,
+    prompt: `使用${agent.name}完成一个${landingCategory.value}任务。`,
+    targetId: agent.id,
+    title: `${landingCategory.value}：${agent.name}`,
+  }));
+});
 
 const visibleHistorySessions = computed(() => {
   const query = historyQuery.value.trim().toLowerCase();
@@ -456,6 +795,10 @@ function openLandingTask(targetId: string, prompt: string): void {
   openLandingAgent(targetId, prompt);
 }
 
+function openLandingTemplate(template: LandingTemplate): void {
+  openLandingAgent(template.targetId, template.prompt);
+}
+
 function openLandingAgent(agentId: string, prompt?: string): void {
   void router.push({
     path: `/agents/${agentId}`,
@@ -568,7 +911,6 @@ function goToPage(page: number): void {
 
       <header class="agent-home__heading">
         <h1>HI，我是Agent助手</h1>
-        <p>选择一个专业助手，描述你的目标，它会帮你完成复杂任务。</p>
       </header>
 
       <nav class="agent-home__tasks" aria-label="智能体任务类型">
@@ -615,12 +957,9 @@ function goToPage(page: number): void {
 
     <section class="agent-showcase">
       <header class="agent-showcase__heading">
-        <div>
-          <strong>
-            {{ landingCategory === '探索' ? '选择一个助手开始' : `${landingCategory} · 推荐助手` }}
-          </strong>
-          <p>常用任务已经整理成可直接运行的智能体模板。</p>
-        </div>
+        <strong class="agent-showcase__sr-title">
+          {{ landingCategory === '探索' ? '选择一个助手开始' : `${landingCategory} · 推荐助手` }}
+        </strong>
         <button type="button" @click="openCatalog">
           全部智能体
           <ArrowRightOutlined />
@@ -629,34 +968,47 @@ function goToPage(page: number): void {
 
       <div class="agent-showcase__grid">
         <article
-          v-for="(agent, index) in landingAgents"
-          :key="agent.id"
+          v-for="(template, index) in visibleLandingTemplates"
+          :key="template.id"
           class="agent-showcase-card"
           tabindex="0"
-          @click="openAgent(agent.id)"
-          @keydown.enter="openAgent(agent.id)"
+          @click="openLandingTemplate(template)"
+          @keydown.enter="openLandingTemplate(template)"
         >
           <div class="agent-showcase-card__copy">
-            <span class="agent-showcase-card__icon" :style="{ '--agent-accent': agent.color }">
-              {{ agent.glyph }}
-            </span>
-            <div>
-              <strong>{{ agent.name }}</strong>
-              <p>{{ agent.description }}</p>
-            </div>
-            <footer>
-              <span v-for="tag in agent.tags.slice(0, 3)" :key="tag">{{ tag }}</span>
-            </footer>
+            <strong>{{ template.title }}</strong>
+            <button type="button" @click.stop="openLandingTemplate(template)">
+              做同款
+              <ArrowRightOutlined />
+            </button>
           </div>
           <div
             class="agent-showcase-card__preview"
             :class="`agent-showcase-card__preview--${index % 6}`"
             aria-hidden="true"
           >
-            <span />
-            <span />
-            <span />
-            <i />
+            <div class="agent-template-preview">
+              <header>
+                <i />
+                <span />
+                <em />
+              </header>
+              <div class="agent-template-preview__hero">
+                <span />
+                <i />
+              </div>
+              <div class="agent-template-preview__columns">
+                <span />
+                <span />
+                <span />
+              </div>
+              <div class="agent-template-preview__chart">
+                <i />
+                <i />
+                <i />
+                <i />
+              </div>
+            </div>
           </div>
         </article>
       </div>
@@ -2130,14 +2482,14 @@ function goToPage(page: number): void {
 
 .agent-home__composer {
   display: grid;
-  width: min(100%, 900px);
-  min-height: 168px;
+  width: min(100%, 768px);
+  min-height: 142px;
   box-sizing: border-box;
-  grid-template-rows: minmax(96px, 1fr) auto;
+  grid-template-rows: minmax(72px, 1fr) auto;
   margin: 18px auto 0;
-  padding: 18px 20px 14px;
+  padding: 16px 18px 12px;
   border: 1px solid #e5ebe8;
-  border-radius: 16px;
+  border-radius: 14px;
   background: #fff;
   box-shadow:
     0 16px 42px rgb(36 71 55 / 7%),
@@ -2146,7 +2498,7 @@ function goToPage(page: number): void {
 
 .agent-home__composer textarea {
   width: 100%;
-  min-height: 96px;
+  min-height: 72px;
   box-sizing: border-box;
   resize: none;
   border: 0;
@@ -2226,7 +2578,7 @@ function goToPage(page: number): void {
   display: flex;
   justify-content: center;
   gap: 4px;
-  margin-top: 24px;
+  margin-top: 20px;
   padding-bottom: 10px;
   border-bottom: 1px solid #edf1ef;
   overflow-x: auto;
@@ -2566,27 +2918,26 @@ function goToPage(page: number): void {
 
 .agent-showcase {
   width: min(100%, 1380px);
-  margin: 24px auto 0;
+  margin: 14px auto 0;
 }
 
 .agent-showcase__heading {
   display: flex;
-  align-items: end;
-  justify-content: space-between;
+  min-height: 26px;
+  align-items: center;
+  justify-content: flex-end;
   gap: 18px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
-.agent-showcase__heading strong {
-  display: block;
-  color: #26312c;
-  font-size: 14px;
-}
-
-.agent-showcase__heading p {
-  margin: 5px 0 0;
-  color: #89938e;
-  font-size: 10px;
+.agent-showcase__sr-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .agent-showcase__heading > button {
@@ -2598,24 +2949,24 @@ function goToPage(page: number): void {
   background: transparent;
   color: #168d5f;
   font: inherit;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 780;
   cursor: pointer;
 }
 
 .agent-showcase__grid {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .agent-showcase-card {
   display: grid;
-  min-height: 182px;
+  min-height: 154px;
   overflow: hidden;
-  grid-template-columns: minmax(0, 1.16fr) minmax(96px, 0.84fr);
+  grid-template-columns: minmax(0, 1fr) minmax(108px, 1.06fr);
   border: 1px solid #e5ebe8;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #fff;
   box-shadow: 0 8px 24px rgb(33 78 59 / 4%);
   cursor: pointer;
@@ -2636,163 +2987,246 @@ function goToPage(page: number): void {
 .agent-showcase-card__copy {
   display: grid;
   min-width: 0;
-  align-content: start;
-  gap: 10px;
-  padding: 15px 14px;
-}
-
-.agent-showcase-card__icon {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--agent-accent) 13%, white);
-  color: var(--agent-accent);
-  font-size: 14px;
-  font-weight: 900;
+  align-content: space-between;
+  gap: 12px;
+  padding: 13px 12px 11px;
 }
 
 .agent-showcase-card__copy strong {
-  display: block;
-  overflow: hidden;
-  color: #29332f;
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-showcase-card__copy p {
   display: -webkit-box;
   overflow: hidden;
-  margin: 6px 0 0;
-  color: #7c8781;
-  font-size: 10px;
-  line-height: 1.65;
+  color: #343d39;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.52;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 4;
 }
 
-.agent-showcase-card__copy footer {
-  display: flex;
-  gap: 5px;
-  margin-top: auto;
-  flex-wrap: wrap;
+.agent-showcase-card__copy button {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #6b7771;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 650;
+  cursor: pointer;
 }
 
-.agent-showcase-card__copy footer span {
-  padding: 3px 7px;
-  border-radius: 4px;
-  background: #f4f7f5;
-  color: #77837d;
-  font-size: 8px;
-  white-space: nowrap;
+.agent-showcase-card__copy button:hover,
+.agent-showcase-card__copy button:focus-visible {
+  color: #169c66;
 }
 
 .agent-showcase-card__preview {
   position: relative;
   overflow: hidden;
-  background:
-    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
-    linear-gradient(160deg, #eef8f3, #e5f1eb);
+  background: #eff6f2;
 }
 
-.agent-showcase-card__preview::before {
+.agent-template-preview {
   position: absolute;
-  inset: 14px 11px 12px;
-  border: 1px solid rgb(105 171 143 / 18%);
-  border-radius: 6px;
-  background: rgb(255 255 255 / 74%);
-  box-shadow: 0 9px 20px rgb(49 102 79 / 8%);
-  content: '';
-}
-
-.agent-showcase-card__preview span {
-  position: absolute;
-  z-index: 1;
-  left: 22px;
-  height: 5px;
-  border-radius: 999px;
-  background: #d4e6de;
-}
-
-.agent-showcase-card__preview span:nth-child(1) {
-  top: 36px;
-  width: 48%;
-}
-
-.agent-showcase-card__preview span:nth-child(2) {
-  top: 50px;
-  width: 38%;
-}
-
-.agent-showcase-card__preview span:nth-child(3) {
-  top: 72px;
-  width: 58%;
-  height: 30px;
+  inset: 8px 7px 8px 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  overflow: hidden;
+  padding: 8px;
+  border: 1px solid #dfe9e4;
   border-radius: 5px;
-  background: #e8f4ef;
+  background: #fff;
+  box-shadow: 0 5px 14px rgb(42 77 62 / 8%);
 }
 
-.agent-showcase-card__preview i {
-  position: absolute;
-  z-index: 1;
-  right: 20px;
-  bottom: 24px;
-  width: 42px;
-  height: 4px;
+.agent-template-preview > header {
+  display: grid;
+  height: 13px;
+  align-items: center;
+  gap: 4px;
+  grid-template-columns: 8px minmax(0, 1fr) 15px;
+}
+
+.agent-template-preview > header i {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: #86c9a9;
+}
+
+.agent-template-preview > header span {
+  height: 3px;
   border-radius: 999px;
-  background: #9dd1bb;
+  background: #dce7e2;
+}
+
+.agent-template-preview > header em {
+  height: 7px;
+  border-radius: 999px;
+  background: #eef3f1;
+}
+
+.agent-template-preview__hero {
+  display: grid;
+  min-height: 43px;
+  overflow: hidden;
+  grid-template-columns: 1.1fr 0.9fr;
+  border-radius: 4px;
+  background: #e9f4ee;
+}
+
+.agent-template-preview__hero span {
+  align-self: center;
+  height: 5px;
+  margin: 0 7px;
+  border-radius: 999px;
+  background: #bcdfcf;
+}
+
+.agent-template-preview__hero i {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 35%), transparent),
+    linear-gradient(160deg, #9ac9b3, #dceee5);
+}
+
+.agent-template-preview__columns {
+  display: grid;
+  gap: 3px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.agent-template-preview__columns span {
+  height: 3px;
+  border-radius: 999px;
+  background: #e4ebe8;
+}
+
+.agent-template-preview__chart {
+  display: flex;
+  height: 20px;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.agent-template-preview__chart i {
+  width: 10px;
+  border-radius: 2px 2px 0 0;
+  background: #a9d5c0;
+}
+
+.agent-template-preview__chart i:nth-child(1) {
+  height: 8px;
+}
+
+.agent-template-preview__chart i:nth-child(2) {
+  height: 15px;
+}
+
+.agent-template-preview__chart i:nth-child(3) {
+  height: 11px;
+}
+
+.agent-template-preview__chart i:nth-child(4) {
+  height: 18px;
 }
 
 .agent-showcase-card__preview--1 {
-  background:
-    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
-    linear-gradient(160deg, #eff5fc, #e5eef9);
+  background: #eff4fb;
 }
 
-.agent-showcase-card__preview--1 i {
-  background: #9ebbe3;
+.agent-showcase-card__preview--1 .agent-template-preview__hero {
+  background: #e8effa;
+}
+
+.agent-showcase-card__preview--1 .agent-template-preview__hero i {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 35%), transparent),
+    linear-gradient(160deg, #9db8de, #dbe7f7);
+}
+
+.agent-showcase-card__preview--1 .agent-template-preview > header i,
+.agent-showcase-card__preview--1 .agent-template-preview__chart i {
+  background: #9bb6df;
 }
 
 .agent-showcase-card__preview--2 {
-  background:
-    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
-    linear-gradient(160deg, #f8f2ff, #eee7fa);
+  background: #f5f0fb;
 }
 
-.agent-showcase-card__preview--2 i {
-  background: #bba6e5;
+.agent-showcase-card__preview--2 .agent-template-preview__hero {
+  background: #eee7f7;
+}
+
+.agent-showcase-card__preview--2 .agent-template-preview__hero i {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 35%), transparent),
+    linear-gradient(160deg, #b7a2d8, #e7def3);
+}
+
+.agent-showcase-card__preview--2 .agent-template-preview > header i,
+.agent-showcase-card__preview--2 .agent-template-preview__chart i {
+  background: #b6a2d9;
 }
 
 .agent-showcase-card__preview--3 {
-  background:
-    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
-    linear-gradient(160deg, #fff5ed, #f8e9da);
+  background: #fbf3eb;
 }
 
-.agent-showcase-card__preview--3 i {
-  background: #e2b284;
+.agent-showcase-card__preview--3 .agent-template-preview__hero {
+  background: #f7eadc;
+}
+
+.agent-showcase-card__preview--3 .agent-template-preview__hero i {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 35%), transparent),
+    linear-gradient(160deg, #d7ad83, #f0dfce);
+}
+
+.agent-showcase-card__preview--3 .agent-template-preview > header i,
+.agent-showcase-card__preview--3 .agent-template-preview__chart i {
+  background: #daa979;
 }
 
 .agent-showcase-card__preview--4 {
-  background:
-    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
-    linear-gradient(160deg, #fff1f4, #f9e4e9);
+  background: #fbf0f2;
 }
 
-.agent-showcase-card__preview--4 i {
-  background: #dfa0af;
+.agent-showcase-card__preview--4 .agent-template-preview__hero {
+  background: #f8e7eb;
+}
+
+.agent-showcase-card__preview--4 .agent-template-preview__hero i {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 35%), transparent),
+    linear-gradient(160deg, #dca1ae, #f2d9df);
+}
+
+.agent-showcase-card__preview--4 .agent-template-preview > header i,
+.agent-showcase-card__preview--4 .agent-template-preview__chart i {
+  background: #dca0ad;
 }
 
 .agent-showcase-card__preview--5 {
-  background:
-    linear-gradient(135deg, rgb(255 255 255 / 80%), transparent 50%),
-    linear-gradient(160deg, #eef9f8, #e0f0ef);
+  background: #edf7f7;
 }
 
-.agent-showcase-card__preview--5 i {
-  background: #8ecac6;
+.agent-showcase-card__preview--5 .agent-template-preview__hero {
+  background: #e3f2f1;
+}
+
+.agent-showcase-card__preview--5 .agent-template-preview__hero i {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 35%), transparent),
+    linear-gradient(160deg, #92c5c2, #d7ecea);
+}
+
+.agent-showcase-card__preview--5 .agent-template-preview > header i,
+.agent-showcase-card__preview--5 .agent-template-preview__chart i {
+  background: #91c6c2;
 }
 
 .agents-catalog--expanded {
@@ -2911,11 +3345,37 @@ function goToPage(page: number): void {
   }
 
   .agent-showcase__grid {
-    grid-template-columns: 1fr;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .agent-showcase-card {
-    min-height: 154px;
+    min-height: 146px;
+    grid-template-columns: minmax(0, 0.92fr) minmax(72px, 1.08fr);
+  }
+
+  .agent-showcase-card__copy {
+    gap: 8px;
+    padding: 10px 8px 9px;
+  }
+
+  .agent-showcase-card__copy strong {
+    font-size: 11px;
+    line-height: 1.45;
+    -webkit-line-clamp: 5;
+  }
+
+  .agent-showcase-card__copy button {
+    font-size: 8px;
+  }
+
+  .agent-template-preview {
+    inset: 7px 5px 7px 0;
+    padding: 6px;
+  }
+
+  .agent-template-preview__hero {
+    min-height: 38px;
   }
 }
 </style>
