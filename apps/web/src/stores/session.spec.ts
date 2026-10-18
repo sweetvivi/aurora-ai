@@ -82,4 +82,16 @@ describe('session store', () => {
     expect(store.status).toBe('authenticated');
     expect(store.user).toEqual(storedUser);
   });
+
+  it('handles a session payload without a display name', () => {
+    const store = useSessionStore();
+
+    store.user = {
+      ...storedUser,
+      displayName: undefined as unknown as string,
+    };
+
+    expect(store.displayName).toBe('未登录');
+    expect(store.initials).toBe('?');
+  });
 });

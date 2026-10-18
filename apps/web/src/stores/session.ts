@@ -33,7 +33,7 @@ export const useSessionStore = defineStore('session', {
   getters: {
     authenticated: (state) => state.status === 'authenticated' && state.user !== null,
     displayName: (state) => state.user?.displayName ?? '未登录',
-    initials: (state) => state.user?.displayName.slice(0, 1) || '?',
+    initials: (state) => state.user?.displayName?.slice(0, 1) || '?',
     points: (state) => state.user?.pointsBalance ?? 0,
     tier: (state) => (state.user ? '开发体验版' : '请登录'),
   },
