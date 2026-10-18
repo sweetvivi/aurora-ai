@@ -322,3 +322,12 @@
 - 浏览器验收复跑：`verify-draw.mjs`（mock 生成全流程）、`verify-draw-modes.mjs`（四种模式切换与校验）、`verify-draw-navigation.mjs`（二级导航与工具分组）、`verify-newdraw-templates.mjs`（模板视图 17 → 4 张卡）桌面端 `1440x1000` 与移动端 `390x844` 全部通过，无横向溢出
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
 - 本轮只改动本地文案与样式，未读取、输出或调用任何真实 Key，未消耗参考产品积分
+
+## 26. 2026-10-19 智能修图头部顺序对齐
+
+- 对照 `outputs/ui-reference/live-reference/retouch.png` 与本地 `outputs/ui-reference/modules/retouch-desktop.png`，参考产品的「我的创作（0 张图片）」和「返回旧版」按钮从画布左上依次排列，本地此前使用 `space-between` 把返回按钮推到了另一侧
+- 将 `apps/web/src/views/ImageToolWorkbenchView.vue` 的 `.retouch-canvas__header` 改为 `justify-content: flex-start`，保留 `18px` 间距；画布主体、示例条、右侧新建项目区和底部工具栏不变
+- 自动截图会话已回收，`retouch/desktop` 与 `retouch/mobile` 均显示 `clientWidth === scrollWidth`，页面错误为 `[]`
+- 浏览器验收：`verify-retouch-history.mjs` 桌面端 `1440x1000` 与移动端 `390x844` 均通过，缩放 `110%`、撤销可用、重做禁用、无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
+- 本轮只调整本地样式，未读取、输出或调用任何真实 Key，未消耗参考产品积分

@@ -3745,7 +3745,7 @@ onBeforeUnmount(() => {
   display: flex;
   min-height: 64px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 18px;
   padding: 0 20px;
 }
