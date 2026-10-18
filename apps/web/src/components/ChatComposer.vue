@@ -508,7 +508,7 @@ function createAttachmentId(): string {
 }
 
 .chat-composer--welcome .chat-composer__inner {
-  min-height: 132px;
+  min-height: 173px;
 }
 
 .chat-composer textarea {
@@ -525,7 +525,7 @@ function createAttachmentId(): string {
 }
 
 .chat-composer--welcome textarea {
-  min-height: 76px;
+  min-height: 116px;
 }
 
 .chat-composer textarea::placeholder {
@@ -682,6 +682,10 @@ function createAttachmentId(): string {
 
   .chat-composer--welcome .chat-composer__inner {
     min-height: 118px;
+  }
+
+  .chat-composer--welcome textarea {
+    min-height: 86px;
   }
 
   .chat-composer__inner {

@@ -1441,7 +1441,7 @@ function formatConversationTime(value: string | null): string {
 
 .chat-main__toolbar {
   display: grid;
-  height: 62px;
+  height: 80px;
   align-items: center;
   gap: 18px;
   grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
@@ -1453,7 +1453,9 @@ function formatConversationTime(value: string | null): string {
   display: flex;
   min-width: 0;
   align-items: center;
+  flex-direction: row-reverse;
   gap: 10px;
+  justify-content: flex-end;
   justify-self: start;
 }
 
@@ -1476,7 +1478,7 @@ function formatConversationTime(value: string | null): string {
 }
 
 .chat-main__model-select {
-  width: 210px;
+  width: 180px;
 }
 
 .chat-main__model-select :deep(.ant-select-selector) {
@@ -1596,7 +1598,7 @@ function formatConversationTime(value: string | null): string {
 
 .chat-conversation {
   overflow-y: auto;
-  padding: 40px 24px 24px;
+  padding: 56px 24px 24px;
 }
 
 .chat-conversation.active {
@@ -1623,7 +1625,7 @@ function formatConversationTime(value: string | null): string {
   position: relative;
   width: min(100%, 820px);
   justify-items: stretch;
-  margin: 46px auto 28px;
+  margin: 72px auto 28px;
 }
 
 .chat-model-series {
@@ -1666,7 +1668,7 @@ function formatConversationTime(value: string | null): string {
 }
 
 .chat-welcome__heading {
-  margin-bottom: 20px;
+  margin-bottom: 32px;
 }
 
 .chat-welcome h1 {
@@ -1688,7 +1690,7 @@ function formatConversationTime(value: string | null): string {
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  margin-top: 20px;
+  margin-top: 26px;
 }
 
 .chat-capabilities button {
@@ -1728,12 +1730,12 @@ function formatConversationTime(value: string | null): string {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 36px;
   text-align: left;
 }
 
 .chat-welcome__section-title--charts {
-  margin-top: 24px;
+  margin-top: 28px;
 }
 
 .chat-welcome__section-title strong {
@@ -1751,13 +1753,13 @@ function formatConversationTime(value: string | null): string {
   width: 100%;
   gap: 9px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: 22px;
+  margin-top: 6px;
 }
 
 .chat-suggestions button {
   display: grid;
   position: relative;
-  min-height: 104px;
+  min-height: 91px;
   align-content: space-between;
   justify-items: start;
   padding: 14px 15px 13px;
@@ -1807,7 +1809,7 @@ function formatConversationTime(value: string | null): string {
   width: 100%;
   gap: 7px;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  margin-top: 8px;
+  margin-top: 11px;
 }
 
 .chat-chart-types button {
@@ -2081,6 +2083,10 @@ function formatConversationTime(value: string | null): string {
 
   .chat-welcome h1 {
     font-size: 22px;
+  }
+
+  .chat-welcome__heading {
+    margin-bottom: 20px;
   }
 
   .chat-suggestions {
