@@ -65,13 +65,15 @@ interface ModelItem {
 }
 
 interface ToolItem {
+  actionLabel?: string;
+  actionTone?: 'outline' | 'solid';
   accent: string;
   description: string;
   glyph: string;
   icon?: Component;
   label: string;
   previewImages?: string[];
-  previewVariant?: 'collage' | 'scene';
+  previewVariant?: 'collage' | 'scene' | 'video';
   tags: string[];
 }
 
@@ -256,8 +258,10 @@ const creativeTypes: ToolItem[] = [
 
 const commerceTools: ToolItem[] = [
   {
+    actionLabel: '立即上传',
+    actionTone: 'outline',
     accent: '#e2a02f',
-    description: '上传商品图，一次生成主图、详情页与活动背景，保持品牌视觉统一。',
+    description: '上传商品图，一键生成多张专业主图、详情页和投放素材。',
     glyph: '商',
     label: 'AI 商品套图',
     previewImages: [
@@ -269,13 +273,15 @@ const commerceTools: ToolItem[] = [
     tags: ['商品主图', '详情页', '活动素材'],
   },
   {
+    actionLabel: '生成视频',
+    actionTone: 'solid',
     accent: '#2c8fd1',
-    description: '保留商品主体与构图，快速替换场景并生成多比例展示图。',
-    glyph: '展',
-    label: '商品场景图',
+    description: '从商品图片生成动态短片，适合电商详情、社媒和投放场景。',
+    glyph: '视',
+    label: '产品宣传视频',
     previewImages: ['/showcase/product-v1.png'],
-    previewVariant: 'scene',
-    tags: ['商品展示', '场景替换', '多比例'],
+    previewVariant: 'video',
+    tags: ['商品短片', '电商详情', '社媒投放'],
   },
 ];
 
@@ -743,8 +749,8 @@ function handleCreativeTag(item: ToolItem, tag: string): void {
 }
 
 function handleCommerceTag(item: ToolItem): void {
-  if (item.label === '商品场景图') {
-    void router.push('/commerce');
+  if (item.label === '产品宣传视频') {
+    openVideoStudio();
     return;
   }
 
@@ -2340,10 +2346,13 @@ onBeforeUnmount(() => {
                 <h3>{{ item.label }}</h3>
                 <p>{{ item.description }}</p>
                 <div>
-                  <button type="button" @click="handleCommerceTag(item)">
-                    {{ item.tags[0] }}
+                  <button
+                    type="button"
+                    :class="`draw-commerce-card__action--${item.actionTone ?? 'solid'}`"
+                    @click="handleCommerceTag(item)"
+                  >
+                    {{ item.actionLabel ?? '立即使用' }}
                   </button>
-                  <button type="button" @click="handleCommerceTag(item)">立即使用</button>
                 </div>
               </div>
               <div
@@ -2360,6 +2369,9 @@ onBeforeUnmount(() => {
                   alt=""
                   loading="lazy"
                 />
+                <span v-if="item.previewVariant === 'video'" class="draw-commerce-card__play">
+                  <i />
+                </span>
               </div>
             </article>
           </div>
@@ -5784,10 +5796,15 @@ onBeforeUnmount(() => {
   padding-top: 13px;
 }
 
-.draw-commerce-card__copy > div button:last-child {
+.draw-commerce-card__copy > div button.draw-commerce-card__action--solid {
   border-color: #258b70;
   background: #258b70;
   color: #fff;
+}
+
+.draw-commerce-card__copy > div button.draw-commerce-card__action--outline {
+  border-color: #2b9976;
+  color: #238268;
 }
 
 .draw-commerce-card__preview {
@@ -5836,6 +5853,45 @@ onBeforeUnmount(() => {
   height: calc(100% - 26px);
   border-width: 0;
   object-position: center;
+}
+
+.draw-commerce-card__preview--video .draw-commerce-card__image--0 {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-width: 0;
+  border-radius: 0;
+}
+
+.draw-commerce-card__preview--video::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 58%, rgb(18 34 30 / 18%));
+  content: '';
+}
+
+.draw-commerce-card__play {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 2px solid rgb(255 255 255 / 78%);
+  border-radius: 999px;
+  background: rgb(25 34 32 / 72%);
+  box-shadow: 0 6px 16px rgb(19 29 27 / 20%);
+}
+
+.draw-commerce-card__play i {
+  width: 0;
+  height: 0;
+  margin-left: 2px;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 9px solid #fff;
 }
 
 .draw-tool-group + .draw-tool-group {

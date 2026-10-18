@@ -479,12 +479,14 @@
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
 
-## 41. 2026-10-19 AI 绘画电商宣传卡真实素材预览
+## 41. 2026-10-19 AI 绘画电商宣传卡真实素材与独立视频入口
 
-- 对照 `C:\Users\Administrator\Desktop\参考网站截图合集\AI绘画页面的下半部分.png`，参考产品“电商与宣传”右栏使用真实商品与场景图片，而不是抽象几何占位图
-- `DrawStudioView.vue` 的 `ToolItem` 增加可选 `previewImages` 与 `previewVariant`；AI 商品套图使用三张本地展示素材叠放，商品场景图使用单张商品图铺满预览区
-- 移除旧的 CSS 渐变假图和 `draw-commerce-card__photo` / `draw-commerce-card__panel` 结构，替换为带白边、圆角、阴影和轻微旋转的本地图片；移动端仍按原断点改为上下布局
-- `verify-draw-navigation.mjs` 增加电商卡图片断言：两张卡片都必须有成功加载的本地图片，AI 商品套图至少包含三张叠放素材，同时继续验证商品场景图进入 `/commerce`
+- 对照 `C:\Users\Administrator\Desktop\参考网站截图合集\AI绘画页面的下半部分.png`，参考产品“电商与宣传”右栏使用真实商品与视频画面，而不是抽象几何占位图
+- `DrawStudioView.vue` 的 `ToolItem` 增加可选 `previewImages`、`previewVariant`、`actionLabel` 与 `actionTone`；AI 商品套图使用三张本地展示素材叠放，产品宣传视频使用单张商品图铺满预览区
+- 参考产品实际两张卡的文案与按钮已对齐：第一张为 `AI 商品套图` + 描边绿色 `立即上传`，第二张为 `产品宣传视频` + 深绿实心 `生成视频`
+- 移除旧的 CSS 渐变假图和 `draw-commerce-card__photo` / `draw-commerce-card__panel` 结构，替换为带白边、圆角、阴影和轻微旋转的本地图片；视频卡增加播放按钮覆盖层，移动端仍按原断点改为上下布局
+- `handleCommerceTag` 改为：AI 商品套图进入商品图生成流程，产品宣传视频通过 `openVideoStudio()` 打开独立 `/video` 窗口，符合参考产品点击跳转行为
+- `verify-draw-navigation.mjs` 增加电商卡断言：标签必须为 `AI 商品套图` 与 `产品宣传视频`，第一张至少三张成功加载的本地图片；点击 `生成视频` 后捕获 `/video` 新窗口
 - 浏览器验收通过：桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
