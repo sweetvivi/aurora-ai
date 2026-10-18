@@ -331,3 +331,13 @@
 - 浏览器验收：`verify-retouch-history.mjs` 桌面端 `1440x1000` 与移动端 `390x844` 均通过，缩放 `110%`、撤销可用、重做禁用、无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
 - 本轮只调整本地样式，未读取、输出或调用任何真实 Key，未消耗参考产品积分
+
+## 27. 2026-10-19 图片生成首页标题与示例卡比例对齐
+
+- 对照 `outputs/ui-reference/live-reference/image-generation.png`，参考产品左上角是单行「边界AI平台 智能生图」加铅笔图标，本地此前使用「AI PLATFORM」眉题、独立图标块和「智能生图」两层排版，视觉结构明显不同
+- 将标题改为单行 `极光 AI 平台 智能生图`，保留品牌语义并补上参考产品式铅笔图标；右上角「旧文生图」补金色星标，「新版修图」补绿色修图图标
+- 通过参考截图测量，参考产品示例卡约 `364×339px`，其中预览区约 `251px`；本地卡片此前约 `304px`，预览区只有 `217px`。将 `.generation-showcase-card__visual` 的宽高比由 `16:8.55` 改为 `16:11`，卡片总高度回到约 `338px`
+- 桌面端与移动端重新截取 `outputs/ui-reference/modules/image-generation-{desktop,mobile}.png`；移动端仍保持单列卡片和底部创作条，无横向溢出
+- 专项验收：`verify-image-generation.mjs` 桌面端 `1440x1000` 与移动端 `390x844` 均通过（4 张首屏可用模板、按钮无溢出、无横向溢出）；`verify-image-workbench-detail.mjs` 更新为校验单行标题、铅笔图标、右上角入口、7 个设置控件、积分角标和 6 张效果示例，桌面与移动端全部通过
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
+- 本轮只读取本地代码、本地页面和参考截图，未读取、输出或调用任何真实 Key，未消耗参考产品积分

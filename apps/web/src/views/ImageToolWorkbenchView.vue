@@ -24,6 +24,7 @@ import {
   SendOutlined,
   SettingOutlined,
   SmileOutlined,
+  StarFilled,
   StarOutlined,
   ThunderboltFilled,
   UndoOutlined,
@@ -1188,13 +1189,21 @@ onBeforeUnmount(() => {
   <section v-else-if="isGeneration" class="generation-studio">
     <header class="generation-studio__header">
       <div class="generation-studio__title">
-        <span class="generation-studio__title-icon"><EditOutlined /></span>
-        <span>AI PLATFORM</span>
-        <h1>智能生图</h1>
+        <h1>
+          <span>极光 AI 平台</span>
+          智能生图
+          <EditOutlined />
+        </h1>
       </div>
       <nav aria-label="图片生成入口">
-        <button type="button" @click="legacyGenerationMode = true">旧文生图</button>
-        <RouterLink to="/retouch">新版修图</RouterLink>
+        <button type="button" @click="legacyGenerationMode = true">
+          <StarFilled />
+          旧文生图
+        </button>
+        <RouterLink to="/retouch">
+          <ScissorOutlined />
+          新版修图
+        </RouterLink>
       </nav>
     </header>
 
@@ -2519,41 +2528,28 @@ onBeforeUnmount(() => {
 }
 
 .generation-studio__title {
-  display: grid;
+  display: flex;
   min-width: 0;
   align-items: center;
-  gap: 1px 9px;
-  grid-template-columns: auto minmax(0, 1fr);
-}
-
-.generation-studio__title > span:not(.generation-studio__title-icon) {
-  align-self: end;
-  color: #258b70;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.16em;
-}
-
-.generation-studio__title-icon {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
-  grid-row: 1 / 3;
-  place-items: center;
-  border: 1px solid #b9dfd3;
-  border-radius: 8px;
-  background: #eef9f5;
-  color: #1f9471;
-  font-size: 14px;
 }
 
 .generation-studio__header h1 {
-  align-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   margin: 0;
   color: #26313a;
   font-size: 28px;
   font-weight: 900;
+}
+
+.generation-studio__header h1 > span {
+  color: #258b70;
+}
+
+.generation-studio__header h1 :deep(svg) {
+  color: #258b70;
+  font-size: 22px;
 }
 
 .generation-studio__header nav {
@@ -2583,6 +2579,14 @@ onBeforeUnmount(() => {
   border-color: #8dcab7;
   background: #eef9f5;
   color: #247b63;
+}
+
+.generation-studio__header nav button :deep(svg) {
+  color: #d99a24;
+}
+
+.generation-studio__header nav a :deep(svg) {
+  color: #1f9471;
 }
 
 .generation-studio__content {
@@ -3117,7 +3121,7 @@ onBeforeUnmount(() => {
 
 .generation-showcase-card__visual {
   display: grid;
-  aspect-ratio: 16 / 8.55;
+  aspect-ratio: 16 / 11;
   grid-template-columns: 1fr 1fr;
   gap: 1px;
   overflow: hidden;
