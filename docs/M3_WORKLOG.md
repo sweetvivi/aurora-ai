@@ -341,3 +341,13 @@
 - 专项验收：`verify-image-generation.mjs` 桌面端 `1440x1000` 与移动端 `390x844` 均通过（4 张首屏可用模板、按钮无溢出、无横向溢出）；`verify-image-workbench-detail.mjs` 更新为校验单行标题、铅笔图标、右上角入口、7 个设置控件、积分角标和 6 张效果示例，桌面与移动端全部通过
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
 - 本轮只读取本地代码、本地页面和参考截图，未读取、输出或调用任何真实 Key，未消耗参考产品积分
+
+## 28. 2026-10-19 视频工作台顶部导航与模式网格对齐
+
+- 对照参考视频截图的独立窗口布局，参考产品顶栏使用 `AI视频 / AI绘画 / 超级对话 / AI音乐` 四个短标签；本地此前在“视频”和“绘画”等词语中保留了多余空格
+- `VideoStudioView.vue` 顶栏文案改为参考产品原始标签，导航字号由 `11px` 提到 `12px`、左右内边距由 `12px` 收到 `10px`，保持 `34px` 点击高度不变
+- 创作模式网格由三列改为两列，移动端断点同步保持两列，更接近参考产品参数面板中两列模式入口的排布
+- 现有 `60px` 顶栏、`80px` 模型轨道、`400px` 参数面板、独立滚动作品区和响应式作品网格均保持不变
+- Mock 浏览器验收通过：`verify-video-preview.mjs`、`verify-video-tasks.mjs`、`verify-video-capabilities.mjs`、`verify-video-studio.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
+- 本轮未读取、输出或调用任何真实 Key，未消耗参考产品积分，未调用真实视频生成

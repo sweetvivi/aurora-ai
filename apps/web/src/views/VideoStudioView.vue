@@ -783,12 +783,12 @@ onBeforeUnmount(() => {
         <strong>视频创作</strong>
       </div>
       <nav class="video-toolbar__nav" aria-label="创作工具切换">
-        <RouterLink class="active" to="/video">AI 视频</RouterLink>
-        <RouterLink to="/retouch" target="_blank" rel="noopener noreferrer">AI 绘画</RouterLink>
+        <RouterLink class="active" to="/video">AI视频</RouterLink>
+        <RouterLink to="/retouch" target="_blank" rel="noopener noreferrer">AI绘画</RouterLink>
         <RouterLink to="/newchat/groups" target="_blank" rel="noopener noreferrer"
           >超级对话</RouterLink
         >
-        <RouterLink to="/music" target="_blank" rel="noopener noreferrer">AI 音乐</RouterLink>
+        <RouterLink to="/music" target="_blank" rel="noopener noreferrer">AI音乐</RouterLink>
       </nav>
       <div class="video-toolbar__status">
         <span>
@@ -1373,10 +1373,10 @@ onBeforeUnmount(() => {
   display: inline-flex;
   height: 34px;
   align-items: center;
-  padding: 0 12px;
+  padding: 0 10px;
   border-radius: 7px;
   color: #8f8f99;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-decoration: none;
 }
@@ -1615,7 +1615,7 @@ onBeforeUnmount(() => {
 .video-mode-grid {
   display: grid;
   gap: 5px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .video-mode-grid button {
@@ -2792,7 +2792,7 @@ onBeforeUnmount(() => {
   }
 
   .video-mode-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .video-mode-grid button {
