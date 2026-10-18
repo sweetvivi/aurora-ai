@@ -306,6 +306,7 @@ function openCapability(item: ChatCapabilityPreset): void {
           <RouterLink to="/newchat">
             <MessageOutlined />
             模型对话
+            <i class="chat-mode-switch__badge">New</i>
           </RouterLink>
           <RouterLink class="active" to="/newchat/groups">
             <AppstoreOutlined />
@@ -777,6 +778,7 @@ function openCapability(item: ChatCapabilityPreset): void {
 }
 
 .chat-mode-switch a {
+  position: relative;
   display: inline-flex;
   height: 31px;
   align-items: center;
@@ -789,6 +791,22 @@ function openCapability(item: ChatCapabilityPreset): void {
   font-weight: 750;
   text-decoration: none;
   white-space: nowrap;
+}
+
+.chat-mode-switch__badge {
+  position: absolute;
+  top: -7px;
+  right: -2px;
+  padding: 1px 5px 1px 6px;
+  border-radius: 8px 8px 8px 2px;
+  background: #ff4d4f;
+  box-shadow: 0 3px 8px rgb(255 77 79 / 32%);
+  color: #fff;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.35;
 }
 
 .chat-mode-switch a.active {

@@ -810,6 +810,7 @@ function formatConversationTime(value: string | null): string {
             <RouterLink class="active" :to="isHome ? '/' : '/newchat'">
               <MessageOutlined />
               模型对话
+              <i class="chat-mode-switch__badge">New</i>
             </RouterLink>
             <RouterLink to="/newchat/groups">
               <AppstoreOutlined />
@@ -861,7 +862,9 @@ function formatConversationTime(value: string | null): string {
           <div class="chat-welcome__heading">
             <h1>
               您好，
-              <span>今天有什么我可以帮你的吗？</span>
+              <span
+                >👋今天有什么我可以帮你的吗？<i class="chat-welcome__caret" aria-hidden="true"
+              /></span>
             </h1>
           </div>
 
@@ -1571,6 +1574,7 @@ function formatConversationTime(value: string | null): string {
 }
 
 .chat-mode-switch a {
+  position: relative;
   display: inline-flex;
   height: 31px;
   align-items: center;
@@ -1583,6 +1587,22 @@ function formatConversationTime(value: string | null): string {
   font-weight: 750;
   text-decoration: none;
   white-space: nowrap;
+}
+
+.chat-mode-switch__badge {
+  position: absolute;
+  top: -7px;
+  right: -2px;
+  padding: 1px 5px 1px 6px;
+  border-radius: 8px 8px 8px 2px;
+  background: #ff4d4f;
+  box-shadow: 0 3px 8px rgb(255 77 79 / 32%);
+  color: #fff;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.35;
 }
 
 .chat-mode-switch a.active {
@@ -1682,6 +1702,35 @@ function formatConversationTime(value: string | null): string {
 
 .chat-welcome h1 span {
   display: block;
+}
+
+.chat-welcome__caret {
+  display: inline-block;
+  width: 3px;
+  height: 0.9em;
+  margin-left: 6px;
+  border-radius: 1px;
+  background: #2f3442;
+  vertical-align: -0.05em;
+  animation: chat-welcome-caret 1.1s steps(1, end) infinite;
+}
+
+@keyframes chat-welcome-caret {
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-welcome__caret {
+    animation: none;
+  }
 }
 
 .chat-capabilities {

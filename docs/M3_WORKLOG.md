@@ -277,3 +277,13 @@
 - 桌面端 `1440x1000` 与移动端 `390x844` 重新生成智能体首页截图；两张能力卡、创建入口、禁用态、历史记录和推荐卡片均通过浏览器断言，无横向溢出或页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`，以及 `verify-agent-home.mjs` 桌面端 `1440x1000` 与移动端 `390x844` 复跑
 - 本轮只使用本地 Mock 与本地服务，不读取、输出或调用任何真实 Key
+
+## 22. 2026-10-19 本地开发代理指向与模型对话首页细节
+
+- 本地 `pnpm dev:web` 默认把 `/api` 代理到 `http://127.0.0.1:3001`，但该端口上运行的是 10/17 的旧 API 构建，`/api/v1/agents` 返回 404，前端拿不到智能体等新接口
+- 为不停止任何已有进程，改用 `pnpm --filter @aurora/api build` 重新构建当前分支，并另起一个本地 API 实例（`API_PORT=3006`）承载最新路由
+- `apps/web/vite.config.ts` 改为通过 `loadEnv` 读取 `WEB_API_PROXY_TARGET`，默认值仍是 `http://127.0.0.1:3001`；本机用被 `.gitignore` 忽略的 `apps/web/.env.local` 指向 3006，仓库默认行为不变
+- 验证：5173 上 `/api/v1/modules/display` 返回 200（3001 为 404，3006 为 200），`/api/v1/agents` 由 404 变为正常的鉴权响应；`verify-m2-routes.mjs` 复跑 18 条路由，桌面端 `1440x1000` 与移动端 `390x844` 全部无横向溢出、无页面脚本错误
+- 模型对话首页按参考产品首屏补细节：欢迎标题加入招手表情与句末闪烁光标（`prefers-reduced-motion` 下停用动画），`模型对话` 标签右上角补红色 `New` 徽标，`GroupChatView` 的模式切换器同步对齐
+- 新增 `verify-chat-home-polish.mjs`，断言问候语、招手表情、光标尺寸与动画、`New` 徽标文本与位置、横向溢出和页面脚本错误；桌面端与移动端全部通过
+- 本轮只使用本地服务与 Mock，不读取、输出或调用任何真实 Key
