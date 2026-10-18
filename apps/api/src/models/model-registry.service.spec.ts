@@ -63,9 +63,11 @@ describe('model registry', () => {
         alias: 'database-chat',
         capabilities: ['CHAT'],
         displayName: 'Database Chat',
+        enabled: true,
         provider: {
           baseUrl: 'https://provider.example/v1',
           code: 'database-provider',
+          enabled: true,
           keyRef: 'DATABASE_PROVIDER_KEY',
         },
         providerModel: 'provider-chat-v1',
@@ -73,20 +75,76 @@ describe('model registry', () => {
     ]);
 
     await expect(registry.reload()).resolves.toEqual({
-      count: 1,
+      count: 15,
       source: 'database',
     });
-    expect(registry.list()).toEqual([
+    expect(registry.list()).toEqual(
+      expect.arrayContaining([
+        {
+          alias: 'database-chat',
+          baseUrl: 'https://provider.example/v1',
+          capabilities: ['chat'],
+          displayName: 'Database Chat',
+          keyRef: 'DATABASE_PROVIDER_KEY',
+          providerCode: 'database-provider',
+          providerModel: 'provider-chat-v1',
+        },
+        expect.objectContaining({
+          alias: 'doubao-seedance-2-0',
+        }),
+      ]),
+    );
+    expect(registry.list()).toHaveLength(15);
+  });
+
+  it('lets an enabled database model override the default alias', async () => {
+    const registry = createRegistry({}, [
       {
-        alias: 'database-chat',
-        baseUrl: 'https://provider.example/v1',
+        alias: 'openai-gpt-6-astra',
         capabilities: ['chat'],
-        displayName: 'Database Chat',
-        keyRef: 'DATABASE_PROVIDER_KEY',
-        providerCode: 'database-provider',
-        providerModel: 'provider-chat-v1',
+        displayName: 'Database GPT',
+        enabled: true,
+        provider: {
+          baseUrl: 'https://provider.example/v1',
+          code: 'database-provider',
+          enabled: true,
+          keyRef: 'DATABASE_PROVIDER_KEY',
+        },
+        providerModel: 'database-gpt-v1',
       },
     ]);
+
+    await registry.reload();
+
+    expect(registry.getByAlias('openai-gpt-6-astra')).toMatchObject({
+      displayName: 'Database GPT',
+      providerCode: 'database-provider',
+      providerModel: 'database-gpt-v1',
+    });
+    expect(registry.list().filter((model) => model.alias === 'openai-gpt-6-astra')).toHaveLength(1);
+  });
+
+  it('keeps a disabled database override from falling back to the default alias', async () => {
+    const registry = createRegistry({}, [
+      {
+        alias: 'openai-gpt-6-astra',
+        capabilities: ['chat'],
+        displayName: 'Disabled GPT',
+        enabled: false,
+        provider: {
+          baseUrl: 'https://provider.example/v1',
+          code: 'database-provider',
+          enabled: true,
+          keyRef: 'DATABASE_PROVIDER_KEY',
+        },
+        providerModel: 'database-gpt-v1',
+      },
+    ]);
+
+    await registry.reload();
+
+    expect(() => registry.getByAlias('openai-gpt-6-astra')).toThrow();
+    expect(registry.list()).toHaveLength(13);
   });
 
   it('derives capability profiles for known image and video model families', () => {

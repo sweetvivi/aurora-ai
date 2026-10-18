@@ -361,20 +361,16 @@ export class ModelRegistryService implements OnModuleInit {
           alias: true,
           capabilities: true,
           displayName: true,
+          enabled: true,
           provider: {
             select: {
               baseUrl: true,
               code: true,
+              enabled: true,
               keyRef: true,
             },
           },
           providerModel: true,
-        },
-        where: {
-          enabled: true,
-          provider: {
-            enabled: true,
-          },
         },
       });
 
@@ -388,28 +384,33 @@ export class ModelRegistryService implements OnModuleInit {
         };
       }
 
-      this.models = records.map((record) => {
-        const capabilities = record.capabilities.map(
-          (capability) => capability.toLowerCase() as ModelCapability,
-        );
-        const profile = resolveModelCapabilityProfile({
-          alias: record.alias,
-          capabilities,
-          providerCode: record.provider.code,
-          providerModel: record.providerModel,
-        });
+      const overriddenAliases = new Set(records.map((record) => record.alias));
+      const builtInModels = DEFAULT_MODELS.filter((model) => !overriddenAliases.has(model.alias));
+      const databaseModels = records
+        .filter((record) => record.enabled && record.provider.enabled)
+        .map((record) => {
+          const capabilities = record.capabilities.map(
+            (capability) => capability.toLowerCase() as ModelCapability,
+          );
+          const profile = resolveModelCapabilityProfile({
+            alias: record.alias,
+            capabilities,
+            providerCode: record.provider.code,
+            providerModel: record.providerModel,
+          });
 
-        return {
-          alias: record.alias,
-          baseUrl: record.provider.baseUrl,
-          capabilities,
-          displayName: record.displayName,
-          keyRef: record.provider.keyRef,
-          ...(profile ? { profile } : {}),
-          providerCode: record.provider.code,
-          providerModel: record.providerModel,
-        };
-      });
+          return {
+            alias: record.alias,
+            baseUrl: record.provider.baseUrl,
+            capabilities,
+            displayName: record.displayName,
+            keyRef: record.provider.keyRef,
+            ...(profile ? { profile } : {}),
+            providerCode: record.provider.code,
+            providerModel: record.providerModel,
+          };
+        });
+      this.models = [...databaseModels, ...builtInModels];
       this.loadedFromDatabase = true;
 
       return {
