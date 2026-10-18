@@ -947,6 +947,20 @@ node outputs/ui-reference/verify-chat-conversation-actions.mjs
 - 桌面端 `1440x1000` 与移动端 `390x844` 均通过：4 张推荐卡、3 张模型卡、9 个分类入口、1 次 Mock 对话请求、无页面脚本错误、无横向溢出
 - 验收只使用 Mock 和 Playwright 路由拦截，不调用真实 Provider，不读取或输出 Key
 
+图片生成创作条参考产品对齐：
+
+```text
+pnpm exec prettier --check apps/web/src/views/ImageToolWorkbenchView.vue
+node outputs/ui-reference/verify-image-generation.mjs
+node outputs/ui-reference/verify-image-workbench-detail.mjs
+```
+
+- 桌面端创作条从页面末尾的普通网格行改为固定在主内容区底部，覆盖样例卡底部；在 `1440x1000` 下测得 `x=267, y=823, 宽=1146, 高=161`，与参考图位置和尺寸接近
+- 创作条内部改为 `88px` 上传列、两行输入/操作列；上传块固定为 `82px` 高，避免被两行网格拉伸，设置行和提交按钮保持同一行
+- 样例卡预览图提升到约 `16 / 8.55`，页脚最小高度增加到 `88px`，让卡片整体纵向比例更接近参考产品
+- 移动端恢复到文档流布局，避免固定创作条遮挡长表单；桌面、平板和移动端均无横向溢出
+- 现有图片生成与工作台细节验收全部通过；验收使用已 Mock 的现有页面数据，没有读取、输出或调用真实 Key
+
 ## 7. 中断恢复
 
 恢复工作时依次执行：

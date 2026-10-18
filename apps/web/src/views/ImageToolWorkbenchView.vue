@@ -2462,7 +2462,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 24px;
   margin: 0 auto;
-  padding: 30px 30px 20px;
+  padding: 30px 27px 20px;
 }
 
 .generation-studio__title {
@@ -2536,7 +2536,7 @@ onBeforeUnmount(() => {
   width: min(100%, 1320px);
   min-height: 0;
   margin: 0 auto;
-  padding: 0 30px 28px;
+  padding: 0 27px 190px;
 }
 
 .generation-filter-bar {
@@ -2924,7 +2924,7 @@ onBeforeUnmount(() => {
   place-items: center;
   align-content: center;
   gap: 10px;
-  padding: 34px 20px 42px;
+  padding: 99px 20px 42px;
   text-align: center;
 }
 
@@ -3064,7 +3064,7 @@ onBeforeUnmount(() => {
 
 .generation-showcase-card__visual {
   display: grid;
-  aspect-ratio: 16 / 7.8;
+  aspect-ratio: 16 / 8.55;
   grid-template-columns: 1fr 1fr;
   gap: 1px;
   overflow: hidden;
@@ -3155,11 +3155,11 @@ onBeforeUnmount(() => {
 
 .generation-showcase-card footer {
   display: flex;
-  min-height: 69px;
+  min-height: 88px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px 14px;
 }
 
 .generation-showcase-card footer > span {
@@ -3197,22 +3197,26 @@ onBeforeUnmount(() => {
 }
 
 .generation-composer {
-  position: relative;
-  z-index: 18;
+  position: fixed;
+  bottom: 16px;
+  left: calc(50% + 120px);
+  z-index: 24;
   display: grid;
-  width: min(calc(100% - 60px), 1320px);
-  gap: 10px;
-  grid-template-columns: 104px minmax(0, 1fr);
+  width: min(calc(100vw - 294px), 1266px);
+  gap: 11px;
+  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-rows: 76px 50px;
   justify-self: center;
-  margin: 0 auto 16px;
-  padding: 12px;
+  margin: 0 auto;
+  padding: 11px;
   border: 1px solid #b9ddd1;
-  border-radius: 12px;
+  border-radius: 11px;
   background: rgb(252 255 254 / 96%);
   box-shadow:
     0 18px 48px rgb(31 80 65 / 14%),
     inset 0 0 0 1px rgb(255 255 255 / 78%);
   backdrop-filter: blur(18px);
+  transform: translateX(-50%);
 }
 
 .generation-composer--sticky {
@@ -3222,14 +3226,16 @@ onBeforeUnmount(() => {
 
 .generation-composer__upload-tile {
   display: grid;
+  height: 82px;
   min-width: 0;
-  min-height: 116px;
+  min-height: 82px;
   align-content: center;
+  align-self: center;
   justify-items: center;
   gap: 4px;
   grid-column: 1;
   grid-row: 1 / span 2;
-  padding: 8px;
+  padding: 7px;
   border: 1px dashed #c8d8d2;
   border-radius: 9px;
   background: linear-gradient(135deg, rgb(255 255 255 / 92%), rgb(245 251 249 / 88%)), #fff;
@@ -3260,22 +3266,24 @@ onBeforeUnmount(() => {
 
 .generation-composer__source {
   display: grid;
+  height: 82px;
   min-width: 0;
-  min-height: 116px;
+  min-height: 82px;
   align-items: center;
+  align-self: center;
   gap: 9px;
   grid-column: 1;
   grid-row: 1 / span 2;
-  grid-template-columns: 40px minmax(0, 1fr) 28px;
-  padding: 7px;
+  grid-template-columns: 34px minmax(0, 1fr) 24px;
+  padding: 6px;
   border: 1px solid #e0e9e6;
   border-radius: 8px;
   background: #f8fbfa;
 }
 
 .generation-composer__source img {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: 6px;
   object-fit: cover;
 }
@@ -3301,8 +3309,8 @@ onBeforeUnmount(() => {
 
 .generation-composer__source button {
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   place-items: center;
   border: 0;
   border-radius: 6px;
@@ -3314,6 +3322,7 @@ onBeforeUnmount(() => {
 .generation-composer__prompt {
   position: relative;
   display: block;
+  align-self: start;
   grid-column: 2;
   grid-row: 1;
 }
@@ -3321,8 +3330,8 @@ onBeforeUnmount(() => {
 .generation-composer__prompt textarea {
   display: block;
   width: 100%;
-  min-height: 72px;
-  padding: 10px 52px 10px 10px;
+  min-height: 68px;
+  padding: 8px 48px 8px 9px;
   border: 0;
   outline: 0;
   background: transparent;
@@ -4526,10 +4535,15 @@ onBeforeUnmount(() => {
   }
 
   .generation-composer {
-    bottom: 70px;
+    position: relative;
+    right: auto;
+    bottom: auto;
+    left: auto;
     width: calc(100% - 24px);
     grid-template-columns: 92px minmax(0, 1fr);
-    margin-bottom: 12px;
+    grid-template-rows: auto;
+    margin: 0 auto 12px;
+    transform: none;
   }
 
   .generation-composer--sticky {
