@@ -126,6 +126,7 @@ const moduleForm = reactive({
   name: '',
   route: '',
   sortOrder: 100,
+  subtitle: '',
   visible: true,
 });
 
@@ -161,6 +162,7 @@ const modelColumns = [
 const moduleColumns = [
   { dataIndex: 'name', key: 'module', title: '模块' },
   { dataIndex: 'group', key: 'group', title: '分组', width: 112 },
+  { dataIndex: 'subtitle', key: 'subtitle', title: '说明', width: 176 },
   { dataIndex: 'route', key: 'route', title: '路由' },
   { dataIndex: 'sortOrder', key: 'sortOrder', title: '排序', width: 76 },
   { dataIndex: 'badge', key: 'presentation', title: '展示', width: 168 },
@@ -609,6 +611,7 @@ function openModuleModal(module: ModuleDisplayConfig): void {
   moduleForm.name = module.name;
   moduleForm.route = module.route;
   moduleForm.sortOrder = module.sortOrder;
+  moduleForm.subtitle = module.subtitle ?? '';
   moduleForm.visible = module.visible;
   moduleModalOpen.value = true;
 }
@@ -695,6 +698,7 @@ async function saveModule(): Promise<void> {
       name: moduleForm.name.trim(),
       route: moduleForm.route.trim(),
       sortOrder: moduleForm.sortOrder,
+      subtitle: moduleForm.subtitle.trim() || null,
       visible: moduleForm.visible,
     });
 
@@ -1154,7 +1158,7 @@ onBeforeUnmount(() => {
             :data-source="filteredModules"
             :loading="loading"
             :pagination="false"
-            :scroll="{ x: 980 }"
+            :scroll="{ x: 1080 }"
             row-key="key"
             size="middle"
           >
@@ -1177,6 +1181,12 @@ onBeforeUnmount(() => {
                 <a-tag :color="record.group === 'primary' ? 'blue' : 'green'">
                   {{ getModuleGroupLabel(record.group) }}
                 </a-tag>
+              </template>
+              <template v-else-if="column.key === 'subtitle'">
+                <span v-if="record.subtitle" class="admin-module-subtitle">
+                  {{ record.subtitle }}
+                </span>
+                <span v-else class="admin-module-presentation__empty">未设置</span>
               </template>
               <template v-else-if="column.key === 'route'">
                 <code class="admin-code">{{ record.route }}</code>
@@ -1237,7 +1247,7 @@ onBeforeUnmount(() => {
           </span>
           <span>
             <strong>{{ moduleForm.name || '模块名称' }}</strong>
-            <small>{{ moduleForm.route || '/module-route' }}</small>
+            <small>{{ moduleForm.subtitle || moduleForm.route || '/module-route' }}</small>
           </span>
           <a-tag :color="moduleForm.visible ? 'green' : 'default'">
             {{ moduleForm.visible ? '显示' : '隐藏' }}
@@ -1252,6 +1262,14 @@ onBeforeUnmount(() => {
             <a-select v-model:value="moduleForm.icon" :options="moduleIconOptions" show-search />
           </a-form-item>
         </div>
+
+        <a-form-item label="导航说明">
+          <a-input
+            v-model:value="moduleForm.subtitle"
+            :maxlength="40"
+            placeholder="可选，例如 100+大模型"
+          />
+        </a-form-item>
 
         <div class="admin-form-grid">
           <a-form-item label="所属分组">
@@ -1922,6 +1940,15 @@ onBeforeUnmount(() => {
 .admin-module-presentation__empty {
   color: #9aa1ae;
   font-size: 10px;
+}
+
+.admin-module-subtitle {
+  display: block;
+  overflow: hidden;
+  color: #667085;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-module-cover-editor {

@@ -14,11 +14,11 @@ const entries = buildGlobalSearchEntries(catalogItems);
 
 describe('global search', () => {
   it('matches module aliases used in everyday tasks', () => {
-    expect(searchGlobalEntries(entries, '文生图')[0]?.title).toBe('AI 绘画');
+    expect(searchGlobalEntries(entries, '文生图')[0]?.title).toBe('AI绘画');
     expect(searchGlobalEntries(entries, '抠图')[0]?.title).toBe('智能修图');
-    expect(searchGlobalEntries(entries, '做视频')[0]?.title).toBe('视频生成');
+    expect(searchGlobalEntries(entries, '做视频')[0]?.title).toBe('视频生成3.0');
     expect(searchGlobalEntries(entries, '商品图')[0]?.title).toBe('电商工具');
-    expect(searchGlobalEntries(entries, '工作流')[0]?.title).toBe('AI 画布');
+    expect(searchGlobalEntries(entries, '工作流')[0]?.title).toBe('AI画布');
   });
 
   it('keeps the catalog order for an empty query and ranks exact titles first', () => {

@@ -42,6 +42,7 @@ describe('module catalog store', () => {
           name: '在线对话',
           route: '/chat',
           sortOrder: 5,
+          subtitle: '100+大模型',
           visible: true,
         },
         {
@@ -54,6 +55,7 @@ describe('module catalog store', () => {
           name: '首页',
           route: '/',
           sortOrder: 10,
+          subtitle: null,
           visible: true,
         },
       ],
@@ -68,6 +70,7 @@ describe('module catalog store', () => {
       badge: 'NEW',
       key: 'chat',
       name: '在线对话',
+      subtitle: '100+大模型',
     });
   });
 

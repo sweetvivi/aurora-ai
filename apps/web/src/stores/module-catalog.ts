@@ -55,10 +55,11 @@ const fallbackItems: ModuleDisplayConfig[] = [
     name: '首页',
     route: '/',
     sortOrder: 10,
+    subtitle: null,
     visible: true,
   },
   {
-    badge: '100+',
+    badge: null,
     cover: null,
     coverSource: null,
     customized: false,
@@ -68,6 +69,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
     name: '模型对话',
     route: '/newchat',
     sortOrder: 20,
+    subtitle: '100+大模型',
     visible: true,
   },
   {
@@ -78,13 +80,14 @@ const fallbackItems: ModuleDisplayConfig[] = [
     group: 'primary',
     icon: 'draw',
     key: 'draw',
-    name: 'AI 绘画',
+    name: 'AI绘画',
     route: '/draw',
     sortOrder: 30,
+    subtitle: '绘图 / 修图 / 图片创作',
     visible: true,
   },
   {
-    badge: '6000+',
+    badge: null,
     cover: null,
     coverSource: null,
     customized: false,
@@ -94,6 +97,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
     name: '超级智能体',
     route: '/agents',
     sortOrder: 40,
+    subtitle: '1000+功能',
     visible: true,
   },
   {
@@ -107,6 +111,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
     name: '智能修图',
     route: '/retouch',
     sortOrder: 50,
+    subtitle: '抠图、一键PS',
     visible: true,
   },
   {
@@ -120,6 +125,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
     name: '图片生成',
     route: '/image-generation',
     sortOrder: 60,
+    subtitle: '3D手办、文生图',
     visible: true,
   },
   {
@@ -130,9 +136,10 @@ const fallbackItems: ModuleDisplayConfig[] = [
     group: 'primary',
     icon: 'video',
     key: 'video',
-    name: '视频生成',
+    name: '视频生成3.0',
     route: '/video',
     sortOrder: 70,
+    subtitle: 'Seedance2.0',
     visible: true,
   },
   {
@@ -143,9 +150,10 @@ const fallbackItems: ModuleDisplayConfig[] = [
     group: 'primary',
     icon: 'canvas',
     key: 'canvas',
-    name: 'AI 画布',
+    name: 'AI画布',
     route: '/canvas',
     sortOrder: 80,
+    subtitle: '画布生图 / 画布视频',
     visible: true,
   },
   {
@@ -159,6 +167,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
     name: '电商工具',
     route: '/commerce',
     sortOrder: 90,
+    subtitle: '试衣、换背景',
     visible: true,
   },
   {
@@ -172,6 +181,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
     name: 'AI 音乐',
     route: '/music',
     sortOrder: 100,
+    subtitle: '真人、克隆',
     visible: true,
   },
   {
@@ -185,6 +195,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
     name: '文档处理',
     route: '/workbench',
     sortOrder: 110,
+    subtitle: '写作、表格、汇报',
     visible: true,
   },
   {
@@ -198,6 +209,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
     name: '工具地图',
     route: '/map',
     sortOrder: 120,
+    subtitle: '全部能力一览',
     visible: true,
   },
   {
@@ -211,6 +223,7 @@ const fallbackItems: ModuleDisplayConfig[] = [
     name: '全部工具',
     route: '/map',
     sortOrder: 130,
+    subtitle: '更多功能',
     visible: true,
   },
 ];

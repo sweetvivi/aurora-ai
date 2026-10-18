@@ -115,6 +115,7 @@ export interface ModuleDisplayConfig {
   name: string;
   route: string;
   sortOrder: number;
+  subtitle: string | null;
   visible: boolean;
 }
 
@@ -802,6 +803,7 @@ export async function updateAdminModuleDisplayConfig(
     name?: string;
     route?: string;
     sortOrder?: number;
+    subtitle?: string | null;
     visible?: boolean;
   },
 ): Promise<ModuleDisplayConfig> {

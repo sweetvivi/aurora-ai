@@ -23,6 +23,11 @@ export class UpdateModuleDisplayConfigDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(40)
+  subtitle?: string | null;
+
+  @IsOptional()
+  @IsString()
   @MinLength(1)
   @MaxLength(40)
   icon?: string;

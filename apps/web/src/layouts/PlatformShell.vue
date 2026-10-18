@@ -25,6 +25,7 @@ interface NavigationItem {
   badge?: string;
   icon: Component;
   label: string;
+  subtitle?: string;
   to: string;
 }
 
@@ -97,6 +98,7 @@ function toNavigationItem(item: ModuleCatalogItem): NavigationItem {
     badge: item.badge ?? undefined,
     icon: resolveModuleIcon(item.icon),
     label: item.name,
+    subtitle: item.subtitle ?? undefined,
     to: item.route,
   };
 }
@@ -150,7 +152,12 @@ onMounted(() => {
               :class="{ 'platform-sidebar__link--active': isActivePath(route.path, item.to) }"
             >
               <component :is="item.icon" class="platform-sidebar__icon" />
-              <span class="platform-sidebar__label">{{ item.label }}</span>
+              <span class="platform-sidebar__copy">
+                <span class="platform-sidebar__label">{{ item.label }}</span>
+                <span v-if="item.subtitle" class="platform-sidebar__subtitle">
+                  {{ item.subtitle }}
+                </span>
+              </span>
               <span v-if="item.badge" class="platform-sidebar__badge">{{ item.badge }}</span>
             </RouterLink>
           </section>
@@ -162,7 +169,10 @@ onMounted(() => {
               :class="{ 'platform-sidebar__link--active': isActivePath(route.path, '/admin') }"
             >
               <SettingOutlined class="platform-sidebar__icon" />
-              <span class="platform-sidebar__label">管理后台</span>
+              <span class="platform-sidebar__copy">
+                <span class="platform-sidebar__label">管理后台</span>
+                <span class="platform-sidebar__subtitle">系统配置与模型管理</span>
+              </span>
             </RouterLink>
           </section>
         </nav>
@@ -342,7 +352,7 @@ onMounted(() => {
 .platform-sidebar__link {
   position: relative;
   display: grid;
-  min-height: 42px;
+  min-height: 50px;
   align-items: center;
   gap: 9px;
   grid-template-columns: 20px minmax(0, 1fr) auto;
@@ -373,15 +383,43 @@ onMounted(() => {
 }
 
 .platform-sidebar__icon {
+  align-self: center;
   width: 17px;
   height: 17px;
   color: currentColor;
 }
 
-.platform-sidebar__label {
+.platform-sidebar__copy {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 1px;
+}
+
+.platform-sidebar__label,
+.platform-sidebar__subtitle {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.platform-sidebar__label {
+  color: currentColor;
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 17px;
+}
+
+.platform-sidebar__subtitle {
+  color: #778191;
+  font-size: 10px;
+  font-weight: 560;
+  line-height: 13px;
+}
+
+.platform-sidebar__link:hover .platform-sidebar__subtitle,
+.platform-sidebar__link--active .platform-sidebar__subtitle {
+  color: #aeb8c8;
 }
 
 .platform-sidebar__badge {

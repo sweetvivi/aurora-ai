@@ -130,6 +130,7 @@ model ModuleDisplayConfig {
   id              String   @id @default(cuid())
   key             String   @unique
   name            String
+  subtitle        String?
   icon            String
   cover           String?
   coverStorageKey String?

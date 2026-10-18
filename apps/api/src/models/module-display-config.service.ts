@@ -26,6 +26,7 @@ export interface ModuleDisplayConfigItem {
   name: string;
   route: string;
   sortOrder: number;
+  subtitle: string | null;
   visible: boolean;
 }
 
@@ -41,17 +42,19 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     name: '首页',
     route: '/',
     sortOrder: 10,
+    subtitle: null,
     visible: true,
   },
   {
-    badge: '100+',
+    badge: null,
     cover: null,
     group: 'primary',
     icon: 'chat',
     key: 'chat',
     name: '模型对话',
-    route: '/chat',
+    route: '/newchat',
     sortOrder: 20,
+    subtitle: '100+大模型',
     visible: true,
   },
   {
@@ -60,13 +63,14 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     group: 'primary',
     icon: 'draw',
     key: 'draw',
-    name: 'AI 绘画',
+    name: 'AI绘画',
     route: '/draw',
     sortOrder: 30,
+    subtitle: '绘图 / 修图 / 图片创作',
     visible: true,
   },
   {
-    badge: '6000+',
+    badge: null,
     cover: null,
     group: 'primary',
     icon: 'agents',
@@ -74,6 +78,7 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     name: '超级智能体',
     route: '/agents',
     sortOrder: 40,
+    subtitle: '1000+功能',
     visible: true,
   },
   {
@@ -85,6 +90,7 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     name: '智能修图',
     route: '/retouch',
     sortOrder: 50,
+    subtitle: '抠图、一键PS',
     visible: true,
   },
   {
@@ -96,6 +102,7 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     name: '图片生成',
     route: '/image-generation',
     sortOrder: 60,
+    subtitle: '3D手办、文生图',
     visible: true,
   },
   {
@@ -104,9 +111,10 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     group: 'primary',
     icon: 'video',
     key: 'video',
-    name: '视频生成',
+    name: '视频生成3.0',
     route: '/video',
     sortOrder: 70,
+    subtitle: 'Seedance2.0',
     visible: true,
   },
   {
@@ -115,9 +123,10 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     group: 'primary',
     icon: 'canvas',
     key: 'canvas',
-    name: 'AI 画布',
+    name: 'AI画布',
     route: '/canvas',
     sortOrder: 80,
+    subtitle: '画布生图 / 画布视频',
     visible: true,
   },
   {
@@ -129,6 +138,7 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     name: '电商工具',
     route: '/commerce',
     sortOrder: 90,
+    subtitle: '试衣、换背景',
     visible: true,
   },
   {
@@ -140,6 +150,7 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     name: 'AI 音乐',
     route: '/music',
     sortOrder: 100,
+    subtitle: '真人、克隆',
     visible: true,
   },
   {
@@ -151,6 +162,7 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     name: '文档处理',
     route: '/workbench',
     sortOrder: 110,
+    subtitle: '写作、表格、汇报',
     visible: true,
   },
   {
@@ -162,6 +174,7 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     name: '工具地图',
     route: '/map',
     sortOrder: 120,
+    subtitle: '全部能力一览',
     visible: true,
   },
   {
@@ -173,6 +186,7 @@ export const DEFAULT_MODULE_DISPLAY_CONFIGS: readonly DefaultModuleDisplayConfig
     name: '全部工具',
     route: '/map',
     sortOrder: 130,
+    subtitle: '更多功能',
     visible: true,
   },
 ];
@@ -230,6 +244,7 @@ export class ModuleDisplayConfigService {
       name: input.name?.trim(),
       route: input.route?.trim(),
       sortOrder: input.sortOrder,
+      subtitle: input.subtitle === undefined ? undefined : input.subtitle?.trim() || null,
       visible: input.visible,
     };
     const record = await this.prismaService.moduleDisplayConfig.upsert({
@@ -243,6 +258,7 @@ export class ModuleDisplayConfigService {
         name: data.name ?? defaultConfig?.name ?? normalizedKey,
         route: data.route ?? defaultConfig?.route ?? '/',
         sortOrder: data.sortOrder ?? defaultConfig?.sortOrder ?? 100,
+        subtitle: data.subtitle ?? defaultConfig?.subtitle ?? null,
         visible: data.visible ?? defaultConfig?.visible ?? true,
       },
       update: data,
@@ -299,6 +315,7 @@ export class ModuleDisplayConfigService {
           name: defaultConfig?.name ?? normalizedKey,
           route: defaultConfig?.route ?? '/',
           sortOrder: defaultConfig?.sortOrder ?? 100,
+          subtitle: defaultConfig?.subtitle ?? null,
           visible: defaultConfig?.visible ?? true,
         },
         update: {
@@ -412,6 +429,7 @@ export class ModuleDisplayConfigService {
       name: record.name,
       route: record.route,
       sortOrder: record.sortOrder,
+      subtitle: record.subtitle,
       visible: record.visible,
     };
   }

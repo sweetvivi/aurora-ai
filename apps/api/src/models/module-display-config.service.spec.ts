@@ -18,8 +18,9 @@ function moduleRecord(overrides: Record<string, unknown> = {}) {
     id: 'module-record-1',
     key: 'chat',
     name: '模型对话',
-    route: '/chat',
+    route: '/newchat',
     sortOrder: 20,
+    subtitle: '100+大模型',
     updatedAt: new Date('2026-10-17T00:00:00.000Z'),
     visible: true,
     ...overrides,
@@ -134,7 +135,7 @@ describe('module display config service', () => {
         icon: 'chat',
         key: 'chat',
         name: '模型对话',
-        route: '/chat',
+        route: '/newchat',
         sortOrder: 20,
         visible: false,
       }),
@@ -147,6 +148,7 @@ describe('module display config service', () => {
         name: undefined,
         route: undefined,
         sortOrder: undefined,
+        subtitle: undefined,
         visible: false,
       },
       where: { key: 'chat' },
@@ -221,6 +223,7 @@ describe('module display config service', () => {
         name: undefined,
         route: undefined,
         sortOrder: undefined,
+        subtitle: undefined,
         visible: undefined,
       },
       where: { key: 'chat' },
@@ -230,6 +233,39 @@ describe('module display config service', () => {
       cover: 'https://cdn.example/new-cover.webp',
       coverSource: 'url',
     });
+  });
+
+  it('updates the navigation subtitle without requiring a new database record', async () => {
+    const { moduleDisplayConfig, service } = createService();
+
+    moduleDisplayConfig.upsert.mockImplementation(
+      ({ create }: { create: Record<string, unknown> }) =>
+        Promise.resolve(moduleRecord({ ...create, id: 'created-module' })),
+    );
+
+    const result = await service.update('chat', {
+      subtitle: ' 100+大模型 ',
+    });
+
+    expect(moduleDisplayConfig.upsert).toHaveBeenCalledWith({
+      create: expect.objectContaining({
+        subtitle: '100+大模型',
+      }),
+      update: {
+        badge: undefined,
+        cover: undefined,
+        coverStorageKey: undefined,
+        group: undefined,
+        icon: undefined,
+        name: undefined,
+        route: undefined,
+        sortOrder: undefined,
+        subtitle: '100+大模型',
+        visible: undefined,
+      },
+      where: { key: 'chat' },
+    });
+    expect(result.subtitle).toBe('100+大模型');
   });
 
   it('stores uploaded cover files and replaces the previous local file', async () => {
