@@ -478,3 +478,13 @@
 - 浏览器验收通过：桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误，`New` 徽标位于激活页签内，打字光标动画正常
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
+
+## 41. 2026-10-19 AI 绘画电商宣传卡真实素材预览
+
+- 对照 `C:\Users\Administrator\Desktop\参考网站截图合集\AI绘画页面的下半部分.png`，参考产品“电商与宣传”右栏使用真实商品与场景图片，而不是抽象几何占位图
+- `DrawStudioView.vue` 的 `ToolItem` 增加可选 `previewImages` 与 `previewVariant`；AI 商品套图使用三张本地展示素材叠放，商品场景图使用单张商品图铺满预览区
+- 移除旧的 CSS 渐变假图和 `draw-commerce-card__photo` / `draw-commerce-card__panel` 结构，替换为带白边、圆角、阴影和轻微旋转的本地图片；移动端仍按原断点改为上下布局
+- `verify-draw-navigation.mjs` 增加电商卡图片断言：两张卡片都必须有成功加载的本地图片，AI 商品套图至少包含三张叠放素材，同时继续验证商品场景图进入 `/commerce`
+- 浏览器验收通过：桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成

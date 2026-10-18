@@ -70,6 +70,8 @@ interface ToolItem {
   glyph: string;
   icon?: Component;
   label: string;
+  previewImages?: string[];
+  previewVariant?: 'collage' | 'scene';
   tags: string[];
 }
 
@@ -258,6 +260,12 @@ const commerceTools: ToolItem[] = [
     description: '上传商品图，一次生成主图、详情页与活动背景，保持品牌视觉统一。',
     glyph: '商',
     label: 'AI 商品套图',
+    previewImages: [
+      '/showcase/product-v1.png',
+      '/showcase/fashion-v1.png',
+      '/showcase/landscape-v1.png',
+    ],
+    previewVariant: 'collage',
     tags: ['商品主图', '详情页', '活动素材'],
   },
   {
@@ -265,6 +273,8 @@ const commerceTools: ToolItem[] = [
     description: '保留商品主体与构图，快速替换场景并生成多比例展示图。',
     glyph: '展',
     label: '商品场景图',
+    previewImages: ['/showcase/product-v1.png'],
+    previewVariant: 'scene',
     tags: ['商品展示', '场景替换', '多比例'],
   },
 ];
@@ -2336,14 +2346,20 @@ onBeforeUnmount(() => {
                   <button type="button" @click="handleCommerceTag(item)">立即使用</button>
                 </div>
               </div>
-              <div class="draw-commerce-card__preview" aria-hidden="true">
-                <span class="draw-commerce-card__photo draw-commerce-card__photo--one" />
-                <span class="draw-commerce-card__photo draw-commerce-card__photo--two" />
-                <span class="draw-commerce-card__panel">
-                  <i />
-                  <i />
-                  <i />
-                </span>
+              <div
+                class="draw-commerce-card__preview"
+                :class="`draw-commerce-card__preview--${item.previewVariant ?? 'collage'}`"
+                aria-hidden="true"
+              >
+                <img
+                  v-for="(previewImage, index) in item.previewImages ?? []"
+                  :key="previewImage"
+                  class="draw-commerce-card__image"
+                  :class="`draw-commerce-card__image--${index % 4}`"
+                  :src="previewImage"
+                  alt=""
+                  loading="lazy"
+                />
               </div>
             </article>
           </div>
@@ -5780,61 +5796,46 @@ onBeforeUnmount(() => {
   background: #f1f4f8;
 }
 
-.draw-commerce-card__photo,
-.draw-commerce-card__panel {
+.draw-commerce-card__image {
   position: absolute;
   display: block;
+  width: 76px;
+  height: 104px;
+  object-fit: cover;
+  border: 3px solid #fff;
   border-radius: 6px;
   box-shadow: 0 8px 20px rgb(35 52 75 / 10%);
 }
 
-.draw-commerce-card__photo {
-  width: 76px;
-  height: 104px;
-  border: 3px solid #fff;
+.draw-commerce-card__preview--collage .draw-commerce-card__image--0 {
+  top: 22px;
+  left: 18px;
+  transform: rotate(-5deg);
 }
 
-.draw-commerce-card__photo--one {
-  top: 18px;
-  left: 21px;
-  background:
-    linear-gradient(145deg, transparent 42%, #ae8d68 43% 57%, transparent 58%),
-    linear-gradient(180deg, #cee4ee 0 44%, #f5eee6 45%);
-  transform: rotate(-4deg);
+.draw-commerce-card__preview--collage .draw-commerce-card__image--1 {
+  top: 9px;
+  left: 70px;
+  z-index: 2;
+  width: 92px;
+  height: 118px;
+  transform: rotate(2deg);
 }
 
-.draw-commerce-card__photo--two {
-  top: 34px;
-  left: 79px;
-  background:
-    linear-gradient(150deg, transparent 48%, #6c8d72 49% 62%, transparent 63%),
-    linear-gradient(180deg, #f8d9cb 0 45%, #e6d5c7 46%);
-  transform: rotate(3deg);
+.draw-commerce-card__preview--collage .draw-commerce-card__image--2 {
+  top: 37px;
+  right: 7px;
+  width: 68px;
+  height: 94px;
+  transform: rotate(6deg);
 }
 
-.draw-commerce-card__panel {
-  top: 19px;
-  right: 15px;
-  display: grid;
-  width: 48px;
-  height: 108px;
-  align-content: start;
-  gap: 7px;
-  padding: 11px 8px;
-  border: 3px solid #fff;
-  background: #fff;
-}
-
-.draw-commerce-card__panel i {
-  display: block;
-  height: 5px;
-  border-radius: 999px;
-  background: #d8dde5;
-}
-
-.draw-commerce-card__panel i:first-child {
-  height: 22px;
-  background: #b8d7d1;
+.draw-commerce-card__preview--scene .draw-commerce-card__image--0 {
+  inset: 13px 10px;
+  width: calc(100% - 20px);
+  height: calc(100% - 26px);
+  border-width: 0;
+  object-position: center;
 }
 
 .draw-tool-group + .draw-tool-group {
