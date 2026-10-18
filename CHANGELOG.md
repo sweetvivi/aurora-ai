@@ -24,6 +24,7 @@
 
 ### Changed
 
+- 2026-10-19：继续按参考产品收紧超级智能体历史记录抽屉。根据参考截图右边缘约 `x=1553` 与视口宽度 `1799` 的比例，抽屉实际宽度约 `246px`；`AgentDetailView.vue` 已将本地面板从 `280px` 调整到 `246px`，`verify-agent-detail-actions.mjs` 同步按新宽度断言。桌面端 `1440x1000` 与移动端 `390x844` 验收继续通过，消息列、输入区宽度和无横向溢出状态保持不变；格式、lint、类型检查、全量测试（API 27 个文件 115 项、Web 20 个文件 89 项）与生产构建全部通过。本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分。
 - 2026-10-19：超级智能体历史记录抽屉按参考产品收紧。`AgentDetailView.vue` 将关闭按钮移到面板左上，智能体头像和名称紧随其后；历史条目恢复为单行标题，去掉条数/时间副信息，并使用参考产品接近的浅灰底、细边框和 34px 行高。`verify-agent-detail-actions.mjs` 增加关闭按钮位于头像左侧、首个历史条目高度 32–38px 且不含副信息的断言，并补充抽屉截图 `agent-detail-history-desktop.png`。复跑桌面端 `1440x1000` 与移动端 `390x844`，无横向溢出、无页面脚本错误；`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）与 `pnpm build` 全部通过。本轮未读取、输出或记录任何 Key/Token/Cookie，未访问参考产品积分，未调用真实视频生成。
 - 2026-10-19：超级智能体详情页的消息操作栏按参考产品调整为「复制 → 有帮助 → 需改进 → 重新生成 → 继续追问」。`AgentDetailView.vue` 为五个操作补充稳定的 `data-action` 标记，提交按钮补充 `data-action="submit"`；`verify-agent-detail-actions.mjs` 新增 DOM 顺序与空输入禁用态断言。复跑桌面端 `1440x1000` 与移动端 `390x844` 验收，侧栏/消息列/输入区宽度和无横向溢出保持正常，重新生成、复制、有帮助、继续追问及流式链路全部通过；`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）与 `pnpm build` 全部通过。本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或调用任何真实 Key，未消耗参考产品积分。
 - 2026-10-19：AI 绘画页移除混入图片创作流程的 “AI 视频” 创作卡、作品卡“视频”操作和详情页“生成视频”操作，创作类型恢复为 AI 绘画与图片编辑两栏；保留顶部“做视频”入口独立打开 `/video`。同步更新 `verify-draw-navigation.mjs` 与 `verify-draw-editor.mjs`，断言类型卡不再包含 AI 视频、作品快捷操作不含视频入口且顶部入口仍可用。

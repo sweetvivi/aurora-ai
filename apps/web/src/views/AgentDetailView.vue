@@ -1266,7 +1266,7 @@ watch(
 
 .agent-history-panel {
   display: flex;
-  width: min(280px, 100%);
+  width: min(246px, 100%);
   height: 100%;
   flex-direction: column;
   border-left: 1px solid #e9edf2;
