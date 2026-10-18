@@ -2263,6 +2263,10 @@ onBeforeUnmount(() => {
             <button type="button" @click="workspace.clearError">关闭</button>
           </div>
 
+          <p class="draw-composer__model-note">
+            当前模型：{{ selectedModelLabel }} · {{ selectedModeConfig.description }}
+          </p>
+
           <div class="draw-composer__presets">
             <button
               v-for="mode in creationModes"
@@ -2274,10 +2278,6 @@ onBeforeUnmount(() => {
               {{ mode }}
             </button>
           </div>
-
-          <p class="draw-composer__model-note">
-            当前模型：{{ selectedModelLabel }} · {{ selectedModeConfig.description }}
-          </p>
         </section>
 
         <section class="draw-section">
@@ -5564,8 +5564,9 @@ onBeforeUnmount(() => {
 
 .draw-composer__model-note {
   margin: 11px 0 0;
-  color: #9aa2ae;
-  font-size: 8px;
+  color: #8d96a3;
+  font-size: 10px;
+  text-align: center;
 }
 
 .draw-section {

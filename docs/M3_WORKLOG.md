@@ -312,3 +312,13 @@
 - 全量路由验收：`verify-m2-routes.mjs` 覆盖 18 条路由，桌面端与移动端均无横向溢出、无页面脚本错误、侧栏激活态正确
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
 - 本轮只读取本地代码与本地页面，未读取、输出或调用任何真实 Key，未消耗参考产品积分
+
+## 25. 2026-10-19 AI 绘画首页提示语与信息顺序对齐
+
+- 对照 `outputs/ui-reference/live-reference/draw.png` 的首屏，参考产品在大创作卡下方先显示「当前模型：…」一行居中说明，再是四个创作模式胶囊（文生图 / 参考图重绘 / 局部编辑 / 商品图处理）；本地此前顺序相反
+- 把 `.draw-composer__model-note` 移到 `.draw-composer__presets` 之前，并加 `text-align: center`；字号 `8px` → `10px`、颜色 `#9aa2ae` → `#8d96a3`，与参考产品说明行的可读度接近
+- 文生图输入占位文案由「描述希望生成的画面，例如：春日樱花树下的橘猫…」改为参考产品原句「描述画面，可 Ctrl+V 粘贴图片或拖拽上传」，落在 `data/draw-creation-modes.ts` 的 `promptPlaceholder`；本地没有 `@ 引用图片` 能力，因此未把该提示写进占位文案
+- 参考图重绘、局部编辑、商品图处理三种模式保留各自的引导式占位文案，避免丢失模式专属输入提示
+- 浏览器验收复跑：`verify-draw.mjs`（mock 生成全流程）、`verify-draw-modes.mjs`（四种模式切换与校验）、`verify-draw-navigation.mjs`（二级导航与工具分组）、`verify-newdraw-templates.mjs`（模板视图 17 → 4 张卡）桌面端 `1440x1000` 与移动端 `390x844` 全部通过，无横向溢出
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 26 个文件 110 项、Web 20 个文件 88 项）、`pnpm build`
+- 本轮只改动本地文案与样式，未读取、输出或调用任何真实 Key，未消耗参考产品积分

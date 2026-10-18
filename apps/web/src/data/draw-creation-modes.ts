@@ -16,7 +16,7 @@ const MODE_CONFIGS: Record<DrawCreationMode, DrawCreationModeConfig> = {
   文生图: {
     description: '从文字描述直接生成画面，参考图为可选项。',
     mode: '文生图',
-    promptPlaceholder: '描述希望生成的画面，例如：春日樱花树下的橘猫，柔和自然光，高清摄影',
+    promptPlaceholder: '描述画面，可 Ctrl+V 粘贴图片或拖拽上传',
     referenceDescription: '可选，用参考图辅助锁定主体、构图或风格。',
     referenceLabel: '参考图（可选）',
     requiresReference: false,
