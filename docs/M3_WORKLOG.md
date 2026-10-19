@@ -538,3 +538,15 @@
 - 回归验收通过：`verify-video-studio.mjs`、`verify-video-preview.mjs`；桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`
 - 本轮只读取本地代码与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
+
+## 47. 2026-10-19 AI 画布交互与上传移植
+
+- 以 `MagicalCanvas` 的节点画布操作作为行为蓝本，在 `CanvasStudioView.vue` 中按现有 Vue 架构重写交互，没有嵌入 React 子应用；参考产品与开源项目不一致时继续以 参考产品 的实际操作为准
+- 画布支持普通滚轮平移、`Ctrl/Cmd + 滚轮`围绕鼠标缩放、空白处左键或中键拖动平移，缩放范围限定为 `25%–200%`；滚轮落在顶部栏、创作区、缩放控件或侧边面板时不会误触画布
+- 节点连接点支持按住拖拽连线，拖拽时显示临时贝塞尔预览线、有效目标和无效目标反馈；点击连线可选中并显示流动虚线，按 `Delete/Backspace` 删除时优先处理已选连线，不误删节点
+- 左侧加号菜单的「上传」改为直接创建画布图片节点，支持一次选择多张图片、按原图比例生成节点尺寸并立即显示本地预览；成功上传后调用现有 `workspace.uploadReference()`，节点工具栏的「上传」继续用于替换当前节点图片
+- 新增 `outputs/ui-reference/verify-canvas-interactions.mjs`，覆盖多图上传、比例保持、滚轮平移、左键拖拽平移、`Ctrl + 滚轮`缩放、拖拽连线、连线选中与删除；相关截图输出到 `m2-canvas-interactions-desktop.png` 和 `m2-canvas-edge-selected.png`
+- 用户已有的「分镜生成器」侧栏入口保持保留，不在本轮回退或覆盖
+- 浏览器回归通过：`verify-canvas-studio.mjs` 桌面端、移动端、本地降级全部通过；`verify-canvas-interactions.mjs` 输出 `{"errors":[],"firstNodeMetrics":{"hasImage":true,"height":250,"ratio":1.44,"width":360},"metrics":{"clientWidth":1440,"scrollWidth":1440}}`
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm --filter @aurora/web test`（20 个文件 89 项）
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成

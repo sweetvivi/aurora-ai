@@ -23,6 +23,7 @@ import {
   PlusOutlined,
   RedoOutlined,
   SaveOutlined,
+  ScissorOutlined,
   SendOutlined,
   SettingOutlined,
   ThunderboltFilled,
@@ -61,6 +62,7 @@ type CanvasAssetCategory = 'all' | 'character' | 'item' | 'other' | 'scene' | 's
 type HistoryTab = 'image' | 'video';
 type NodeGenerationAction = 'angle' | 'image' | 'local-image' | 'local-video' | 'text' | 'video';
 type BatchFilter = 'all' | 'failed' | 'pending';
+type ConnectionSide = 'left' | 'right';
 
 interface CanvasNode {
   createdAt: number;
@@ -144,7 +146,8 @@ interface Point {
 interface RailAction {
   icon: Component;
   label: string;
-  value: 'account' | 'add' | 'assets' | 'batch' | 'history' | 'inspiration' | 'workflow';
+  value:
+    'account' | 'add' | 'assets' | 'batch' | 'history' | 'inspiration' | 'storyboard' | 'workflow';
 }
 
 interface GenerationModel {
@@ -162,7 +165,7 @@ const railActions: RailAction[] = [
   { icon: NodeIndexOutlined, label: '工作流', value: 'workflow' },
   { icon: AppstoreOutlined, label: '素材', value: 'assets' },
   { icon: HistoryOutlined, label: '历史', value: 'history' },
-  { icon: ThunderboltFilled, label: '批量生成', value: 'batch' },
+  { icon: ScissorOutlined, label: '分镜生成器', value: 'storyboard' },
   { icon: UserOutlined, label: '账户', value: 'account' },
 ];
 
@@ -234,9 +237,23 @@ const workflowTitleDraft = ref('');
 const canvasTitle = ref('新建画布');
 const selectedNodeId = ref('');
 const selectedNodeIds = ref<string[]>([]);
+const selectedEdgeId = ref('');
 const nodeMenuNodeId = ref('');
 const nodeToolbarMenuNodeId = ref('');
 const connectionFromId = ref('');
+const connectionDrag = ref<{
+  moved: boolean;
+  pointerX: number;
+  pointerY: number;
+  side: ConnectionSide;
+  sourceId: string;
+  worldX: number;
+  worldY: number;
+} | null>(null);
+const connectionHover = ref<{
+  nodeId: string;
+  side: ConnectionSide;
+} | null>(null);
 const contextMenu = ref<CanvasContextMenu | null>(null);
 const canvasNotice = ref('');
 const inspirationOpen = ref(false);
@@ -254,6 +271,8 @@ const selectedRatio = ref('16:9');
 const selectedSize = ref('1K');
 const uploadCategory = ref<Exclude<CanvasAssetCategory, 'all'>>('other');
 const uploadingAssets = ref(false);
+const uploadingNodeImage = ref(false);
+const nodeUploadIntent = ref<'canvas' | 'replace'>('canvas');
 const assetError = ref('');
 const batchSelectedIds = ref<string[]>([]);
 const batchRunning = ref(false);
@@ -280,6 +299,7 @@ const angleGenerating = ref(false);
 const angleError = ref('');
 const loadedFileIds = new Set<string>();
 const objectUrls = new Set<string>();
+const isCanvasPanning = ref(false);
 let dragState:
   | {
       origins: Map<string, { x: number; y: number }>;
@@ -375,6 +395,42 @@ const canvasTransform = computed(
   () =>
     `translate3d(${viewport.value.x}px, ${viewport.value.y}px, 0) scale(${viewport.value.scale})`,
 );
+const connectionPreview = computed(() => {
+  const drag = connectionDrag.value;
+
+  if (!drag) {
+    return null;
+  }
+
+  const source = nodes.value.find((node) => node.id === drag.sourceId);
+
+  if (!source) {
+    return null;
+  }
+
+  const startX = drag.side === 'right' ? source.x + source.width : source.x;
+  const startY = source.y + source.height / 2;
+
+  return {
+    d: createBezierPath(startX, startY, drag.worldX, drag.worldY, drag.side),
+    invalid: Boolean(
+      connectionHover.value && !isConnectionTargetValid(drag, connectionHover.value),
+    ),
+  };
+});
+
+const linkHoverState = computed(() => {
+  const drag = connectionDrag.value;
+  const hover = connectionHover.value;
+
+  if (!drag || !hover) {
+    return { invalid: false, nodeId: '', valid: false };
+  }
+
+  const valid = isConnectionTargetValid(drag, hover);
+
+  return { invalid: !valid, nodeId: hover.nodeId, valid };
+});
 
 function createId(prefix: string): string {
   const randomPart =
@@ -388,6 +444,7 @@ function uniqueIds(ids: string[]): string[] {
 }
 
 function setSelection(ids: string[], primaryId = ''): void {
+  selectedEdgeId.value = '';
   selectedNodeIds.value = uniqueIds(ids);
   selectedNodeId.value =
     primaryId && selectedNodeIds.value.includes(primaryId)
@@ -396,6 +453,7 @@ function setSelection(ids: string[], primaryId = ''): void {
 }
 
 function clearSelection(): void {
+  selectedEdgeId.value = '';
   selectedNodeIds.value = [];
   selectedNodeId.value = '';
   nodeToolbarMenuNodeId.value = '';
@@ -888,6 +946,14 @@ function loadWorkflow(workflow: CanvasWorkflowTemplate): void {
   persistCanvas();
 }
 
+function loadStoryboardTemplate(): void {
+  const storyboardTemplate = workflowTemplates.find((workflow) => workflow.id === 'storyboard');
+
+  if (storyboardTemplate) {
+    loadWorkflow(storyboardTemplate);
+  }
+}
+
 function addPromptNode(prompt = '描述当前节点需要生成或处理的内容'): CanvasNode {
   const node: CanvasNode = {
     createdAt: Date.now(),
@@ -1106,6 +1172,21 @@ function startConnection(nodeId: string): void {
   nodeToolbarMenuNodeId.value = '';
 }
 
+function createBezierPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+  direction: ConnectionSide = 'right',
+): string {
+  const distance = Math.max(64, Math.abs(endX - startX) * 0.48);
+  const directionMultiplier = direction === 'right' ? 1 : -1;
+  const firstControlX = startX + distance * directionMultiplier;
+  const secondControlX = endX - distance * directionMultiplier;
+
+  return `M ${startX} ${startY} C ${firstControlX} ${startY}, ${secondControlX} ${endY}, ${endX} ${endY}`;
+}
+
 function canConnectNodes(source: CanvasNode, target: CanvasNode): boolean {
   if (source.id === target.id || target.kind === 'prompt') {
     return false;
@@ -1120,6 +1201,34 @@ function canConnectNodes(source: CanvasNode, target: CanvasNode): boolean {
   }
 
   return false;
+}
+
+function getDraggedConnectionPair(
+  drag: NonNullable<typeof connectionDrag.value>,
+  hover: NonNullable<typeof connectionHover.value>,
+): { from: string; to: string } {
+  return drag.side === 'right'
+    ? { from: drag.sourceId, to: hover.nodeId }
+    : { from: hover.nodeId, to: drag.sourceId };
+}
+
+function isConnectionTargetValid(
+  drag: NonNullable<typeof connectionDrag.value>,
+  hover: NonNullable<typeof connectionHover.value>,
+): boolean {
+  const pair = getDraggedConnectionPair(drag, hover);
+  const source = nodes.value.find((node) => node.id === pair.from);
+  const target = nodes.value.find((node) => node.id === pair.to);
+
+  if (!source || !target || !canConnectNodes(source, target)) {
+    return false;
+  }
+
+  if (wouldCreateCycle(pair.from, pair.to)) {
+    return false;
+  }
+
+  return !edges.value.some((edge) => edge.from === pair.from && edge.to === pair.to);
 }
 
 function wouldCreateCycle(sourceId: string, targetId: string): boolean {
@@ -1144,6 +1253,52 @@ function wouldCreateCycle(sourceId: string, targetId: string): boolean {
   return false;
 }
 
+function addConnection(sourceId: string, targetId: string): CanvasEdge | null {
+  const source = nodes.value.find((node) => node.id === sourceId);
+  const target = nodes.value.find((node) => node.id === targetId);
+
+  if (!source || !target || !canConnectNodes(source, target)) {
+    showCanvasNotice('节点类型不支持这样连接');
+    return null;
+  }
+
+  if (wouldCreateCycle(sourceId, targetId)) {
+    showCanvasNotice('不能连接成循环工作流');
+    return null;
+  }
+
+  const alreadyConnected = edges.value.some(
+    (edge) => edge.from === sourceId && edge.to === targetId,
+  );
+
+  if (alreadyConnected) {
+    const existing = edges.value.find((edge) => edge.from === sourceId && edge.to === targetId);
+
+    selectedNodeIds.value = [];
+    selectedNodeId.value = '';
+    selectedEdgeId.value = existing?.id ?? '';
+    return existing ?? null;
+  }
+
+  const edge: CanvasEdge = {
+    from: sourceId,
+    id: createId('edge'),
+    to: targetId,
+  };
+
+  commitHistory();
+  edges.value = [...edges.value, edge];
+  selectedNodeIds.value = [];
+  selectedNodeId.value = '';
+  selectedEdgeId.value = edge.id;
+  connectionFromId.value = '';
+  nodeMenuNodeId.value = '';
+  nodeToolbarMenuNodeId.value = '';
+  contextMenu.value = null;
+
+  return edge;
+}
+
 function connectNode(targetId: string): void {
   const sourceId = connectionFromId.value;
 
@@ -1153,40 +1308,101 @@ function connectNode(targetId: string): void {
     return;
   }
 
-  const source = nodes.value.find((node) => node.id === sourceId);
-  const target = nodes.value.find((node) => node.id === targetId);
+  addConnection(sourceId, targetId);
+  connectionFromId.value = '';
+}
 
-  if (!source || !target || !canConnectNodes(source, target)) {
-    showCanvasNotice('节点类型不支持这样连接');
-    connectionFromId.value = '';
+function clientToCanvas(clientX: number, clientY: number): Point {
+  const rect = workspaceElement.value?.getBoundingClientRect();
+
+  return {
+    x: (clientX - (rect?.left ?? 0) - viewport.value.x) / viewport.value.scale,
+    y: (clientY - (rect?.top ?? 0) - viewport.value.y) / viewport.value.scale,
+  };
+}
+
+function beginConnectionDrag(event: PointerEvent, nodeId: string, side: ConnectionSide): void {
+  if (event.button !== 0) {
     return;
   }
 
-  if (wouldCreateCycle(sourceId, targetId)) {
-    showCanvasNotice('不能连接成循环工作流');
-    connectionFromId.value = '';
-    return;
-  }
-
-  const alreadyConnected = edges.value.some(
-    (edge) => edge.from === sourceId && edge.to === targetId,
-  );
-
-  if (!alreadyConnected) {
-    commitHistory();
-    edges.value = [
-      ...edges.value,
-      {
-        from: sourceId,
-        id: createId('edge'),
-        to: targetId,
-      },
-    ];
-  }
+  event.preventDefault();
+  event.stopPropagation();
+  const point = clientToCanvas(event.clientX, event.clientY);
 
   connectionFromId.value = '';
-  setSelection([targetId], targetId);
+  connectionHover.value = null;
+  connectionDrag.value = {
+    moved: false,
+    pointerX: event.clientX,
+    pointerY: event.clientY,
+    side,
+    sourceId: nodeId,
+    worldX: point.x,
+    worldY: point.y,
+  };
+}
+
+function updateConnectionHover(drag: NonNullable<typeof connectionDrag.value>, point: Point): void {
+  const targetSide: ConnectionSide = drag.side === 'right' ? 'left' : 'right';
+  const target = [...nodes.value]
+    .reverse()
+    .find(
+      (node) =>
+        node.id !== drag.sourceId &&
+        point.x >= node.x - 12 &&
+        point.x <= node.x + node.width + 12 &&
+        point.y >= node.y - 12 &&
+        point.y <= node.y + node.height + 12,
+    );
+
+  connectionHover.value = target ? { nodeId: target.id, side: targetSide } : null;
+}
+
+function completeConnectionDrag(): void {
+  const drag = connectionDrag.value;
+
+  if (!drag) {
+    return;
+  }
+
+  const hover = connectionHover.value;
+
+  if (drag.moved || hover) {
+    if (!hover) {
+      showCanvasNotice('松开鼠标前请移动到目标节点');
+    } else if (!isConnectionTargetValid(drag, hover)) {
+      showCanvasNotice('该连接不符合当前工作流规则');
+    } else {
+      const pair = getDraggedConnectionPair(drag, hover);
+      addConnection(pair.from, pair.to);
+    }
+  } else if (drag.side === 'right') {
+    toggleNodeGenerationMenu(drag.sourceId);
+  }
+
+  connectionDrag.value = null;
+  connectionHover.value = null;
+}
+
+function selectEdge(edgeId: string): void {
+  selectedNodeIds.value = [];
+  selectedNodeId.value = '';
   nodeMenuNodeId.value = '';
+  nodeToolbarMenuNodeId.value = '';
+  contextMenu.value = null;
+  connectionFromId.value = '';
+  selectedEdgeId.value = edgeId;
+}
+
+function deleteSelectedEdge(): void {
+  if (!selectedEdgeId.value) {
+    return;
+  }
+
+  commitHistory();
+  edges.value = edges.value.filter((edge) => edge.id !== selectedEdgeId.value);
+  selectedEdgeId.value = '';
 }
 
 function handleNodePointerDown(event: PointerEvent, node: CanvasNode): void {
@@ -1230,13 +1446,27 @@ function handleNodePointerDown(event: PointerEvent, node: CanvasNode): void {
   };
 }
 
+function isCanvasControlTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    Boolean(
+      target.closest(
+        '.canvas-rail, .canvas-rail-menu, .canvas-floating-panel, .canvas-composer, .canvas-zoom-control, .canvas-topbar, .canvas-inspiration, .canvas-angle-dialog, .canvas-node-group',
+      ),
+    )
+  );
+}
+
 function handleCanvasPointerDown(event: PointerEvent): void {
-  if (event.button !== 0 || event.target !== event.currentTarget) {
+  if ((event.button !== 0 && event.button !== 1) || isCanvasControlTarget(event.target)) {
     return;
   }
 
+  event.preventDefault();
   clearSelection();
   connectionFromId.value = '';
+  connectionDrag.value = null;
+  connectionHover.value = null;
   activeRailMenu.value = null;
   nodeMenuNodeId.value = '';
   nodeToolbarMenuNodeId.value = '';
@@ -1247,6 +1477,7 @@ function handleCanvasPointerDown(event: PointerEvent): void {
     pointerX: event.clientX,
     pointerY: event.clientY,
   };
+  isCanvasPanning.value = true;
 }
 
 function handlePointerMove(event: PointerEvent): void {
@@ -1263,6 +1494,26 @@ function handlePointerMove(event: PointerEvent): void {
     }
   }
 
+  const activeConnection = connectionDrag.value;
+
+  if (activeConnection) {
+    const point = clientToCanvas(event.clientX, event.clientY);
+    const moved =
+      activeConnection.moved ||
+      Math.hypot(
+        event.clientX - activeConnection.pointerX,
+        event.clientY - activeConnection.pointerY,
+      ) > 4;
+
+    connectionDrag.value = {
+      ...activeConnection,
+      moved,
+      worldX: point.x,
+      worldY: point.y,
+    };
+    updateConnectionHover(connectionDrag.value, point);
+  }
+
   if (panState) {
     viewport.value.x = Math.round(panState.originX + event.clientX - panState.pointerX);
     viewport.value.y = Math.round(panState.originY + event.clientY - panState.pointerY);
@@ -1270,19 +1521,51 @@ function handlePointerMove(event: PointerEvent): void {
 }
 
 function finishPointerAction(): void {
+  completeConnectionDrag();
   dragState = undefined;
   panState = undefined;
+  isCanvasPanning.value = false;
+}
+
+function clampCanvasZoom(value: number): number {
+  return Math.min(2, Math.max(0.25, Number(value.toFixed(3))));
+}
+
+function setZoomAroundPoint(nextZoom: number, clientX: number, clientY: number): void {
+  const rect = workspaceElement.value?.getBoundingClientRect();
+  const localX = clientX - (rect?.left ?? 0);
+  const localY = clientY - (rect?.top ?? 0);
+  const previousZoom = viewport.value.scale;
+  const clampedZoom = clampCanvasZoom(nextZoom);
+  const canvasX = (localX - viewport.value.x) / previousZoom;
+  const canvasY = (localY - viewport.value.y) / previousZoom;
+
+  viewport.value = {
+    scale: clampedZoom,
+    x: Math.round(localX - canvasX * clampedZoom),
+    y: Math.round(localY - canvasY * clampedZoom),
+  };
+}
+
+function workspaceCenter(): Point {
+  const rect = workspaceElement.value?.getBoundingClientRect();
+
+  return {
+    x: (rect?.left ?? 0) + (rect?.width ?? window.innerWidth) / 2,
+    y: (rect?.top ?? 0) + (rect?.height ?? window.innerHeight) / 2,
+  };
 }
 
 function changeZoom(delta: number): void {
-  viewport.value.scale = Math.min(
-    1.55,
-    Math.max(0.42, Number((viewport.value.scale + delta).toFixed(2))),
-  );
+  const center = workspaceCenter();
+
+  setZoomAroundPoint(viewport.value.scale + delta, center.x, center.y);
 }
 
 function setZoom(value: number): void {
-  viewport.value.scale = Number(value);
+  const center = workspaceCenter();
+
+  setZoomAroundPoint(value, center.x, center.y);
 }
 
 function resetViewport(): void {
@@ -1290,12 +1573,30 @@ function resetViewport(): void {
 }
 
 function handleWheel(event: WheelEvent): void {
-  if (!event.ctrlKey && !event.metaKey) {
+  if (isCanvasControlTarget(event.target)) {
     return;
   }
 
   event.preventDefault();
-  changeZoom(event.deltaY > 0 ? -0.06 : 0.06);
+  const deltaMultiplier =
+    event.deltaMode === WheelEvent.DOM_DELTA_LINE
+      ? 18
+      : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+        ? (workspaceElement.value?.clientHeight ?? window.innerHeight)
+        : 1;
+
+  if (event.ctrlKey || event.metaKey) {
+    const factor = Math.exp(-event.deltaY * deltaMultiplier * 0.0015);
+
+    setZoomAroundPoint(viewport.value.scale * factor, event.clientX, event.clientY);
+    return;
+  }
+
+  viewport.value = {
+    ...viewport.value,
+    x: Math.round(viewport.value.x - event.deltaX * deltaMultiplier),
+    y: Math.round(viewport.value.y - event.deltaY * deltaMultiplier),
+  };
 }
 
 function nodeImageUrl(node: CanvasNode): string {
@@ -1392,14 +1693,12 @@ function historyDate(timestamp: number): string {
   }).format(timestamp);
 }
 
-function replaceNodeImage(event: Event): void {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
+function replaceNodeImage(files: File[]): void {
+  const file = files[0];
   const node = selectedNode.value;
 
   if (!file || !node) {
     pendingNodeQuickAction.value = '';
-    input.value = '';
     return;
   }
 
@@ -1415,7 +1714,6 @@ function replaceNodeImage(event: Event): void {
     status: 'done',
     title: file.name,
   });
-  input.value = '';
 
   void workspace
     .uploadReference(file)
@@ -1508,7 +1806,14 @@ function beginNodeUpload(node: CanvasNode, quickAction: 'image' | 'video' | '' =
   setSelection([node.id], node.id);
   nodeMenuNodeId.value = '';
   nodeToolbarMenuNodeId.value = '';
+  nodeUploadIntent.value = 'replace';
   pendingNodeQuickAction.value = quickAction;
+  nodeUploadInput.value?.click();
+}
+
+function beginCanvasUpload(): void {
+  nodeUploadIntent.value = 'canvas';
+  pendingNodeQuickAction.value = '';
   nodeUploadInput.value?.click();
 }
 
@@ -1777,8 +2082,107 @@ function handleAssetUpload(event: Event): void {
   input.value = '';
 }
 
+function readImageSize(url: string): Promise<{ height: number; width: number }> {
+  return new Promise((resolve) => {
+    const image = new Image();
+
+    image.onload = () => {
+      const naturalWidth = image.naturalWidth || 330;
+      const naturalHeight = image.naturalHeight || 218;
+      const ratio = Math.min(1, 360 / naturalWidth, 320 / naturalHeight);
+
+      resolve({
+        height: Math.max(120, Math.round(naturalHeight * ratio)),
+        width: Math.max(180, Math.round(naturalWidth * ratio)),
+      });
+    };
+    image.onerror = () => resolve({ height: 218, width: 330 });
+    image.src = url;
+  });
+}
+
+function canvasPlacementPoint(offsetIndex = 0): Point {
+  const center = workspaceCenter();
+  const point = clientToCanvas(center.x, center.y);
+
+  return {
+    x: Math.round(point.x - 165 + offsetIndex * 22),
+    y: Math.round(point.y - 120 + offsetIndex * 18),
+  };
+}
+
+async function createCanvasImageNodes(files: File[]): Promise<void> {
+  uploadingNodeImage.value = true;
+  assetError.value = '';
+
+  const baseIndex = nodes.value.length;
+  let offsetIndex = 0;
+
+  for (const file of files) {
+    const previewUrl = URL.createObjectURL(file);
+    const size = await readImageSize(previewUrl);
+    const position = canvasPlacementPoint(baseIndex + offsetIndex);
+
+    objectUrls.add(previewUrl);
+
+    const node: CanvasNode = {
+      createdAt: Date.now(),
+      height: size.height,
+      id: createId('image'),
+      kind: 'image',
+      previewUrl,
+      prompt: file.name,
+      status: 'done',
+      title: file.name,
+      width: size.width,
+      x: position.x,
+      y: position.y,
+    };
+
+    commitHistory();
+    nodes.value = [...nodes.value, node];
+    setSelection([node.id], node.id);
+    offsetIndex += 1;
+
+    try {
+      const uploaded = await workspace.uploadReference(file);
+
+      node.sourceFileId = uploaded.id;
+      void loadFileUrl(uploaded.id);
+    } catch (error) {
+      assetError.value =
+        error instanceof Error
+          ? `${file.name} 已放到画布，但云端上传失败：${error.message}`
+          : `${file.name} 已放到画布，但云端上传失败`;
+    }
+  }
+
+  uploadingNodeImage.value = false;
+  activeRailMenu.value = null;
+  persistCanvas();
+}
+
 function handleNodeUpload(event: Event): void {
-  replaceNodeImage(event);
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+
+  input.value = '';
+
+  if (files.length === 0) {
+    pendingNodeQuickAction.value = '';
+    return;
+  }
+
+  if (nodeUploadIntent.value === 'replace') {
+    replaceNodeImage(files);
+    return;
+  }
+
+  if (uploadingNodeImage.value) {
+    return;
+  }
+
+  void createCanvasImageNodes(files);
 }
 
 async function submitComposer(): Promise<void> {
@@ -2501,7 +2905,13 @@ function handleKeyboard(event: KeyboardEvent): void {
   }
 
   if (event.key === 'Delete' || event.key === 'Backspace') {
-    deleteSelectedNode();
+    if (selectedEdgeId.value) {
+      event.preventDefault();
+      deleteSelectedEdge();
+    } else if (selectedNodeIds.value.length > 0) {
+      event.preventDefault();
+      deleteSelectedNode();
+    }
   }
 }
 
@@ -2524,6 +2934,15 @@ function edgeLine(edge: CanvasEdge): {
     startX: source.x + source.width,
     startY: source.y + source.height / 2,
   };
+}
+
+function edgePath(edge: CanvasEdge): string {
+  const line = edgeLine(edge);
+  const distance = Math.max(64, Math.abs(line.endX - line.startX) * 0.48);
+
+  return `M ${line.startX} ${line.startY} C ${line.startX + distance} ${line.startY}, ${
+    line.endX - distance
+  } ${line.endY}, ${line.endX} ${line.endY}`;
 }
 
 watch(
@@ -2667,7 +3086,7 @@ onBeforeUnmount(() => {
 
       <Transition name="canvas-pop">
         <div v-if="activeRailMenu === 'add'" class="canvas-rail-menu" @pointerdown.stop>
-          <button type="button" @click="nodeUploadInput?.click()">
+          <button type="button" @click="beginCanvasUpload">
             <UploadOutlined />
             <span>上传</span>
           </button>
@@ -3024,6 +3443,48 @@ onBeforeUnmount(() => {
 
       <Transition name="canvas-pop">
         <section
+          v-if="activeRailMenu === 'storyboard'"
+          class="canvas-floating-panel canvas-storyboard-panel"
+          aria-label="分镜生成器"
+        >
+          <header>
+            <div>
+              <strong>分镜生成器</strong>
+              <span>把剧情描述整理成连续镜头工作流</span>
+            </div>
+            <button type="button" aria-label="关闭分镜生成器" @click="closeRailMenu">
+              <CloseOutlined />
+            </button>
+          </header>
+          <div class="canvas-storyboard-hero">
+            <span>
+              <ScissorOutlined />
+            </span>
+            <div>
+              <strong>用 AI 创建分镜</strong>
+              <p>从角色、场景和剧情指令出发，自动搭好镜头素材与输出节点。</p>
+            </div>
+          </div>
+          <div class="canvas-storyboard-steps">
+            <span><b>01</b>描述剧情</span>
+            <span><b>02</b>整理镜头</span>
+            <span><b>03</b>生成画面</span>
+          </div>
+          <footer>
+            <button type="button" class="primary" @click="loadStoryboardTemplate">
+              <ScissorOutlined />
+              用 AI 创建分镜
+            </button>
+            <button type="button" @click="openRail('batch')">
+              <ThunderboltFilled />
+              批量生成队列
+            </button>
+          </footer>
+        </section>
+      </Transition>
+
+      <Transition name="canvas-pop">
+        <section
           v-if="activeRailMenu === 'batch'"
           class="canvas-floating-panel canvas-batch-panel"
           aria-label="批量生成"
@@ -3135,6 +3596,7 @@ onBeforeUnmount(() => {
       >
         <svg
           class="canvas-edges"
+          :class="{ 'canvas-edges--panning': isCanvasPanning }"
           :height="WORLD_HEIGHT"
           :viewBox="`0 0 ${WORLD_WIDTH} ${WORLD_HEIGHT}`"
           :width="WORLD_WIDTH"
@@ -3144,17 +3606,52 @@ onBeforeUnmount(() => {
               <stop offset="0" stop-color="#4b7ef4" />
               <stop offset="1" stop-color="#7a6cf4" />
             </linearGradient>
+            <linearGradient id="canvas-edge-gradient-active" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0" stop-color="#7fb0ff" />
+              <stop offset="1" stop-color="#a893ff" />
+            </linearGradient>
           </defs>
+          <g v-for="edge in edges" :key="edge.id" class="canvas-edge">
+            <path
+              class="canvas-edge__hit"
+              :d="edgePath(edge)"
+              fill="none"
+              stroke="transparent"
+              stroke-width="22"
+              @click.stop="selectEdge(edge.id)"
+            />
+            <path
+              class="canvas-edge__line"
+              :class="{ 'is-selected': selectedEdgeId === edge.id }"
+              :d="edgePath(edge)"
+              fill="none"
+              :stroke="
+                selectedEdgeId === edge.id
+                  ? 'url(#canvas-edge-gradient-active)'
+                  : 'url(#canvas-edge-gradient)'
+              "
+              stroke-linecap="round"
+              :stroke-width="selectedEdgeId === edge.id ? 3 : 2"
+            />
+            <path
+              class="canvas-edge__flow"
+              :class="{ 'is-selected': selectedEdgeId === edge.id }"
+              :d="edgePath(edge)"
+              fill="none"
+              stroke="#dbe6ff"
+              stroke-dasharray="4 18"
+              stroke-linecap="round"
+              stroke-width="2"
+            />
+          </g>
           <path
-            v-for="edge in edges"
-            :key="edge.id"
-            :d="`M ${edgeLine(edge).startX} ${edgeLine(edge).startY} C ${
-              edgeLine(edge).startX + 110
-            } ${edgeLine(edge).startY}, ${edgeLine(edge).endX - 110} ${
-              edgeLine(edge).endY
-            }, ${edgeLine(edge).endX} ${edgeLine(edge).endY}`"
+            v-if="connectionPreview"
+            class="canvas-edge__preview"
+            :class="{ 'is-invalid': connectionPreview.invalid }"
+            :d="connectionPreview.d"
             fill="none"
-            stroke="url(#canvas-edge-gradient)"
+            :stroke="connectionPreview.invalid ? '#f2607c' : '#8ea8ff'"
+            stroke-dasharray="6 7"
             stroke-linecap="round"
             stroke-width="2"
           />
@@ -3192,6 +3689,9 @@ onBeforeUnmount(() => {
             `canvas-node--${node.kind}`,
             {
               'canvas-node--connecting': connectionFromId === node.id,
+              'canvas-node--link-invalid':
+                linkHoverState.nodeId === node.id && linkHoverState.invalid,
+              'canvas-node--link-target': linkHoverState.nodeId === node.id && linkHoverState.valid,
               'canvas-node--menu-open':
                 nodeMenuNodeId === node.id || nodeToolbarMenuNodeId === node.id,
               'canvas-node--selected': isNodeSelected(node.id),
@@ -3350,17 +3850,17 @@ onBeforeUnmount(() => {
 
           <button
             class="canvas-node__port canvas-node__port--in"
+            :class="{ 'is-active': connectionFromId !== '' }"
             type="button"
             aria-label="输入连接点"
-            @pointerdown.stop
+            @pointerdown="beginConnectionDrag($event, node.id, 'left')"
             @click.stop="connectNode(node.id)"
           />
           <button
             class="canvas-node__port canvas-node__port--out"
             type="button"
             aria-label="从该节点生成"
-            @pointerdown.stop
-            @click.stop="toggleNodeGenerationMenu(node.id)"
+            @pointerdown="beginConnectionDrag($event, node.id, 'right')"
           >
             <PlusOutlined />
           </button>
@@ -3476,8 +3976,8 @@ onBeforeUnmount(() => {
         <span>Zoom</span>
         <input
           type="range"
-          min="42"
-          max="155"
+          min="25"
+          max="200"
           :value="Math.round(viewport.scale * 100)"
           @input="setZoom(Number(($event.target as HTMLInputElement).value) / 100)"
         />
@@ -4726,6 +5226,140 @@ onBeforeUnmount(() => {
   font-size: 7px;
 }
 
+.canvas-storyboard-panel {
+  top: 206px;
+  left: 68px;
+  display: grid;
+  width: min(410px, calc(100% - 92px));
+  max-height: calc(100% - 216px);
+  gap: 12px;
+  padding: 14px;
+}
+
+.canvas-storyboard-panel > header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.canvas-storyboard-panel > header strong {
+  color: #fff;
+  font-size: 12px;
+}
+
+.canvas-storyboard-panel > header span {
+  color: #878d99;
+  font-size: 8px;
+}
+
+.canvas-storyboard-panel > header > button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #8c919c;
+  cursor: pointer;
+}
+
+.canvas-storyboard-panel > header > button:hover {
+  background: #34353b;
+  color: #fff;
+}
+
+.canvas-storyboard-hero {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgb(111 91 234 / 34%);
+  border-radius: 10px;
+  background: radial-gradient(circle at 12% 12%, rgb(99 80 232 / 22%), transparent 48%), #25272d;
+}
+
+.canvas-storyboard-hero > span {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #2f7ee6, #7659ed);
+  color: #fff;
+  font-size: 17px;
+}
+
+.canvas-storyboard-hero strong {
+  color: #fff;
+  font-size: 11px;
+}
+
+.canvas-storyboard-hero p {
+  margin: 4px 0 0;
+  color: #9399a5;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.canvas-storyboard-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+
+.canvas-storyboard-steps span {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding: 9px;
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 9px;
+  background: #24252a;
+  color: #c9ccd4;
+  font-size: 8px;
+}
+
+.canvas-storyboard-steps b {
+  color: #7d8490;
+  font-size: 7px;
+  font-weight: 600;
+}
+
+.canvas-storyboard-panel > footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.canvas-storyboard-panel > footer button {
+  display: inline-flex;
+  min-width: 0;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 9px;
+  background: #2b2d33;
+  color: #d9dbe1;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.canvas-storyboard-panel > footer button:hover {
+  border-color: rgb(124 104 245 / 55%);
+  color: #fff;
+}
+
+.canvas-storyboard-panel > footer button.primary {
+  border-color: transparent;
+  background: linear-gradient(145deg, #227ce8, #6551ed);
+  color: #fff;
+}
+
 .canvas-batch-panel {
   top: 206px;
   left: 68px;
@@ -4957,6 +5591,55 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
+.canvas-edge__hit {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.canvas-edges--panning .canvas-edge__hit {
+  pointer-events: none;
+}
+
+.canvas-edge__line {
+  transition:
+    filter 140ms ease,
+    stroke-width 140ms ease;
+}
+
+.canvas-edge__line.is-selected {
+  filter: drop-shadow(0 0 7px rgb(126 158 255 / 58%));
+}
+
+.canvas-edge__flow {
+  opacity: 0.22;
+  animation: canvas-edge-flow 1.15s linear infinite;
+  transition: opacity 160ms ease;
+}
+
+.canvas-edge__flow.is-selected {
+  opacity: 0.9;
+}
+
+@keyframes canvas-edge-flow {
+  from {
+    stroke-dashoffset: 22;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.canvas-edge__preview {
+  opacity: 0.95;
+  filter: drop-shadow(0 0 6px rgb(120 150 255 / 45%));
+  pointer-events: none;
+}
+
+.canvas-edge__preview.is-invalid {
+  filter: drop-shadow(0 0 6px rgb(242 96 124 / 45%));
+}
+
 .canvas-node-group {
   position: absolute;
   z-index: 1;
@@ -5104,6 +5787,22 @@ onBeforeUnmount(() => {
   box-shadow:
     0 0 0 1px #8f6fff,
     0 0 22px rgb(111 77 255 / 28%);
+}
+
+.canvas-node--link-target {
+  z-index: 6;
+  border-color: #6fa2ff;
+  box-shadow:
+    0 0 0 1px #6fa2ff,
+    0 0 26px rgb(88 132 255 / 34%);
+}
+
+.canvas-node--link-invalid {
+  z-index: 6;
+  border-color: #ef5f7d;
+  box-shadow:
+    0 0 0 1px #ef5f7d,
+    0 0 26px rgb(239 95 125 / 26%);
 }
 
 .canvas-node__header {
@@ -5670,6 +6369,13 @@ onBeforeUnmount(() => {
 
 .canvas-node__port--out {
   right: -13px;
+}
+
+.canvas-node__port.is-active,
+.canvas-node__port:active {
+  border-color: #8fb0ff;
+  background: #3f5ad8;
+  color: #fff;
 }
 
 .canvas-node__port:hover,
@@ -6608,6 +7314,7 @@ onBeforeUnmount(() => {
   .canvas-asset-panel,
   .canvas-workflow-panel,
   .canvas-history-panel,
+  .canvas-storyboard-panel,
   .canvas-batch-panel {
     left: 62px;
   }
@@ -6646,6 +7353,7 @@ onBeforeUnmount(() => {
   .canvas-workflow-panel,
   .canvas-asset-panel,
   .canvas-history-panel,
+  .canvas-storyboard-panel,
   .canvas-batch-panel {
     top: 105px;
     left: 58px;
@@ -6669,6 +7377,7 @@ onBeforeUnmount(() => {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .canvas-storyboard-panel,
   .canvas-batch-panel {
     max-height: calc(100% - 115px);
   }
