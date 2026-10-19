@@ -265,6 +265,48 @@ describe('file uploads and image tasks', () => {
     ).toBe(1);
   });
 
+  it('treats blank source file ids as text-to-image instead of failing the request', async () => {
+    imageMode = 'success';
+    lastImageInput = undefined;
+    const { accessToken } = await registerUser();
+
+    // 画布节点在素材缺失时会传空字符串；这里必须归一化成「没有来源图」，
+    // 而不是把空值写进外键列并返回 500（用户侧会看到 Internal server error）。
+    const blankSourceResponse = await request(app.getHttpServer())
+      .post('/api/v1/image-tasks')
+      .set('authorization', `Bearer ${accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        prompt: '空来源图时按文生图处理',
+        sourceFileId: '   ',
+      })
+      .expect(202);
+
+    expect(blankSourceResponse.body.data.sourceFile).toBeNull();
+
+    const blankSourceTask = await waitForTerminalTask(
+      accessToken,
+      blankSourceResponse.body.data.id as string,
+    );
+
+    expect(blankSourceTask).toMatchObject({ sourceFile: null, status: 'SUCCEEDED' });
+    const streamedInput = lastImageInput as GenerateImageInput | undefined;
+
+    expect(streamedInput?.sourceImages).toBeUndefined();
+
+    const missingSourceResponse = await request(app.getHttpServer())
+      .post('/api/v1/image-tasks')
+      .set('authorization', `Bearer ${accessToken}`)
+      .set('idempotency-key', randomUUID())
+      .send({
+        prompt: '来源图不存在',
+        sourceFileId: 'file-does-not-exist',
+      })
+      .expect(404);
+
+    expect(missingSourceResponse.body.error.code).toBe('FILE_NOT_FOUND');
+  });
+
   it('accepts ten total images and rejects an eleventh input', async () => {
     imageMode = 'success';
     lastImageInput = undefined;

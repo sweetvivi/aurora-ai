@@ -87,6 +87,10 @@ export class VideoTasksService implements OnModuleInit {
   async create(userId: string, input: CreateVideoTaskDto, rawIdempotencyKey: string | undefined) {
     const idempotencyKey = this.normalizeIdempotencyKey(userId, rawIdempotencyKey);
     const prompt = input.prompt.trim();
+    // 前端在「没有来源素材」时会传空字符串，统一归一化，避免外键约束报 500。
+    const sourceFileId = this.normalizeFileId(input.sourceFileId);
+    const lastFrameFileId = this.normalizeFileId(input.lastFrameFileId);
+    const referenceVideoFileId = this.normalizeFileId(input.referenceVideoFileId);
 
     if (!prompt) {
       throw new ConflictException({
@@ -107,30 +111,30 @@ export class VideoTasksService implements OnModuleInit {
     }
 
     const capabilityViolation = findVideoModelConstraintViolation({
-      hasLastFrame: Boolean(input.lastFrameFileId),
-      hasReferenceVideo: Boolean(input.referenceVideoFileId),
+      hasLastFrame: Boolean(lastFrameFileId),
+      hasReferenceVideo: Boolean(referenceVideoFileId),
       parameters: input.parameters,
       profile: model.profile,
-      sourceFileId: input.sourceFileId,
+      sourceFileId,
     });
 
     if (capabilityViolation) {
       throw new ConflictException(capabilityViolation);
     }
 
-    if (input.sourceFileId) {
-      await this.filesService.getOwnedAsset(userId, input.sourceFileId);
+    if (sourceFileId) {
+      await this.filesService.getOwnedAsset(userId, sourceFileId);
     }
 
-    if (input.lastFrameFileId) {
-      if (!input.sourceFileId) {
+    if (lastFrameFileId) {
+      if (!sourceFileId) {
         throw new ConflictException({
           code: 'VIDEO_SOURCE_FRAME_REQUIRED',
           message: '首尾帧模式需要同时提供首帧和尾帧图片',
         });
       }
 
-      await this.filesService.getOwnedAsset(userId, input.lastFrameFileId);
+      await this.filesService.getOwnedAsset(userId, lastFrameFileId);
 
       const supportsLastFrame =
         this.videoProvider.supportsLastFrameFor?.({
@@ -147,18 +151,15 @@ export class VideoTasksService implements OnModuleInit {
       }
     }
 
-    if (input.referenceVideoFileId) {
-      if (input.sourceFileId || input.lastFrameFileId) {
+    if (referenceVideoFileId) {
+      if (sourceFileId || lastFrameFileId) {
         throw new ConflictException({
           code: 'VIDEO_MODE_CONFLICT',
           message: '参考视频模式不能同时提交首帧、尾帧或参考图',
         });
       }
 
-      const referenceVideo = await this.filesService.getOwnedAsset(
-        userId,
-        input.referenceVideoFileId,
-      );
+      const referenceVideo = await this.filesService.getOwnedAsset(userId, referenceVideoFileId);
 
       if (!referenceVideo.mimeType.startsWith('video/')) {
         throw new ConflictException({
@@ -173,7 +174,11 @@ export class VideoTasksService implements OnModuleInit {
     });
 
     if (existing) {
-      this.assertMatchingTask(existing, input, model.alias, prompt);
+      this.assertMatchingTask(existing, input, model.alias, prompt, {
+        lastFrameFileId,
+        referenceVideoFileId,
+        sourceFileId,
+      });
       this.schedule(existing.id, existing.status === 'RUNNING');
 
       return this.getTask(userId, existing.id);
@@ -187,12 +192,12 @@ export class VideoTasksService implements OnModuleInit {
         data: {
           id: taskId,
           idempotencyKey,
-          lastFrameFileId: input.lastFrameFileId,
+          lastFrameFileId,
           modelAlias: model.alias,
           parameters: input.parameters as Prisma.InputJsonValue | undefined,
           prompt,
-          referenceVideoFileId: input.referenceVideoFileId,
-          sourceFileId: input.sourceFileId,
+          referenceVideoFileId,
+          sourceFileId,
           userId,
         },
       });
@@ -201,10 +206,21 @@ export class VideoTasksService implements OnModuleInit {
         const concurrent = await this.prismaService.videoTask.findUniqueOrThrow({
           where: { idempotencyKey },
         });
-        this.assertMatchingTask(concurrent, input, model.alias, prompt);
+        this.assertMatchingTask(concurrent, input, model.alias, prompt, {
+          lastFrameFileId,
+          referenceVideoFileId,
+          sourceFileId,
+        });
         this.schedule(concurrent.id, concurrent.status === 'RUNNING');
 
         return this.getTask(userId, concurrent.id);
+      }
+
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw new ConflictException({
+          code: 'VIDEO_SOURCE_FILE_INVALID',
+          message: '来源素材不存在或尚未上传成功，请重新上传后再试',
+        });
       }
 
       throw error;
@@ -619,15 +635,20 @@ export class VideoTasksService implements OnModuleInit {
     input: CreateVideoTaskDto,
     modelAlias: string,
     prompt: string,
+    fileIds: {
+      lastFrameFileId: string | undefined;
+      referenceVideoFileId: string | undefined;
+      sourceFileId: string | undefined;
+    },
   ): void {
     const parametersMatch = isDeepStrictEqual(task.parameters ?? null, input.parameters ?? null);
 
     if (
       task.modelAlias !== modelAlias ||
       task.prompt !== prompt ||
-      task.sourceFileId !== (input.sourceFileId ?? null) ||
-      task.lastFrameFileId !== (input.lastFrameFileId ?? null) ||
-      task.referenceVideoFileId !== (input.referenceVideoFileId ?? null) ||
+      task.sourceFileId !== (fileIds.sourceFileId ?? null) ||
+      task.lastFrameFileId !== (fileIds.lastFrameFileId ?? null) ||
+      task.referenceVideoFileId !== (fileIds.referenceVideoFileId ?? null) ||
       !parametersMatch
     ) {
       throw new ConflictException({
@@ -635,6 +656,12 @@ export class VideoTasksService implements OnModuleInit {
         message: '幂等键已被其他视频任务使用',
       });
     }
+  }
+
+  private normalizeFileId(value: string | undefined): string | undefined {
+    const trimmed = value?.trim();
+
+    return trimmed ? trimmed : undefined;
   }
 
   private normalizeIdempotencyKey(userId: string, value: string | undefined): string {

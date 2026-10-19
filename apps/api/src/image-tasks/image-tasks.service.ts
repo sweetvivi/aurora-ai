@@ -69,6 +69,9 @@ export class ImageTasksService implements OnModuleInit {
   async create(userId: string, input: CreateImageTaskDto, rawIdempotencyKey: string | undefined) {
     const idempotencyKey = this.normalizeIdempotencyKey(userId, rawIdempotencyKey);
     const prompt = input.prompt.trim();
+    // 画布等前端在「来源图片缺失」时会传空字符串，必须先归一化成 undefined，
+    // 否则写到 image_tasks.sourceFileId 会触发外键约束（P2003）并返回 500。
+    const sourceFileId = this.normalizeFileId(input.sourceFileId);
     const referenceFileIds = this.normalizeReferenceFileIds(input.referenceFileIds);
     const taskParameters = this.buildTaskParameters(input.parameters, referenceFileIds);
 
@@ -94,18 +97,18 @@ export class ImageTasksService implements OnModuleInit {
       parameters: taskParameters,
       profile: model.profile,
       referenceFileIds,
-      sourceFileId: input.sourceFileId,
+      sourceFileId,
     });
 
     if (capabilityViolation) {
       throw new ConflictException(capabilityViolation);
     }
 
-    if (input.sourceFileId) {
-      await this.filesService.getOwnedAsset(userId, input.sourceFileId);
+    if (sourceFileId) {
+      await this.filesService.getOwnedAsset(userId, sourceFileId);
     }
 
-    if (referenceFileIds.length > 0 && !input.sourceFileId) {
+    if (referenceFileIds.length > 0 && !sourceFileId) {
       throw new ConflictException({
         code: 'IMAGE_SOURCE_REQUIRED',
         message: '使用参考图时请先上传主图片',
@@ -121,7 +124,7 @@ export class ImageTasksService implements OnModuleInit {
     });
 
     if (existing) {
-      this.assertMatchingTask(existing, input, model.alias, prompt, taskParameters);
+      this.assertMatchingTask(existing, model.alias, prompt, taskParameters, sourceFileId);
       this.schedule(existing.id);
 
       return this.getTask(userId, existing.id);
@@ -138,7 +141,7 @@ export class ImageTasksService implements OnModuleInit {
           modelAlias: model.alias,
           parameters: taskParameters as Prisma.InputJsonValue | undefined,
           prompt,
-          sourceFileId: input.sourceFileId,
+          sourceFileId,
           userId,
         },
       });
@@ -147,10 +150,17 @@ export class ImageTasksService implements OnModuleInit {
         const concurrent = await this.prismaService.imageTask.findUniqueOrThrow({
           where: { idempotencyKey },
         });
-        this.assertMatchingTask(concurrent, input, model.alias, prompt, taskParameters);
+        this.assertMatchingTask(concurrent, model.alias, prompt, taskParameters, sourceFileId);
         this.schedule(concurrent.id);
 
         return this.getTask(userId, concurrent.id);
+      }
+
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw new ConflictException({
+          code: 'IMAGE_SOURCE_FILE_INVALID',
+          message: '来源图片不存在或尚未上传成功，请重新上传后再试',
+        });
       }
 
       throw error;
@@ -412,10 +422,10 @@ export class ImageTasksService implements OnModuleInit {
 
   private assertMatchingTask(
     task: ImageTask,
-    input: CreateImageTaskDto,
     modelAlias: string,
     prompt: string,
     parameters: Record<string, unknown> | undefined,
+    sourceFileId: string | undefined,
   ): void {
     const parametersMatch =
       JSON.stringify(task.parameters ?? null) === JSON.stringify(parameters ?? null);
@@ -423,7 +433,7 @@ export class ImageTasksService implements OnModuleInit {
     if (
       task.modelAlias !== modelAlias ||
       task.prompt !== prompt ||
-      task.sourceFileId !== (input.sourceFileId ?? null) ||
+      task.sourceFileId !== (sourceFileId ?? null) ||
       !parametersMatch
     ) {
       throw new ConflictException({
@@ -448,6 +458,12 @@ export class ImageTasksService implements OnModuleInit {
 
   private normalizeReferenceFileIds(value: string[] | undefined): string[] {
     return Array.from(new Set((value ?? []).map((fileId) => fileId.trim()).filter(Boolean)));
+  }
+
+  private normalizeFileId(value: string | undefined): string | undefined {
+    const trimmed = value?.trim();
+
+    return trimmed ? trimmed : undefined;
   }
 
   private buildTaskParameters(

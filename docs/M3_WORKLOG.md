@@ -421,6 +421,20 @@
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
 
+## 49. 2026-10-19 画布「节点 → 指令 → 图生图」链路修复
+
+- 定位用户「点击图像生成一直停在待处理 / 正在同步画布结果」的真实原因：`prepareImageNodeGeneration()` 生成的目标节点状态是 `idle`，模板里落到最后的兜底分支，于是显示成同步中；同时前端会把空字符串 `sourceFileId` 提交给 `POST /api/v1/image-tasks`，后端直接写外键列触发 `P2003 image_tasks_sourceFileId_fkey`，前端只看到 `Internal server error`
+- 后端 `image-tasks.service.ts` 与 `video-tasks.service.ts` 统一把空白 `sourceFileId`（含 `lastFrameFileId`、`referenceVideoFileId`）归一化为 `undefined`，缺少来源图时按文生图处理；外键错误转换为明确的 `409`，来源文件查不到时返回 `404 FILE_NOT_FOUND`，不再抛出 500
+- `CanvasStudioView.vue` 的 `nodeSourceFileId()` 不再把空字符串当作有效素材，并可从关联作品结果回退取 `resultFileId`；`submitComposer()` 在缺少素材时直接给出可读提示，提交异常也会落回提示而不是静默失败
+- 新增「等待指令」节点态：从图片节点发起「图像生成」后创建的节点标题为「图生图」，节点内显示来源说明与「填写描述」按钮，不再显示「正在同步画布结果」；只有真正 `queued/generating` 的节点才走同步中样式
+- 创作输入区改为吸附在目标节点下方：新增 `composerAnchorNode`/`composerAnchorStyle` 计算属性，按 `viewport` 与应用 `scale` 把输入区居中放在节点下方 18px，并做工作区边界收敛；输入框 placeholder 变为「描述你想生成的内容，例如：让图中男女位置对调...」，点击「图像生成」后自动聚焦
+- 图片节点的 `prompt` 通常就是文件名，改为不再预填到输入区（只有基于生成结果继续创作时才继承上一轮指令），避免用户必须先删掉文件名
+- 新增 `outputs/runtime/qa-canvas-check.mjs`：无头 Edge + CDP 上传素材、点击节点「+」、选择「图像生成」、断言节点态与输入区位置，可选 `--submit` 做真实图生图回归；输出 `outputs/ui-reference/canvas-node-awaiting-instruction.png`、`canvas-node-submitted.png`、`canvas-node-result.png`
+- 浏览器与真实链路验收：节点态 `图生图 | 在下方输入修改描述后开始生成 | 填写描述`、`composerAnchored: true`、`composerGapBelowNode: 18`、`stillSyncing: false`；提交「让图中男女位置对调」后节点状态由「生成中」变为「已完成」并渲染出结果图
+- 顺带修复 `apps/api/test/files-image-tasks.e2e-spec.ts` 在 `lastImageInput = undefined` 之后被 TS 收窄为 `undefined` 导致 `pnpm typecheck` 失败的问题
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 116 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
+- 本轮只读取本地代码、本地页面、桌面已有参考截图与本地 Key 注入后的自建 API，未读取、输出或记录任何 Key/Token/Cookie，未访问参考产品、未消耗参考产品积分，未调用真实视频生成
+
 ## 35. 2026-10-19 超级智能体历史记录抽屉密度对齐
 
 - 对照用户提供的参考产品历史抽屉截图，参考面板顶部是关闭图标在左、智能体头像和名称在右；本地此前把头像和名称放在左侧，关闭按钮推到最右

@@ -286,6 +286,10 @@ const viewport = ref({
   y: 52,
 });
 const workspaceElement = ref<HTMLElement | null>(null);
+const composerElement = ref<HTMLElement | null>(null);
+const composerInput = ref<HTMLTextAreaElement | null>(null);
+const composerSize = ref({ height: 168, width: 620 });
+const workspaceSize = ref({ height: 0, width: 0 });
 const nodeUploadInput = ref<HTMLInputElement | null>(null);
 const assetUploadInput = ref<HTMLInputElement | null>(null);
 const workflowImportInput = ref<HTMLInputElement | null>(null);
@@ -322,6 +326,7 @@ let hydrated = false;
 let canvasId = '';
 let cloudSavePromise: Promise<void> | null = null;
 let cloudSaveQueued = false;
+let composerResizeObserver: ResizeObserver | undefined;
 
 const generationModels = computed<GenerationModel[]>(() =>
   modelCatalog.modelsFor('image').map((model) => ({
@@ -338,6 +343,67 @@ const availableSizes = computed(() => getImageSizePresets(activeImageProfile.val
 
 const selectedNode = computed(() => nodes.value.find((node) => node.id === selectedNodeId.value));
 const selectedNodeCount = computed(() => selectedNodeIds.value.length);
+// 从节点发起生成后，创作输入区会吸附到该节点下方，形成「节点 → 连线 → 指令输入」的
+// 工作流观感，而不是固定在画布角落。
+const composerAnchorNode = computed(() => {
+  // 只有单选节点时才对选中态兜底，避免多选或误点时输入区乱跑。
+  const candidates = [
+    composerTargetNodeId.value,
+    composerSourceNodeId.value,
+    selectedNodeIds.value.length === 1 ? selectedNodeId.value : '',
+  ];
+
+  for (const id of candidates) {
+    if (!id) {
+      continue;
+    }
+
+    const node = nodes.value.find((item) => item.id === id);
+
+    if (node) {
+      return node;
+    }
+  }
+
+  return undefined;
+});
+const composerAnchorStyle = computed<Record<string, string> | undefined>(() => {
+  const node = composerAnchorNode.value;
+
+  if (!node) {
+    return undefined;
+  }
+
+  const { height, width } = composerSize.value;
+  const gap = 18;
+  const margin = 14;
+  const centerX = viewport.value.x + (node.x + node.width / 2) * viewport.value.scale;
+  const nodeBottom = viewport.value.y + (node.y + node.height) * viewport.value.scale;
+  const boardWidth = workspaceSize.value.width;
+  const boardHeight = workspaceSize.value.height;
+  let left = centerX - width / 2;
+  let top = nodeBottom + gap;
+
+  if (boardWidth > 0) {
+    left = Math.min(left, boardWidth - width - margin);
+  }
+
+  if (boardHeight > 0) {
+    top = Math.min(top, boardHeight - height - margin);
+  }
+
+  return {
+    bottom: 'auto',
+    left: `${Math.round(Math.max(left, margin))}px`,
+    right: 'auto',
+    top: `${Math.round(Math.max(top, margin))}px`,
+  };
+});
+const composerPlaceholder = computed(() =>
+  composerSourceNodeId.value
+    ? '描述你想生成的内容，例如：让图中男女位置对调...'
+    : '描述你想生成的内容...',
+);
 const angleDialogNode = computed(() =>
   nodes.value.find((node) => node.id === angleDialogNodeId.value),
 );
@@ -1743,7 +1809,10 @@ function replaceNodeImage(files: File[]): void {
     })
     .catch((error: unknown) => {
       pendingNodeQuickAction.value = '';
-      assetError.value = error instanceof Error ? error.message : '图片保存失败';
+      const message = error instanceof Error ? error.message : '图片保存失败';
+
+      assetError.value = message;
+      showCanvasNotice(`图片上传失败，暂时无法基于该节点生成：${message}`);
     });
 }
 
@@ -1828,7 +1897,19 @@ function beginCanvasUpload(): void {
 }
 
 function nodeSourceFileId(node: CanvasNode | undefined): string | undefined {
-  return node?.sourceFileId ?? node?.resultFileId;
+  if (!node) {
+    return undefined;
+  }
+
+  // resultFileId 在任务未完成时是空字符串，不能当作有效来源文件，否则会把空值
+  // 提交给后端并触发外键约束错误。节点自身的字段也可能没有回写，因此再回退到作品结果。
+  const direct = node.sourceFileId || node.resultFileId;
+
+  if (direct) {
+    return direct;
+  }
+
+  return nodeWork(node)?.resultFileId || undefined;
 }
 
 function appendNodeWithEdge(
@@ -1890,9 +1971,29 @@ function prepareImageNodeGeneration(sourceNode: CanvasNode, title = '图像生�
   });
 
   appendNodeWithEdge(outputNode, sourceNode);
-  composerPrompt.value = sourceNode.prompt;
+  // 图片节点的 prompt 往往就是文件名，直接填进输入框反而要先删掉；只有基于生成结果
+  // 继续创作时才把上一轮指令带过去。
+  composerPrompt.value = sourceNode.kind === 'output' ? sourceNode.prompt : '';
   composerSourceNodeId.value = sourceNode.id;
   composerTargetNodeId.value = outputNode.id;
+  focusComposer();
+}
+
+// 创作输入区已经吸附到节点下方，直接把光标放进输入框，用户点完「图像生成」就能写指令。
+function focusComposer(): void {
+  void nextTick(() => {
+    composerInput.value?.focus();
+  });
+}
+
+function focusComposerForNode(node: CanvasNode): void {
+  setSelection([node.id], node.id);
+
+  const edge = edges.value.find((item) => item.to === node.id);
+
+  composerSourceNodeId.value = edge?.from ?? '';
+  composerTargetNodeId.value = node.kind === 'output' ? node.id : '';
+  focusComposer();
 }
 
 const TEXT_GENERATION_PLACEHOLDER = '正在读取节点素材并生成文案…';
@@ -2041,10 +2142,7 @@ function runNodeGenerationAction(action: NodeGenerationAction, sourceNode: Canva
     return;
   }
 
-  prepareImageNodeGeneration(
-    sourceNode,
-    action === 'local-image' ? '本地图像模型' : '从该节点生成',
-  );
+  prepareImageNodeGeneration(sourceNode, action === 'local-image' ? '本地图像模型' : '图生图');
 }
 
 async function generateAngleView(): Promise<void> {
@@ -2225,13 +2323,21 @@ async function createCanvasImageNodes(files: File[]): Promise<void> {
     try {
       const uploaded = await workspace.uploadReference(file);
 
-      node.sourceFileId = uploaded.id;
+      // 必须写回 nodes.value 里的响应式代理，直接改原始对象不会触发重渲染。
+      const liveNode = nodes.value.find((item) => item.id === node.id);
+
+      if (liveNode) {
+        liveNode.sourceFileId = uploaded.id;
+      } else {
+        node.sourceFileId = uploaded.id;
+      }
+
       void loadFileUrl(uploaded.id);
     } catch (error) {
-      assetError.value =
-        error instanceof Error
-          ? `${file.name} 已放到画布，但云端上传失败：${error.message}`
-          : `${file.name} 已放到画布，但云端上传失败`;
+      const message = error instanceof Error ? error.message : '云端上传失败';
+
+      assetError.value = `${file.name} 已放到画布，但云端上传失败：${message}`;
+      showCanvasNotice(`${file.name} 上传失败，暂时无法基于该节点生成：${message}`);
     }
   }
 
@@ -2278,13 +2384,27 @@ async function submitComposer(): Promise<void> {
   const preparedTarget = nodes.value.find(
     (node) => node.id === composerTargetNodeId.value && node.kind === 'output',
   );
+  const sourceFileId = nodeSourceFileId(sourceNode);
   let outputNode = preparedTarget;
+
+  // 画布里的「从当前节点生成」必须带上节点素材；缺少有效素材时提前提示，
+  // 避免把空来源文件提交给后端并拿到 500。
+  if (sourceNode && !sourceFileId) {
+    const status = nodeStatus(sourceNode);
+
+    showCanvasNotice(
+      status === 'queued' || status === 'generating'
+        ? '该节点仍在生成中，请等待完成后再基于它继续生成'
+        : '该节点还没有可用的图片素材，请先上传图片后再试',
+    );
+    return;
+  }
 
   if (outputNode) {
     commitHistory();
     Object.assign(outputNode, {
       prompt,
-      sourceFileId: outputNode.sourceFileId ?? nodeSourceFileId(sourceNode),
+      sourceFileId: sourceFileId ?? outputNode.sourceFileId,
       status: 'queued',
       title: selectedModelLabel.value,
     });
@@ -2298,7 +2418,7 @@ async function submitComposer(): Promise<void> {
       id: createId('output'),
       kind: 'output',
       prompt,
-      sourceFileId: nodeSourceFileId(sourceNode),
+      sourceFileId,
       status: 'queued',
       title: selectedModelLabel.value,
       width: 330,
@@ -2308,34 +2428,40 @@ async function submitComposer(): Promise<void> {
     appendNodeWithEdge(outputNode, promptNode, { commit: false });
   }
 
-  await workspace.initialize();
+  try {
+    await workspace.initialize();
 
-  const createdWorks = await workspace.createGenerationWorks({
-    amount: 1,
-    extraParameters: {
-      canvasNodeId: outputNode.id,
-      mode: 'canvas',
-    },
-    model: selectedModel.value,
-    modelAlias: selectedModel.value,
-    modelLabel: selectedModelLabel.value,
-    prompt,
-    ratio: selectedRatio.value,
-    size: selectedSize.value,
-    sourceFileId: nodeSourceFileId(sourceNode),
-    toolKey: 'canvas',
-  });
-  const createdWork = createdWorks[0];
+    const createdWorks = await workspace.createGenerationWorks({
+      amount: 1,
+      extraParameters: {
+        canvasNodeId: outputNode.id,
+        mode: 'canvas',
+      },
+      model: selectedModel.value,
+      modelAlias: selectedModel.value,
+      modelLabel: selectedModelLabel.value,
+      prompt,
+      ratio: selectedRatio.value,
+      size: selectedSize.value,
+      sourceFileId,
+      toolKey: 'canvas',
+    });
+    const createdWork = createdWorks[0];
 
-  if (createdWork) {
-    outputNode.workId = createdWork.id;
-    outputNode.status = 'queued';
-    outputNode.resultFileId = createdWork.resultFileId;
-    composerPrompt.value = '';
-    composerSourceNodeId.value = '';
-    composerTargetNodeId.value = '';
-  } else {
+    if (createdWork) {
+      outputNode.workId = createdWork.id;
+      outputNode.status = 'queued';
+      outputNode.resultFileId = createdWork.resultFileId;
+      composerPrompt.value = '';
+      composerSourceNodeId.value = '';
+      composerTargetNodeId.value = '';
+    } else {
+      outputNode.status = 'failed';
+      showCanvasNotice(workspace.error?.message ?? '生成提交失败，请稍后重试');
+    }
+  } catch (error) {
     outputNode.status = 'failed';
+    showCanvasNotice(error instanceof Error ? error.message : '生成提交失败，请稍后重试');
   }
 
   persistCanvas();
@@ -3087,14 +3213,52 @@ function handleBeforeUnload(): void {
   }
 }
 
+function syncWorkspaceSize(): void {
+  const workspaceElementRef = workspaceElement.value;
+
+  if (!workspaceElementRef) {
+    return;
+  }
+
+  workspaceSize.value = {
+    height: workspaceElementRef.clientHeight,
+    width: workspaceElementRef.clientWidth,
+  };
+}
+
+function syncComposerSize(): void {
+  const composer = composerElement.value;
+
+  if (!composer) {
+    return;
+  }
+
+  composerSize.value = {
+    height: composer.offsetHeight,
+    width: composer.offsetWidth,
+  };
+}
+
 onMounted(() => {
   void loadCanvas();
   void modelCatalog.load();
   void workspace.initialize();
+  void nextTick(() => {
+    syncWorkspaceSize();
+    syncComposerSize();
+
+    if (typeof ResizeObserver !== 'undefined' && composerElement.value) {
+      composerResizeObserver = new ResizeObserver(() => {
+        syncComposerSize();
+      });
+      composerResizeObserver.observe(composerElement.value);
+    }
+  });
   window.addEventListener('beforeunload', handleBeforeUnload);
   window.addEventListener('pointermove', handlePointerMove);
   window.addEventListener('pointerup', finishPointerAction);
   window.addEventListener('keydown', handleKeyboard);
+  window.addEventListener('resize', syncWorkspaceSize);
 });
 
 onBeforeUnmount(() => {
@@ -3107,6 +3271,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointermove', handlePointerMove);
   window.removeEventListener('pointerup', finishPointerAction);
   window.removeEventListener('keydown', handleKeyboard);
+  window.removeEventListener('resize', syncWorkspaceSize);
+  composerResizeObserver?.disconnect();
+  composerResizeObserver = undefined;
   window.clearTimeout(saveTimer);
   window.clearTimeout(noticeTimer);
 
@@ -4071,6 +4238,25 @@ onBeforeUnmount(() => {
               <strong>{{ node.title }}</strong>
               <small>等待视频任务生成</small>
             </div>
+            <div
+              v-else-if="node.kind === 'output' && nodeStatus(node) === 'idle'"
+              class="canvas-node__state canvas-node__state--awaiting"
+            >
+              <PictureOutlined />
+              <strong>{{ node.title }}</strong>
+              <small>在下方输入修改描述后开始生成</small>
+              <div class="canvas-node__awaiting-actions">
+                <button
+                  type="button"
+                  aria-label="填写生成描述"
+                  @pointerdown.stop
+                  @click.stop="focusComposerForNode(node)"
+                >
+                  <EditOutlined />
+                  填写描述
+                </button>
+              </div>
+            </div>
             <div v-else class="canvas-node__state canvas-node__state--loading">
               <LoadingOutlined />
               <strong>{{ statusLabel(nodeStatus(node)) }}</strong>
@@ -4104,14 +4290,20 @@ onBeforeUnmount(() => {
       </div>
 
       <div
+        ref="composerElement"
         class="canvas-composer"
-        :class="{ 'canvas-composer--expanded': composerExpanded }"
+        :class="{
+          'canvas-composer--anchored': Boolean(composerAnchorStyle),
+          'canvas-composer--expanded': composerExpanded,
+        }"
+        :style="composerAnchorStyle"
         @pointerdown.stop
       >
         <textarea
+          ref="composerInput"
           v-model="composerPrompt"
           maxlength="1000"
-          placeholder="描述你想生成的内容..."
+          :placeholder="composerPlaceholder"
           @keydown.ctrl.enter="handleComposerShortcut"
         />
         <button
@@ -6052,6 +6244,41 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 
+.canvas-node__state--awaiting {
+  background:
+    radial-gradient(circle at 50% 26%, rgb(107 76 255 / 20%), transparent 48%),
+    linear-gradient(145deg, #17191f, #131419);
+  color: #b7bdcb;
+}
+
+.canvas-node__state--awaiting :deep(svg) {
+  color: #8d9dff;
+}
+
+.canvas-node__awaiting-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.canvas-node__awaiting-actions button {
+  display: inline-flex;
+  height: 22px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid rgb(140 158 255 / 32%);
+  border-radius: 999px;
+  background: rgb(97 116 255 / 16%);
+  color: #cfd6ff;
+  font-size: 7px;
+  cursor: pointer;
+}
+
+.canvas-node__awaiting-actions button:hover {
+  background: rgb(97 116 255 / 26%);
+}
+
 .canvas-node__empty-actions button {
   display: inline-flex;
   height: 28px;
@@ -6586,6 +6813,11 @@ onBeforeUnmount(() => {
 .canvas-composer--expanded {
   width: min(760px, calc(100% - 76px));
   min-height: 300px;
+}
+
+.canvas-composer--anchored {
+  border-color: rgb(140 158 255 / 26%);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 44%);
 }
 
 .canvas-composer--expanded textarea {
