@@ -550,3 +550,16 @@
 - 浏览器回归通过：`verify-canvas-studio.mjs` 桌面端、移动端、本地降级全部通过；`verify-canvas-interactions.mjs` 输出 `{"errors":[],"firstNodeMetrics":{"hasImage":true,"height":250,"ratio":1.44,"width":360},"metrics":{"clientWidth":1440,"scrollWidth":1440}}`
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm build`、`pnpm --filter @aurora/web test`（20 个文件 89 项）
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
+
+## 48. 2026-10-19 画布节点派生生文与窄屏首次视图
+
+- 参考产品已无积分，本轮不再访问参考产品，只以本地代码、已有截图和 `MagicalCanvas` 开源实现为对照
+- `CanvasStudioView.vue` 的「从该节点生成 - 文本生成」由占位改为真实链路：新增 `nodeTextModel` 优先挑选具备 `vision` 能力的对话模型，`buildNodeTextInstruction()` 把节点说明整理为「一句核心主张 + 三条备选文案 + 五个关键词标签」的指令
+- `generateTextFromNode()` 会先创建 `generationMode === 'node-text'` 的提示词节点并连一条边，随后调用 `streamChat({ fileIds: [sourceFileId] })` 把源节点图片作为多模态输入，`meta/delta/done/error` 分别映射到节点状态；流式写入通过 `nodes.value` 中的响应式代理同步，直接改原始对象不会触发重渲染
+- 提示词节点模板新增「文案生成」标题与生成状态徽标（生成中 / 已完成 / 失败），并补 `.canvas-node__prompt p` 的 `white-space: pre-line` 与滚动，长文案在固定尺寸节点内不溢出
+- 修复窄屏首次进入画布时节点整体落在可视区外的问题：新增 `isCanvasContentVisible()` 与 `ensureInitialCanvasVisibility()`，在 `loadCanvas()` 完成后检测所有节点是否至少有一个落在工作区内，全部不可见时才调用 `fitCanvasView()`，不会覆盖用户已保存的合法视口
+- 图片生成与视频生成行为在本轮明确并记录：图片生成走既有真实图生图链路（Provider 在存在 `sourceImages` 时请求 `/images/edits` 并发送 multipart），视频生成仍只创建待填写参数的视频节点，按约定不自动提交真实视频任务
+- `verify-canvas-interactions.mjs` 扩展为 Mock SSE 断言节点文本生成：校验新节点出现「文案生成」标题与完成态、流式正文包含两次 delta 内容、请求体带上传文件的 `fileIds` 且指令包含源节点说明；另新增 `390x844` 窄屏首次进入的可见性断言并输出 `m2-canvas-mobile-fit.png`
+- 浏览器验收输出：`interactions {"errors":[],"firstNodeMetrics":{"hasImage":true,"height":250,"ratio":1.44,"width":360},"metrics":{"clientWidth":1440,"scrollWidth":1440}}`、`mobile-fit {"mobileErrors":[],"mobileVisibility":{"ratio":0.5,"total":4,"visible":2}}`
+- 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
+- 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成

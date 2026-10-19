@@ -33,6 +33,7 @@
 - 图片生成：参考产品式作品历史、宽版分类栏、高级设置、存储天数、效果示例和底部固定创作栏
 - 视频生成：按参考产品行为从主平台独立打开 `/video`，使用自带深色工具栏和工作区；支持文生视频、单图参考、参考视频、4000 字提示词、任务轮询、取消、重试、下载和播放；Seedance 1.0/1.5/2.x/2.5 的能力约束按官方插件校准，逐模型开放首尾帧、音频和参考视频能力，参考视频会上传为受控文件并随任务、幂等和重试完整恢复，Grok 等不支持模型会禁用对应选项，未知 Seedance endpoint 使用保守的宽能力回退，极速模式继续明确标记
 - AI 画布：节点增删、多选拖拽、连线校验、缩放平移、图片/输出/视频节点、从节点派生文本/图像/视频任务、3D 视角控制、素材库、组合分组、右键菜单、自动布局、工作流 JSON 导入导出、批量生成队列、历史、灵感面板、本地备份、服务端持久化和云端工作流库；工作流库支持新建、打开、重命名和删除非当前画布。空图片节点可直接上传并进入图生图/图生视频，工作流与历史面板支持最大化，底部创作区可展开，节点工具栏和网格状态已按参考产品交互收口
+- 画布节点派生任务：图片或输出节点的「从该节点生成 - 文本生成」会把该节点图片作为多模态输入提交到 `/api/v1/chat/stream`，模型回复按 SSE 增量写入新建的「文案生成」节点并显示生成中/完成/失败状态；「图像生成」沿用真实图生图链路（`/images/edits` multipart 携带原图），「视频生成」当前只创建待填写参数的视频节点，不会自动提交任务
 - 电商工具：四栏工作台、商品换背景、服饰图案替换、产品包装/部件/材质替换、商品抠图、放大、风格转换、虚拟模特试穿和手持模特替换；鞋履行走、服装平铺、白底主图与批量商品图已改为单商品图精修流程，并补齐专属处理方式和仅保存在浏览器本地的建议箱
 - 运行时模型目录：绘画、画布、修图、图片生成、电商和视频工作台统一读取后台已启用模型；后台保存或导入后即时刷新，API 不可用时回退到内置兼容模型
 - Provider 动态路由：图片和视频任务会按模型的厂商代码、Base URL 和上游模型识别 OpenAI-compatible、Seedream 或 Seedance 协议；显式 `mock`/旧 Provider 模式仍可覆盖，自动模式缺少对应 Key 时回退 Mock，不会因新增路由改变本地演示行为
@@ -46,7 +47,7 @@
 当前批次验证结果：
 
 - `pnpm format:check`、`pnpm lint`、`pnpm typecheck` 通过
-- `pnpm test`：API 26 个文件 110 项，Web 20 个文件 88 项
+- `pnpm test`：API 27 个文件 115 项，Web 20 个文件 89 项
 - `pnpm build` 通过
 - `node outputs/ui-reference/verify-image-generation.mjs`、`verify-image-workbench-detail.mjs`、`verify-canvas-studio.mjs`、`verify-video-tasks.mjs`、`verify-m2-interactions.mjs`、`verify-m2-routes.mjs` 和 `verify-admin-modules.mjs` 全部通过
 - `node outputs/ui-reference/verify-m2-routes.mjs` 当前覆盖 18 个主路由；新增占位模块在桌面端与移动端均可加载，侧栏激活态正确，无横向溢出或页面脚本错误
@@ -54,6 +55,7 @@
 - `node outputs/ui-reference/verify-admin-provider-probe.mjs` 通过，桌面端和移动端无横向溢出，探测 Key 未出现在页面、响应或控制台
 - `node outputs/ui-reference/verify-canvas-studio.mjs` 通过，画布批量面板、右键菜单、组合分组、节点生成菜单、云端恢复、自动保存和失败回退在桌面端与移动端无脚本错误或横向溢出
 - `node outputs/ui-reference/verify-canvas-workflow-library.mjs` 通过，云端工作流的列表、新建、重命名、删除非当前画布和重新打开在桌面端与移动端均正常
+- `node outputs/ui-reference/verify-canvas-interactions.mjs` 通过，多图上传、比例保持、滚轮/拖拽平移、`Ctrl + 滚轮`缩放、拖拽连线、连线选中与删除，以及节点「文本生成」的 SSE 流式写入均正常；窄屏 `390x844` 首次进入画布时默认工作流自动落在可视区内
 - `node outputs/ui-reference/verify-chat-m1.mjs` 通过，对话空态、桌面成功流和移动端错误流保持正常
 - `node outputs/ui-reference/verify-chat-markdown.mjs` 通过，Markdown 标题、列表、表格、代码块复制、安全外链和脚本清理在桌面端与移动端均正常
 - `node outputs/ui-reference/verify-chat-attachments.mjs` 通过，图片上传、预览、发送、消息展示和历史恢复在桌面端与移动端均正常；验收使用 Mock，不调用真实 Provider

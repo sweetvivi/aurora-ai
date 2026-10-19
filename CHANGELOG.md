@@ -14,12 +14,14 @@
 
 ### Added
 
+- 2026-10-19：AI 画布「从该节点生成 - 文本生成」接通真实多模态流式链路。`CanvasStudioView.vue` 新增 `nodeTextModel`（优先选择带 `vision` 能力的对话模型）和 `generateTextFromNode()`：点击后创建 `generationMode === 'node-text'` 的提示词节点并自动连线，把源节点图片通过 `streamChat({ fileIds: [sourceFileId] })` 作为多模态输入提交到 `/api/v1/chat/stream`，`delta` 结果增量写入节点正文，`meta/done/error` 映射为节点状态。提示词节点补充「文案生成」标题与生成状态徽标，正文改用 `pre-line` 与局部滚动，长文案不会溢出固定节点尺寸。`verify-canvas-interactions.mjs` 扩展 Mock SSE 断言：校验新节点标题与完成态、两段流式正文落盘、请求体携带上传文件的 `fileIds` 且指令包含源节点说明，并输出 `m2-canvas-node-text.png`。
 - 2026-10-19：新增真实 Provider 流式对话的服务端 E2E 测试 `apps/api/test/chat-stream-provider.e2e-spec.ts`。测试通过 `AppModule`、`ChatService` 和 `OpenAiCompatibleProvider` 的完整 Nest/HTTP/SSE 链路，使用进程内 OpenAI-compatible stub 分段发送数据，不读取或调用真实第三方 Key。覆盖正常流式拼接与消息/积分结算、Provider 请求参数和鉴权头、`401` 鉴权错误退款、仅返回 reasoning 的空响应退款、首个 delta 在流结束前到达，以及上游超时退款；专项测试 5 项通过。
 - 2026-10-19：补上参考产品的历史路由兼容跳转。参考产品会把 `/draw/text2image` 和 `/aiSearch/searchByhome` 两个历史入口直接弹到模型对话，本地此前没有这两个路径，用户点旧链接会落到“页面不存在”。现在 `apps/web/src/router/routes.ts` 在路由表最前面声明这两条重定向，最终停在 `chat` 路由的 `/newchat`；`apps/web/src/router/routes.spec.ts` 新增用例断言跳转结果。同时把已确认的参考产品↔本地路由对应关系补进 `docs/RESEARCH_BASELINE.md` 的“路由注意”一节，覆盖模型对话、超级对话、智能修图、AI 视频独立窗口和 AI 绘画的双路径。
 - 2026-10-19：新增智能体真实流式对话的浏览器端验收脚本 `outputs/ui-reference/verify-agent-streaming.mjs`，用请求拦截模拟 `POST /api/v1/chat/stream` 的 SSE 事件，覆盖三条链路：正常流式（`meta` → 多次 `delta` → `done`）、服务端 `error`（含积分退回）和用户主动停止（`AbortController` 中断）。脚本断言乐观插入的用户消息、助手占位消息与“正在生成”状态在首个 `delta` 到达前就可见、输入框在流式期间禁用、正文按 `delta` 累积、结算后回到“服务就绪”、积分提示与错误/中断文案正确，并校验请求体带上智能体 `systemPrompt`。同时校验新建会话后通过历史记录切回仍能看到完整回答，以及桌面端 `1440x1000` 与移动端 `390x844` 均无横向溢出、无页面脚本错误。本轮只使用 Mock SSE，未读取、输出或调用任何真实 Key。
 
 ### Fixed
 
+- 2026-10-19：修复窄屏首次进入 AI 画布时默认工作流节点整体落在可视区外、画布看起来是空白的问题。`CanvasStudioView.vue` 新增 `isCanvasContentVisible()` 与 `ensureInitialCanvasVisibility()`，在 `loadCanvas()` 完成后检查是否至少有一个节点落在工作区内，全部不可见时才调用 `fitCanvasView()`，因此不会覆盖用户已经保存过的合法视口；`verify-canvas-interactions.mjs` 增加 `390x844` 窄屏首次进入断言（要求至少一半节点可见）并输出 `m2-canvas-mobile-fit.png`，实测 `{"mobileErrors":[],"mobileVisibility":{"ratio":0.5,"total":4,"visible":2}}`。
 - 2026-10-19：修复本地开发环境下前端拿不到智能体等新接口的问题。`apps/web/vite.config.ts` 原先固定代理到 `http://127.0.0.1:3001`，而该端口上跑着 10/17 的旧 API 构建，`/api/v1/agents` 直接返回 404；现在代理目标改为 `WEB_API_PROXY_TARGET` 可覆盖（`.env.local` 或环境变量），默认值仍是 `http://127.0.0.1:3001`，仓库默认行为不变。`apps/web/.env.local` 属于 `.gitignore` 覆盖范围，本机把代理指向当前构建的 API 实例后，5173 的 `/api/v1/modules/display` 返回 200、`/api/v1/agents` 从 404 变为正常鉴权响应；未停止任何已有进程，也未读取、输出或调用任何真实 Key。
 
 ### Changed

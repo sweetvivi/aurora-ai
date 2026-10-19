@@ -42,6 +42,7 @@ import {
   fetchCanvasWorkflows,
   fetchFileBlob,
   saveCanvasWorkflow,
+  streamChat,
   type CanvasWorkflowRecord,
 } from '@/app/api';
 import GalleryArtwork from '@/components/GalleryArtwork.vue';
@@ -352,6 +353,14 @@ const selectedModelLabel = computed(
     generationModels.value[0]?.label ??
     '画布模型',
 );
+// 画布节点的「文本生成」需要一个多模态对话模型，优先选择支持图片理解（vision）的通道。
+const nodeTextModel = computed(() => {
+  const chatModels = modelCatalog.modelsFor('chat');
+
+  return (
+    chatModels.find((model) => model.capabilities.includes('vision')) ?? chatModels[0] ?? undefined
+  );
+});
 const generatedWorks = computed(() =>
   workspace.works.filter((work) => work.status === 'done' && Boolean(work.artworkUrl)),
 );
@@ -851,6 +860,7 @@ async function loadCanvas(): Promise<void> {
   } finally {
     await nextTick();
     hydrated = true;
+    ensureInitialCanvasVisibility();
   }
 }
 
@@ -1885,23 +1895,91 @@ function prepareImageNodeGeneration(sourceNode: CanvasNode, title = '图像生�
   composerTargetNodeId.value = outputNode.id;
 }
 
-function createTextGenerationNode(sourceNode: CanvasNode): void {
-  const promptNode = addPromptNode(
-    `围绕“${sourceNode.prompt.slice(0, 80)}”提炼文案方向和可延展的表达。`,
-  );
+const TEXT_GENERATION_PLACEHOLDER = '正在读取节点素材并生成文案…';
 
-  composerPrompt.value = promptNode.prompt;
-  composerSourceNodeId.value = sourceNode.id;
-  composerTargetNodeId.value = '';
+function buildNodeTextInstruction(sourceNode: CanvasNode): string {
+  return [
+    '请阅读随附的节点素材，并结合下面的节点说明，输出可以直接使用的创意文案。',
+    `节点说明：${sourceNode.prompt?.trim() || '（该节点没有额外文字说明，请以随附素材为准）'}`,
+    '输出格式：',
+    '1. 一句核心主张；',
+    '2. 三条不同风格的备选文案；',
+    '3. 五个关键词标签。',
+  ].join('\n');
+}
+
+// 与「从该节点生成 → 文本生成」对应：把节点上的图片/文字一起送给多模态模型，
+// 流式写回一个新的文案节点，而不是只在前端拼一句提示词。
+async function generateTextFromNode(sourceNode: CanvasNode): Promise<void> {
+  const sourceFileId = nodeSourceFileId(sourceNode);
+  const promptNode = addPromptNode(TEXT_GENERATION_PLACEHOLDER);
+  const promptNodeId = promptNode.id;
+
+  promptNode.generationMode = 'node-text';
+  promptNode.status = 'queued';
   edges.value = [
     ...edges.value,
     {
       from: sourceNode.id,
       id: createId('edge'),
-      to: promptNode.id,
+      to: promptNodeId,
     },
   ];
+  composerSourceNodeId.value = '';
+  composerTargetNodeId.value = '';
   closeNodeGenerationMenu();
+
+  const syncNode = (text: string, status: CanvasNodeStatus): void => {
+    // 必须通过 nodes.value 里的响应式代理写回，直接改原始对象不会触发重渲染。
+    const live = nodes.value.find((node) => node.id === promptNodeId);
+
+    if (!live) {
+      return;
+    }
+
+    live.prompt = text;
+    live.status = status;
+    if (status === 'done' || status === 'failed') {
+      live.title = nodeTextModel.value?.displayName ?? '文案生成';
+    }
+  };
+
+  let accumulated = '';
+
+  try {
+    await streamChat(
+      {
+        content: buildNodeTextInstruction(sourceNode),
+        fileIds: sourceFileId ? [sourceFileId] : undefined,
+        modelAlias: nodeTextModel.value?.alias,
+        systemPrompt:
+          '你是资深中文创意文案，需要先理解随附的素材画面内容，再产出可以直接使用的文案。',
+      },
+      {
+        onDelta: (event) => {
+          accumulated += event.content;
+          syncNode(accumulated, 'generating');
+        },
+        onDone: () => {
+          syncNode(accumulated || '模型没有返回文案内容，请重试。', 'done');
+          persistCanvas();
+        },
+        onError: (event) => {
+          syncNode(accumulated || `文案生成失败：${event.message}`, 'failed');
+        },
+        onMeta: () => {
+          if (!accumulated) {
+            syncNode(TEXT_GENERATION_PLACEHOLDER, 'generating');
+          }
+        },
+      },
+    );
+  } catch (error) {
+    syncNode(
+      accumulated || `文案生成失败：${error instanceof Error ? error.message : '请稍后重试'}`,
+      'failed',
+    );
+  }
 }
 
 function createVideoNodeFromSource(sourceNode: CanvasNode, local = false): void {
@@ -1944,7 +2022,7 @@ function closeAngleDialog(): void {
 
 function runNodeGenerationAction(action: NodeGenerationAction, sourceNode: CanvasNode): void {
   if (action === 'text') {
-    createTextGenerationNode(sourceNode);
+    void generateTextFromNode(sourceNode);
     return;
   }
 
@@ -2592,6 +2670,34 @@ function fitCanvasView(): void {
     x: Math.round((workspaceElement.value.clientWidth - contentWidth * scale) / 2 - minX * scale),
     y: Math.round(110 - minY * scale),
   };
+}
+
+function isCanvasContentVisible(): boolean {
+  const workspace = workspaceElement.value;
+
+  if (!workspace || nodes.value.length === 0) {
+    return true;
+  }
+
+  const { scale, x, y } = viewport.value;
+  const width = workspace.clientWidth;
+  const height = workspace.clientHeight;
+
+  return nodes.value.some((node) => {
+    const left = node.x * scale + x;
+    const top = node.y * scale + y;
+    const right = left + node.width * scale;
+    const bottom = top + node.height * scale;
+
+    return right > 24 && left < width - 24 && bottom > 24 && top < height - 24;
+  });
+}
+
+// 窄屏或恢复出的视口可能让节点整体落在画布外，首次进入时兜底做一次适配。
+function ensureInitialCanvasVisibility(): void {
+  if (!isCanvasContentVisible()) {
+    fitCanvasView();
+  }
 }
 
 function clampContextMenuPosition(x: number, y: number): { x: number; y: number } {
@@ -3887,7 +3993,14 @@ onBeforeUnmount(() => {
           >
             <span>
               <BulbOutlined />
-              创作指令
+              {{ node.generationMode === 'node-text' ? '文案生成' : '创作指令' }}
+              <em
+                v-if="node.generationMode === 'node-text' && nodeStatus(node) !== 'idle'"
+                class="canvas-node__prompt-state"
+                :class="nodeStatus(node)"
+              >
+                {{ statusLabel(nodeStatus(node)) }}
+              </em>
             </span>
             <p>{{ node.prompt }}</p>
             <footer>
@@ -6053,6 +6166,28 @@ onBeforeUnmount(() => {
   color: #d2d4db;
   font-size: 10px;
   line-height: 1.6;
+  overflow: auto;
+  white-space: pre-line;
+}
+
+.canvas-node__prompt-state {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgb(171 150 255 / 16%);
+  color: #c9bcff;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.canvas-node__prompt-state.done {
+  background: rgb(64 199 137 / 16%);
+  color: #7fe0ad;
+}
+
+.canvas-node__prompt-state.failed {
+  background: rgb(255 106 106 / 16%);
+  color: #ff9d9d;
 }
 
 .canvas-node__prompt footer {
