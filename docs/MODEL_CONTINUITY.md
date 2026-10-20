@@ -16,13 +16,17 @@
 任何新模型开始工作前，按顺序阅读：
 
 1. `README.md`
-2. `docs/PROJECT_CONTEXT.md`
-3. `docs/RESEARCH_BASELINE.md`
-4. `docs/SESSION_HANDOFF_2026-10-16.md`
+2. `docs/AI_HANDOFF.md`
+3. `docs/PROJECT_CONTEXT.md`
+4. `docs/RESEARCH_BASELINE.md`
 5. `docs/DECISIONS.md`
 6. `docs/OPEN_QUESTIONS.md`
-7. `CHANGELOG.md`
-8. `docs/IMPLEMENTATION_PLAN.md`
+7. `docs/IMPLEMENTATION_PLAN.md`
+8. `docs/M1_WORKLOG.md`
+9. `docs/M2_WORKLOG.md`
+10. `docs/M3_WORKLOG.md`
+11. `docs/SESSION_HANDOFF_2026-10-16.md`
+12. `CHANGELOG.md`
 
 阅读后先输出：
 

@@ -421,6 +421,13 @@
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
 
+## 50. 2026-10-20 模型交接文档汇总
+
+- 为准备切换模型，重写 `docs/AI_HANDOFF.md`，记录 M0-M3、六个优先工具、AI 画布、电商工具、运行时模型配置和最新画布图生图修复。
+- 同步更新 `docs/PROJECT_CONTEXT.md` 的当前阶段，移除旧的 `feature/m1-vertical-slice` 与 M1 首切描述。
+- 更新 `docs/MODEL_CONTINUITY.md` 和 `README.md` 的必读顺序，加入当前交接文档及 M1/M2/M3 工作日志。
+- 本轮只改文档，不修改业务代码、不读取或记录 Key、不调用真实第三方接口。
+
 ## 49. 2026-10-19 画布「节点 → 指令 → 图生图」链路修复
 
 - 定位用户「点击图像生成一直停在待处理 / 正在同步画布结果」的真实原因：`prepareImageNodeGeneration()` 生成的目标节点状态是 `idle`，模板里落到最后的兜底分支，于是显示成同步中；同时前端会把空字符串 `sourceFileId` 提交给 `POST /api/v1/image-tasks`，后端直接写外键列触发 `P2003 image_tasks_sourceFileId_fkey`，前端只看到 `Internal server error`
