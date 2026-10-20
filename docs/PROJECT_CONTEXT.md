@@ -40,7 +40,7 @@
 
 ## 4. 当前阶段
 
-当前在 `main` 分支继续打磨 M0-M3 已完成能力，最新提交为 `b30d3f0 fix(canvas): anchor node image generation to source node composer`；业务代码与 `origin/main` 同步，本次交接另修改了 6 个文档，尚未提交。
+当前在 `main` 分支继续打磨 M0-M3 已完成能力。业务代码最新提交为 `b30d3f0 fix(canvas): anchor node image generation to source node composer`；其后的交接文档汇总已提交为 `docs(handoff): summarize M0-M3 state for model switchover`，主开发工具切换按 D-042 记录。
 
 已经完成：
 

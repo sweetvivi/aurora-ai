@@ -584,3 +584,12 @@
 - 浏览器验收输出：`interactions {"errors":[],"firstNodeMetrics":{"hasImage":true,"height":250,"ratio":1.44,"width":360},"metrics":{"clientWidth":1440,"scrollWidth":1440}}`、`mobile-fit {"mobileErrors":[],"mobileVisibility":{"ratio":0.5,"total":4,"visible":2}}`
 - 验证通过：`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`（API 27 个文件 115 项、Web 20 个文件 89 项）、`pnpm build`（仅既有 Vite chunk 体积提示）
 - 本轮只读取本地代码、本地页面与已有参考截图，未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口，未消耗参考产品积分，未调用真实视频生成
+
+## 51. 2026-10-20 Codex → WorkBuddy 交接与 D-042 决策
+
+- 上游模型持续 `502`，用户决定把主开发工具从 Codex 切到 WorkBuddy（`DeepSeek-V4.1-Flash`）；codex 先完成上一批工作并写出交接文档，用户确认其收工后才允许提交，避免交接过程与在跑任务互相覆盖
+- 按 `docs/MODEL_CONTINUITY.md` 第 3 节读完 `README.md`、`AI_HANDOFF.md`、`PROJECT_CONTEXT.md`、`RESEARCH_BASELINE.md`、`DECISIONS.md`、`OPEN_QUESTIONS.md`，并核对 `git status`、`git log`、`当前页面截图` 与 `outputs/ui-reference/live-reference`，先输出当前阶段、已确认决策、待确认问题、最后一次有效改动和最小改动范围，再开始动手
+- 交接文档汇总单独提交为 `docs(handoff): summarize M0-M3 state for model switchover`，只含 `CHANGELOG.md`、`README.md`、`docs/AI_HANDOFF.md`、`docs/M3_WORKLOG.md`、`docs/MODEL_CONTINUITY.md`、`docs/PROJECT_CONTEXT.md` 六个文档，未触碰业务代码
+- 新增 D-042：明确主开发工具可因上游可用性切换，D-033 的三档执行规则与红线继续适用于任何接管工具，并把「只在上一工具明确收工后提交」写入约束
+- 修正 `docs/PROJECT_CONTEXT.md` 中「本次交接另修改了 6 个文档，尚未提交」这句会在提交后失效的描述，改为记录交接文档已提交
+- 本轮只改文档，未修改业务代码、未读取或记录任何 Key/Token/Cookie、未调用真实第三方接口，因此未运行 `pnpm test` 和 `pnpm build`
