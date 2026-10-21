@@ -3002,7 +3002,7 @@ onBeforeUnmount(() => {
             <span>01</span>
             <div>
               <strong>先选择左侧工具</strong>
-              <p>左侧已按参考产品整理商品替换、换背景、试衣、穿搭、精修和场景等常用分类。</p>
+              <p>左侧按常用场景整理了商品替换、换背景、试衣、穿搭、精修等分类。</p>
             </div>
           </article>
           <article>
