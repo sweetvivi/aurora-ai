@@ -137,6 +137,105 @@ describe('custom agent endpoints', () => {
     expect(otherPublishResponse.body.error.code).toBe('AGENT_NOT_FOUND');
   });
 
+  it('stores preset params on create, keeps them on unrelated updates, and validates ranges', async () => {
+    const owner = await registerUser(`preset-${randomUUID()}${testEmailSuffix}`, '预设参数用户');
+    const agentId = `agent-${randomUUID()}`;
+
+    const createResponse = await request(app.getHttpServer())
+      .post('/api/v1/agents')
+      .set('authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        id: agentId,
+        inputMode: 'chat',
+        instructions: '先复述问题，再给方案。',
+        maxTokens: 4096,
+        modelAlias: 'qwen-3-8-max',
+        name: '带预设的智能体',
+        temperature: 0.3,
+      })
+      .expect(201);
+
+    expect(createResponse.body.data).toMatchObject({
+      inputMode: 'chat',
+      maxTokens: 4096,
+      modelAlias: 'qwen-3-8-max',
+      temperature: 0.3,
+    });
+
+    const unrelatedUpdate = await request(app.getHttpServer())
+      .patch(`/api/v1/agents/${agentId}`)
+      .set('authorization', `Bearer ${owner.accessToken}`)
+      .send({ name: '改了名字的智能体' })
+      .expect(200);
+
+    expect(unrelatedUpdate.body.data).toMatchObject({
+      maxTokens: 4096,
+      modelAlias: 'qwen-3-8-max',
+      name: '改了名字的智能体',
+      temperature: 0.3,
+    });
+
+    const presetUpdate = await request(app.getHttpServer())
+      .patch(`/api/v1/agents/${agentId}`)
+      .set('authorization', `Bearer ${owner.accessToken}`)
+      .send({
+        inputMode: 'form',
+        maxTokens: 8192,
+        modelAlias: 'openai-gpt-6-astra',
+        temperature: 0.8,
+      })
+      .expect(200);
+
+    expect(presetUpdate.body.data).toMatchObject({
+      inputMode: 'form',
+      maxTokens: 8192,
+      modelAlias: 'openai-gpt-6-astra',
+      temperature: 0.8,
+    });
+
+    const clearPreset = await request(app.getHttpServer())
+      .patch(`/api/v1/agents/${agentId}`)
+      .set('authorization', `Bearer ${owner.accessToken}`)
+      .send({ modelAlias: '', temperature: null, maxTokens: null })
+      .expect(200);
+
+    expect(clearPreset.body.data).toMatchObject({
+      maxTokens: null,
+      modelAlias: null,
+      temperature: null,
+    });
+
+    const plainAgentId = `agent-${randomUUID()}`;
+    const plainCreate = await request(app.getHttpServer())
+      .post('/api/v1/agents')
+      .set('authorization', `Bearer ${owner.accessToken}`)
+      .send({ id: plainAgentId, name: '无预设智能体' })
+      .expect(201);
+
+    expect(plainCreate.body.data).toMatchObject({
+      inputMode: 'chat',
+      maxTokens: null,
+      modelAlias: null,
+      temperature: null,
+    });
+
+    const invalidRequests = [
+      { maxTokens: 100, name: 'maxTokens 太小' },
+      { maxTokens: 99_999, name: 'maxTokens 太大' },
+      { modelAlias: '非法别名!', name: '别名含非法字符' },
+      { temperature: 5, name: 'temperature 越界' },
+      { inputMode: 'voice', name: 'inputMode 非法' },
+    ];
+
+    for (const payload of invalidRequests) {
+      await request(app.getHttpServer())
+        .post('/api/v1/agents')
+        .set('authorization', `Bearer ${owner.accessToken}`)
+        .send(payload)
+        .expect(400);
+    }
+  });
+
   async function registerUser(email: string, displayName: string): Promise<RegisteredUser> {
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/email/register')

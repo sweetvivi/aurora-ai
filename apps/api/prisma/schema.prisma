@@ -392,7 +392,11 @@ model CustomAgent {
   starterPrompts String[]
   color          String            @default("#3979ed")
   glyph          String
+  inputMode      String            @default("chat")
+  maxTokens      Int?
+  modelAlias     String?
   rating         Float             @default(5)
+  temperature    Float?
   usage          Int               @default(0)
   publishedAt    DateTime?
   createdAt      DateTime          @default(now())

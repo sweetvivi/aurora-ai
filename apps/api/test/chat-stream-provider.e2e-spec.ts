@@ -36,6 +36,7 @@ type StubMode = 'auth-error' | 'handshake' | 'reasoning-only' | 'stall' | 'succe
 interface StubRequestRecord {
   authorization?: string;
   body: {
+    max_tokens?: number;
     messages?: Array<{ content?: unknown; role?: string }>;
     model?: string;
     reasoning_effort?: string;
@@ -139,6 +140,7 @@ describe('chat streaming through the real OpenAI-compatible provider', () => {
       .set('idempotency-key', randomUUID())
       .send({
         content: '真实链路测试',
+        maxTokens: 2048,
         modelAlias,
         reasoningEffort: 'medium',
         temperature: 0.3,
@@ -164,6 +166,7 @@ describe('chat streaming through the real OpenAI-compatible provider', () => {
       url: '/v1/chat/completions',
     });
     expect(providerRequest?.body).toMatchObject({
+      max_tokens: 2048,
       model: PROVIDER_MODEL,
       reasoning_effort: 'medium',
       stream: true,

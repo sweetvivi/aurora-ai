@@ -7,21 +7,37 @@ import {
   CopyOutlined,
   DislikeOutlined,
   EditOutlined,
+  FileTextOutlined,
   HistoryOutlined,
+  InfoCircleOutlined,
   LikeOutlined,
+  LinkOutlined,
   MessageOutlined,
   PlusOutlined,
+  PushpinOutlined,
   ReloadOutlined,
   SearchOutlined,
   SendOutlined,
+  ShareAltOutlined,
+  StarFilled,
+  StarOutlined,
   StopOutlined,
   ThunderboltFilled,
+  WarningOutlined,
 } from '@ant-design/icons-vue';
+import { message } from 'ant-design-vue';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MarkdownMessage from '@/components/MarkdownMessage.vue';
 import { getAgentById } from '@/data/agents';
 import { useAgentWorkspaceStore, type AgentSession } from '@/stores/agent-workspace';
+import {
+  isAgentFavorited,
+  isAgentPinned,
+  readAgentInfoPrefs,
+  toggleAgentPreference,
+  writeAgentInfoPrefs,
+} from '@/utils/agent-info-prefs';
 import { isImeComposing } from '@/utils/keyboard';
 
 const route = useRoute();
@@ -35,6 +51,10 @@ const consumedRoutePrompt = ref('');
 const sessionSearchInput = ref<HTMLInputElement | null>(null);
 const composerInput = ref<HTMLTextAreaElement | null>(null);
 const historyOpen = ref(false);
+const infoOpen = ref(false);
+const favorited = ref(false);
+const pinned = ref(false);
+const favoriteCount = computed(() => (favorited.value ? 1 : 0));
 const copiedMessageId = ref('');
 const costRuleMessageId = ref('');
 const messageFeedback = ref<Record<string, '' | 'dislike' | 'like'>>({});
@@ -138,6 +158,67 @@ function startNewSession(): void {
 
 function openHistory(): void {
   historyOpen.value = true;
+}
+
+function toggleFavorite(): void {
+  const agentId = agent.value?.id;
+
+  if (agentId === undefined) {
+    return;
+  }
+
+  const prefs = toggleAgentPreference(readAgentInfoPrefs(), 'favorites', agentId);
+  writeAgentInfoPrefs(prefs);
+  favorited.value = isAgentFavorited(prefs, agentId);
+  message.success(favorited.value ? '已收藏该智能体' : '已取消收藏');
+}
+
+function togglePinned(): void {
+  const agentId = agent.value?.id;
+
+  if (agentId === undefined) {
+    return;
+  }
+
+  const prefs = toggleAgentPreference(readAgentInfoPrefs(), 'pinned', agentId);
+  writeAgentInfoPrefs(prefs);
+  pinned.value = isAgentPinned(prefs, agentId);
+  message.success(pinned.value ? '已置顶该智能体' : '已取消置顶');
+}
+
+function agentShareUrl(): string {
+  return `${window.location.origin}/agents/${agent.value?.id ?? ''}`;
+}
+
+async function copyAgentLink(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(agentShareUrl());
+    message.success('链接已复制到剪贴板');
+  } catch {
+    message.warning('复制失败，请手动复制地址栏链接');
+  }
+}
+
+async function shareAgent(): Promise<void> {
+  if (typeof navigator.share === 'function') {
+    try {
+      await navigator.share({ title: agent.value?.name ?? '极光AI', url: agentShareUrl() });
+    } catch {
+      // 用户取消系统分享面板，无需提示
+    }
+
+    return;
+  }
+
+  await copyAgentLink();
+}
+
+function openAbout(): void {
+  message.info('极光AI · 让每个人都能调用 AI 能力');
+}
+
+function reportAgent(): void {
+  message.success('已收到举报，我们会尽快核实处理');
 }
 
 function editAgent(): void {
@@ -282,6 +363,19 @@ watch(
     void scrollToLatest();
   },
 );
+
+watch(
+  () => agent.value?.id,
+  (agentId) => {
+    const prefs = readAgentInfoPrefs();
+
+    favorited.value = agentId === undefined ? false : isAgentFavorited(prefs, agentId);
+    pinned.value = agentId === undefined ? false : isAgentPinned(prefs, agentId);
+  },
+  {
+    immediate: true,
+  },
+);
 </script>
 
 <template>
@@ -360,6 +454,26 @@ watch(
         <span class="agent-detail__status" :class="{ active: streaming }">
           {{ streaming ? '正在生成' : '服务就绪' }}
         </span>
+        <button
+          type="button"
+          class="agent-detail__favorite"
+          :class="{ active: favorited }"
+          :aria-label="favorited ? '取消收藏' : '收藏智能体'"
+          @click="toggleFavorite"
+        >
+          <StarFilled v-if="favorited" />
+          <StarOutlined v-else />
+          {{ favorited ? '已收藏' : '收藏' }}
+        </button>
+        <button
+          type="button"
+          class="agent-detail__info"
+          aria-label="智能体信息"
+          title="智能体信息"
+          @click="infoOpen = true"
+        >
+          <InfoCircleOutlined />
+        </button>
       </header>
 
       <section ref="conversationArea" class="agent-detail__conversation">
@@ -591,6 +705,80 @@ watch(
               {{ search ? '换一个关键词继续搜索。' : '发送第一条消息后，会话会保存在这里。' }}
             </p>
             <button type="button" @click="startNewSession">新建对话</button>
+          </div>
+        </aside>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="infoOpen"
+        class="agent-info-layer"
+        role="presentation"
+        @click.self="infoOpen = false"
+      >
+        <aside class="agent-info-panel" aria-label="智能体信息">
+          <header>
+            <button type="button" aria-label="关闭智能体信息" @click="infoOpen = false">
+              <CloseOutlined />
+            </button>
+            <div>
+              <span class="agent-info-panel__agent" :style="{ background: agent.color }">
+                {{ agent.glyph }}
+              </span>
+              <div>
+                <strong>{{ agent.name }}</strong>
+                <small>极光AI · 已被 {{ agent.usage }} 人使用</small>
+              </div>
+            </div>
+          </header>
+
+          <div class="agent-info-panel__body">
+            <div class="agent-info-stats">
+              <button
+                type="button"
+                class="agent-info-stats__item"
+                :class="{ active: favorited }"
+                @click="toggleFavorite"
+              >
+                <StarFilled v-if="favorited" />
+                <StarOutlined v-else />
+                <span>收藏</span>
+                <em>{{ favoriteCount }}</em>
+              </button>
+              <button
+                type="button"
+                class="agent-info-stats__item"
+                @click="message.info('评论功能即将开放，敬请期待')"
+              >
+                <MessageOutlined />
+                <span>评论</span>
+                <em>0</em>
+              </button>
+            </div>
+
+            <div class="agent-info-actions">
+              <button type="button" @click="shareAgent">
+                <ShareAltOutlined />
+                分享
+              </button>
+              <button type="button" :class="{ active: pinned }" @click="togglePinned">
+                <PushpinOutlined />
+                置顶
+              </button>
+              <button type="button" @click="copyAgentLink">
+                <LinkOutlined />
+                复制链接
+              </button>
+              <button type="button" @click="openAbout">
+                <FileTextOutlined />
+                关于我们
+              </button>
+              <button type="button" class="agent-info-actions__report" @click="reportAgent">
+                <WarningOutlined />
+                举报
+              </button>
+            </div>
           </div>
         </aside>
       </div>
@@ -859,6 +1047,53 @@ watch(
 
 .agent-detail__cost > svg {
   font-size: 11px;
+}
+
+.agent-detail__favorite {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  margin-left: auto;
+  padding: 0 13px;
+  border: 1px solid #e8ebf0;
+  border-radius: 999px;
+  background: #fff;
+  color: #6d7584;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.agent-detail__favorite:hover {
+  border-color: #bfe6d2;
+  color: #159c66;
+}
+
+.agent-detail__favorite.active {
+  border-color: #bfe6d2;
+  background: #f0faf5;
+  color: #159c66;
+}
+
+.agent-detail__info {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #6d7584;
+  cursor: pointer;
+}
+
+.agent-detail__info:hover {
+  background: #f4f6f9;
+  color: #3979ed;
 }
 
 .agent-detail__conversation {
@@ -1417,6 +1652,182 @@ watch(
   font-size: 11px;
   font-weight: 750;
   cursor: pointer;
+}
+
+.agent-info-layer {
+  position: fixed;
+  z-index: 1700;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(22 30 43 / 24%);
+  backdrop-filter: blur(2px);
+}
+
+.agent-info-panel {
+  display: flex;
+  width: min(300px, 100%);
+  height: 100%;
+  flex-direction: column;
+  border-left: 1px solid #e9edf2;
+  background: #fff;
+  box-shadow: -20px 0 54px rgb(21 31 48 / 14%);
+  animation: agent-history-slide-in 180ms ease-out both;
+}
+
+.agent-info-panel > header {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.agent-info-panel > header > div {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 1px 9px;
+  grid-template-columns: 32px minmax(0, 1fr);
+}
+
+.agent-info-panel > header > div > span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  grid-row: 1 / span 2;
+  place-items: center;
+  border-radius: 9px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agent-info-panel > header strong {
+  overflow: hidden;
+  color: #343c48;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-info-panel > header small {
+  overflow: hidden;
+  color: #969eaa;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-info-panel > header > button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #303640;
+  cursor: pointer;
+}
+
+.agent-info-panel > header > button:hover {
+  background: #f4f6f9;
+  color: #3979ed;
+}
+
+.agent-info-panel__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 14px 24px;
+}
+
+/* 收藏/评论统计：标签与数字紧排（center + 小间距），间距只花在两个按钮之间 */
+.agent-info-stats {
+  display: flex;
+  gap: 10px;
+}
+
+.agent-info-stats__item {
+  display: inline-flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 40px;
+  border: 1px solid #e8ebf0;
+  border-radius: 8px;
+  background: #fff;
+  color: #6d7584;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.agent-info-stats__item:hover {
+  border-color: #bfe6d2;
+  color: #159c66;
+}
+
+.agent-info-stats__item.active {
+  border-color: #bfe6d2;
+  background: #f0faf5;
+  color: #159c66;
+}
+
+.agent-info-stats__item em {
+  font-style: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-info-actions {
+  display: grid;
+  margin-top: 14px;
+}
+
+.agent-info-actions button {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #3c4452;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-info-actions button:hover {
+  background: #f5f7fa;
+}
+
+.agent-info-actions button > svg {
+  flex: 0 0 auto;
+  color: #8a93a3;
+  font-size: 14px;
+}
+
+.agent-info-actions button.active {
+  color: #159c66;
+}
+
+.agent-info-actions button.active > svg {
+  color: #159c66;
+}
+
+.agent-info-actions__report {
+  color: #d9480f;
+}
+
+.agent-info-actions__report > svg {
+  color: #d9480f;
 }
 
 @keyframes agent-history-slide-in {

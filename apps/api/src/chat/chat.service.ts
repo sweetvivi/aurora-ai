@@ -28,6 +28,7 @@ interface StreamChatInput {
   conversationId?: string;
   fileIds?: string[];
   idempotencyKey: string;
+  maxTokens?: number;
   modelAlias?: string;
   reasoningEffort?: 'high' | 'low' | 'medium';
   systemPrompt?: string;
@@ -41,6 +42,7 @@ interface PreparedChat {
   balanceAfter: number;
   chatRequestId: string;
   conversationId: string;
+  maxTokens?: number;
   messages: ChatMessage[];
   modelAlias: string;
   pointsCost: number;
@@ -362,6 +364,7 @@ export class ChatService {
       balanceAfter: reservation.balanceAfter,
       chatRequestId,
       conversationId: conversation.id,
+      maxTokens: input.maxTokens,
       messages: [
         ...(combinedSystemPrompt
           ? [
@@ -411,6 +414,7 @@ export class ChatService {
       });
 
       for await (const event of this.llmProvider.streamChat({
+        maxTokens: prepared.maxTokens,
         messages: prepared.messages,
         model: prepared.providerModel,
         providerBaseUrl: prepared.providerBaseUrl,

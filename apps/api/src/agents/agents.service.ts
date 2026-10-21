@@ -13,7 +13,10 @@ export interface CustomAgentView {
   description: string;
   glyph: string;
   id: string;
+  inputMode: 'chat' | 'form' | 'wizard';
   instructions: string;
+  maxTokens: number | null;
+  modelAlias: string | null;
   name: string;
   opening: string;
   publishedAt: Date | null;
@@ -21,6 +24,7 @@ export interface CustomAgentView {
   starterPrompts: string[];
   status: 'DRAFT' | 'PUBLISHED';
   tags: string[];
+  temperature: number | null;
   updatedAt: Date;
   usage: number;
 }
@@ -133,11 +137,15 @@ export class AgentsService {
       color: input.color?.trim() || '#3979ed',
       description: input.description?.trim() || '',
       glyph: input.glyph?.trim().slice(0, 1) || name.slice(0, 1) || '智',
+      inputMode: input.inputMode ?? 'chat',
       instructions: input.instructions?.trim() || '',
+      maxTokens: input.maxTokens ?? null,
+      modelAlias: input.modelAlias?.trim() || null,
       name,
       opening: input.opening?.trim() || '',
       starterPrompts: this.cleanList(input.starterPrompts),
       tags: this.cleanList(input.tags),
+      temperature: input.temperature ?? null,
       user: {
         connect: { id: userId },
       },
@@ -161,6 +169,22 @@ export class AgentsService {
 
     if (input.opening !== undefined) {
       data.opening = input.opening.trim();
+    }
+
+    if (input.inputMode !== undefined) {
+      data.inputMode = input.inputMode;
+    }
+
+    if (input.maxTokens !== undefined) {
+      data.maxTokens = input.maxTokens;
+    }
+
+    if (input.modelAlias !== undefined) {
+      data.modelAlias = input.modelAlias.trim() || null;
+    }
+
+    if (input.temperature !== undefined) {
+      data.temperature = input.temperature;
     }
 
     if (input.capabilities !== undefined) {
@@ -199,7 +223,11 @@ export class AgentsService {
       description: agent.description,
       glyph: agent.glyph,
       id: agent.id,
+      inputMode:
+        agent.inputMode === 'form' || agent.inputMode === 'wizard' ? agent.inputMode : 'chat',
       instructions: agent.instructions,
+      maxTokens: agent.maxTokens,
+      modelAlias: agent.modelAlias,
       name: agent.name,
       opening: agent.opening,
       publishedAt: agent.publishedAt,
@@ -207,6 +235,7 @@ export class AgentsService {
       starterPrompts: agent.starterPrompts,
       status: agent.status,
       tags: agent.tags,
+      temperature: agent.temperature,
       updatedAt: agent.updatedAt,
       usage: agent.usage,
     };

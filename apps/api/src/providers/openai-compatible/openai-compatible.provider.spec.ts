@@ -31,6 +31,7 @@ async function collectEvents(
   provider: OpenAiCompatibleProvider,
   providerCode: string,
   overrides: {
+    maxTokens?: number;
     providerBaseUrl?: string;
     providerKeyRef?: string;
   } = {},
@@ -251,5 +252,29 @@ describe('OpenAI compatible chat provider', () => {
 
     expect(requestBody.messages).toEqual(messages);
     expect(requestBody.reasoning_effort).toBe('high');
+  });
+
+  it('sends max_tokens only when the caller sets a token limit', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => createStreamResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new OpenAiCompatibleProvider(
+      new ConfigService({
+        LLM_API_KEY: 'default-key',
+        LLM_BASE_URL: 'https://default.example/v1',
+      }),
+    );
+
+    await collectEvents(provider, 'jiguang');
+    await collectEvents(provider, 'jiguang', { maxTokens: 4096 });
+
+    const [firstInit, secondInit] = fetchMock.mock.calls.map((call) => call[1] as RequestInit) as [
+      RequestInit,
+      RequestInit,
+    ];
+    const firstBody = JSON.parse(String(firstInit.body)) as Record<string, unknown>;
+    const secondBody = JSON.parse(String(secondInit.body)) as Record<string, unknown>;
+
+    expect(firstBody).not.toHaveProperty('max_tokens');
+    expect(secondBody.max_tokens).toBe(4096);
   });
 });

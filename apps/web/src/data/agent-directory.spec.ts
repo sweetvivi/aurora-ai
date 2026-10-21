@@ -7,7 +7,7 @@ describe('buildGeneratedAgentCatalog', () => {
 
     expect(catalog).toHaveLength(6358);
     expect(new Set(catalog.map((agent) => agent.id)).size).toBe(6358);
-    expect(new Set(catalog.map((agent) => agent.name)).size).toBeGreaterThan(6000);
+    expect(new Set(catalog.map((agent) => agent.name)).size).toBe(6358);
   });
 
   it('keeps category totals aligned with the reference navigation counts', () => {
@@ -52,5 +52,55 @@ describe('buildGeneratedAgentCatalog', () => {
     expect(first).toHaveLength(120);
     expect(first[0]?.id).toBe('official-01-0001');
     expect(first.at(-1)?.id).toBe('official-01-0120');
+  });
+
+  it('carries a valid model preset on every generated agent', () => {
+    const catalog = buildGeneratedAgentCatalog([]);
+    const missing = catalog.filter(
+      (agent) => !agent.modelAlias || !/^[a-z0-9][a-z0-9._-]*$/.test(agent.modelAlias),
+    );
+
+    expect(missing).toHaveLength(0);
+
+    const outOfRange = catalog.filter(
+      (agent) =>
+        agent.temperature !== undefined && (agent.temperature < 0 || agent.temperature > 2),
+    );
+
+    expect(outOfRange).toHaveLength(0);
+  });
+
+  it('preserves preset params on curated agents passed through the generator', () => {
+    const catalog = buildGeneratedAgentCatalog(
+      [
+        {
+          category: '编程与软件开发',
+          color: '#5b7cfa',
+          description: '带预设参数的精选智能体。',
+          glyph: '码',
+          id: 'curated-preset',
+          inputMode: 'chat',
+          instructions: '先复述问题，再给方案。',
+          maxTokens: 4096,
+          modelAlias: 'qwen-3-8-max',
+          name: '预设参数样例',
+          opening: '你好，我是预设参数样例。',
+          rating: 4.9,
+          starterPrompts: ['解释这段代码'],
+          tags: ['代码'],
+          temperature: 0.2,
+          usage: 1,
+        },
+      ],
+      10,
+    );
+
+    expect(catalog[0]).toMatchObject({
+      id: 'curated-preset',
+      inputMode: 'chat',
+      maxTokens: 4096,
+      modelAlias: 'qwen-3-8-max',
+      temperature: 0.2,
+    });
   });
 });

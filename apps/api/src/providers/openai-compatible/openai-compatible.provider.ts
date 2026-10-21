@@ -66,6 +66,7 @@ export class OpenAiCompatibleProvider implements LlmProvider {
       const baseUrl = credentials.baseUrl.replace(/\/+$/, '');
       const response = await fetch(`${baseUrl}/chat/completions`, {
         body: JSON.stringify({
+          ...(request.maxTokens === undefined ? {} : { max_tokens: request.maxTokens }),
           messages: request.messages,
           model: request.model,
           reasoning_effort: request.reasoningEffort,

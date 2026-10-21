@@ -55,6 +55,13 @@ export class StreamChatDto {
   temperature?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(256)
+  @Max(32_768)
+  maxTokens?: number;
+
+  @IsOptional()
   @IsIn(['low', 'medium', 'high'])
   reasoningEffort?: 'high' | 'low' | 'medium';
 }

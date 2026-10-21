@@ -53,6 +53,7 @@ export interface AgentDraft {
 }
 
 interface AgentWorkspaceState {
+  availableModelAliases: string[];
   customAgents: AgentCatalogItem[];
   drafts: AgentDraft[];
   error: string;
@@ -69,6 +70,7 @@ let activeAgentStreamController: AbortController | null = null;
 
 function emptyWorkspaceState(): AgentWorkspaceState {
   return {
+    availableModelAliases: [],
     customAgents: [],
     drafts: [],
     error: '',
@@ -155,6 +157,7 @@ function loadWorkspaceState(): AgentWorkspaceState {
     const parsedState = JSON.parse(rawState) as Partial<AgentWorkspaceState>;
 
     return {
+      availableModelAliases: [],
       customAgents: Array.isArray(parsedState.customAgents) ? parsedState.customAgents : [],
       drafts: Array.isArray(parsedState.drafts) ? parsedState.drafts : [],
       favoriteAgentIds: Array.isArray(parsedState.favoriteAgentIds)
@@ -210,6 +213,29 @@ function buildAgentSystemPrompt(agent: AgentCatalogItem): string {
     .join('\n');
 }
 
+/**
+ * 解析智能体对话实际使用的模型别名：
+ * - 智能体配置了预设别名且可用（或模型列表加载失败）时，预设优先；
+ * - 预设无效（被下线/写错）时回退到会话或全局选择，避免整个对话失败。
+ */
+export function resolveAgentModelAlias(
+  agent: Pick<AgentCatalogItem, 'modelAlias'>,
+  fallbackAlias: string,
+  availableAliases: string[],
+): string {
+  const preset = agent.modelAlias?.trim();
+
+  if (!preset) {
+    return fallbackAlias;
+  }
+
+  if (availableAliases.length === 0 || availableAliases.includes(preset)) {
+    return preset;
+  }
+
+  return fallbackAlias;
+}
+
 function cleanList(items: string[]): string[] {
   return items.map((item) => item.trim()).filter(Boolean);
 }
@@ -246,11 +272,15 @@ function catalogItemToSaveInput(agent: AgentCatalogItem): SaveAgentInput {
     description: agent.description.trim(),
     glyph: agent.glyph.trim().slice(0, 1) || name.slice(0, 1) || '智',
     id: agent.id,
+    inputMode: agent.inputMode,
     instructions: agent.instructions?.trim() ?? '',
+    maxTokens: agent.maxTokens,
+    modelAlias: agent.modelAlias,
     name,
     opening: agent.opening.trim(),
     starterPrompts: cleanList(agent.starterPrompts),
     tags: cleanList(agent.tags),
+    temperature: agent.temperature,
   };
 }
 
@@ -262,12 +292,16 @@ function persistedAgentToCatalogItem(agent: PersistedAgent): AgentCatalogItem {
     description: agent.description,
     glyph: agent.glyph,
     id: agent.id,
+    inputMode: agent.inputMode ?? undefined,
     instructions: agent.instructions,
+    maxTokens: agent.maxTokens ?? undefined,
+    modelAlias: agent.modelAlias ?? undefined,
     name: agent.name,
     opening: agent.opening,
     rating: agent.rating,
     starterPrompts: [...agent.starterPrompts],
     tags: [...agent.tags],
+    temperature: agent.temperature ?? undefined,
     usage: agent.usage,
   };
 }
@@ -381,6 +415,8 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
 
         const models = modelsResult.value;
 
+        this.availableModelAliases = models.map((model) => model.alias);
+
         if (!models.some((model) => model.alias === this.modelAlias)) {
           this.modelAlias = models[0]?.alias ?? '';
         }
@@ -453,8 +489,13 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
       await this.initialize();
 
       const sessionStore = useSessionStore();
+      const resolvedModelAlias = resolveAgentModelAlias(
+        agent,
+        session.modelAlias || this.modelAlias,
+        this.availableModelAliases,
+      );
 
-      if (!sessionStore.authenticated || !this.modelAlias) {
+      if (!sessionStore.authenticated || !resolvedModelAlias) {
         this.error = this.error || '请先登录后再发送消息';
         this.status = 'error';
         return session;
@@ -494,8 +535,10 @@ export const useAgentWorkspaceStore = defineStore('agent-workspace', {
           {
             content: normalized,
             conversationId: session.conversationId ?? undefined,
-            modelAlias: session.modelAlias || this.modelAlias,
+            maxTokens: agent.maxTokens,
+            modelAlias: resolvedModelAlias,
             systemPrompt: buildAgentSystemPrompt(agent),
+            temperature: agent.temperature,
           },
           {
             onDelta: (event) => {

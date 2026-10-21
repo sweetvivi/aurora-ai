@@ -1730,16 +1730,16 @@ function goToPage(page: number): void {
 
 .agents-tabs button {
   display: inline-flex;
-  height: 34px;
+  height: 36px;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 0 12px;
+  padding: 0 13px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: #68726d;
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 760;
   white-space: nowrap;
   cursor: pointer;
@@ -1752,12 +1752,12 @@ function goToPage(page: number): void {
 }
 
 .agents-tabs button span {
-  min-width: 15px;
-  padding: 1px 4px;
+  min-width: 18px;
+  padding: 2px 6px;
   border-radius: 999px;
   background: #e5f5ee;
   color: #169c66;
-  font-size: 7px;
+  font-size: 11px;
 }
 
 .agents-search {
@@ -1783,7 +1783,7 @@ function goToPage(page: number): void {
   outline: 0;
   background: transparent;
   color: #39423e;
-  font-size: 10px;
+  font-size: 13px;
 }
 
 .agents-search input::placeholder {
@@ -1797,7 +1797,7 @@ function goToPage(page: number): void {
   border-radius: 4px;
   background: #f7f9f8;
   color: #9aa29e;
-  font-size: 7px;
+  font-size: 10px;
 }
 
 .agents-hot-search {
@@ -1817,7 +1817,7 @@ function goToPage(page: number): void {
 .agents-hot-search span {
   flex: 0 0 auto;
   color: #929b96;
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .agents-hot-search button {
@@ -1826,7 +1826,7 @@ function goToPage(page: number): void {
   border: 0;
   background: transparent;
   color: #3267d8;
-  font-size: 8px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
@@ -1864,33 +1864,33 @@ function goToPage(page: number): void {
 
 .agents-categories > header strong {
   color: #46504b;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .agents-categories > header span {
   color: #9ca49f;
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .agents-categories nav {
   display: grid;
-  gap: 3px;
-  padding: 8px;
+  gap: 6px;
+  padding: 10px;
 }
 
 .agents-categories nav button {
   display: flex;
   min-width: 0;
-  min-height: 37px;
+  min-height: 44px;
   align-items: center;
   justify-content: space-between;
-  gap: 9px;
-  padding: 0 10px;
+  gap: 10px;
+  padding: 0 12px;
   border: 0;
   border-radius: 7px;
   background: transparent;
   color: #68726d;
-  font-size: 9px;
+  font-size: 14px;
   text-align: left;
   cursor: pointer;
 }
@@ -1917,13 +1917,13 @@ function goToPage(page: number): void {
 
 .agents-categories nav button :deep(svg) {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: 15px;
 }
 
 .agents-categories nav button em {
   flex: 0 0 auto;
   color: #9ba39f;
-  font-size: 8px;
+  font-size: 12px;
   font-style: normal;
 }
 
@@ -1946,19 +1946,19 @@ function goToPage(page: number): void {
 .agents-results__heading h2 {
   margin: 0;
   color: #29332e;
-  font-size: 15px;
+  font-size: 18px;
 }
 
 .agents-results__heading p {
   margin: 5px 0 0;
   color: #8d9691;
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .agents-results__heading > span {
   flex: 0 0 auto;
   color: #8e9792;
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .agents-grid {
@@ -1970,7 +1970,7 @@ function goToPage(page: number): void {
 .agent-card {
   display: grid;
   min-width: 0;
-  min-height: 232px;
+  min-height: 258px;
   align-content: space-between;
   padding: 15px 16px 16px;
   border: 1px solid #e3e9e6;
@@ -2001,12 +2001,12 @@ function goToPage(page: number): void {
 
 .agent-card__avatar {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   place-items: center;
   border-radius: 10px;
   color: #fff;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 850;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
 }
@@ -2020,7 +2020,7 @@ function goToPage(page: number): void {
 .agent-card__header strong {
   overflow: hidden;
   color: #2e3732;
-  font-size: 12.5px;
+  font-size: 15px;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2028,11 +2028,11 @@ function goToPage(page: number): void {
 
 .agent-card__header > div > span {
   width: max-content;
-  padding: 2px 5px;
+  padding: 3px 7px;
   border-radius: 4px;
   background: #e8f7f0;
   color: #1ca96d;
-  font-size: 6px;
+  font-size: 10px;
   font-weight: 800;
 }
 
@@ -2069,10 +2069,10 @@ function goToPage(page: number): void {
 .agent-card__metrics {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   margin-top: 14px;
   color: #8b9490;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .agent-card__metrics span {
@@ -2083,11 +2083,11 @@ function goToPage(page: number): void {
 }
 
 .agent-card__metrics span:first-child {
-  min-width: 47px;
+  min-width: 56px;
 }
 
 .agent-card__metrics span:last-child {
-  min-width: 54px;
+  min-width: 64px;
 }
 
 .agent-card__metrics :deep(svg:first-child) {
@@ -2096,12 +2096,12 @@ function goToPage(page: number): void {
 
 .agent-card > p {
   display: -webkit-box;
-  min-height: 47px;
+  min-height: 62px;
   overflow: hidden;
   margin: 14px 0 0;
   color: #77817c;
-  font-size: 10px;
-  line-height: 1.6;
+  font-size: 12.5px;
+  line-height: 1.65;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
@@ -2109,16 +2109,67 @@ function goToPage(page: number): void {
 .agent-card > footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
   margin-top: 14px;
 }
 
 .agent-card > footer span {
-  padding: 3px 6px;
+  padding: 3px 8px;
   border-radius: 4px;
   background: #f3f5f4;
   color: #848d88;
-  font-size: 7px;
+  font-size: 11px;
+}
+
+.agents-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 20px;
+}
+
+.agents-pagination button {
+  display: grid;
+  min-width: 34px;
+  height: 34px;
+  place-items: center;
+  padding: 0 9px;
+  border: 1px solid #e3e9e6;
+  border-radius: 7px;
+  background: #fff;
+  color: #68726d;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    background 150ms ease;
+}
+
+.agents-pagination button:hover:not(:disabled):not(.active) {
+  border-color: #a9d8c3;
+  color: #169c66;
+}
+
+.agents-pagination button.active {
+  border-color: #19a96e;
+  background: #19a96e;
+  color: #fff;
+}
+
+.agents-pagination button:disabled {
+  color: #c3cbc7;
+  cursor: not-allowed;
+}
+
+.agents-pagination > span {
+  padding: 0 2px;
+  color: #9ca49f;
+  font-size: 13px;
 }
 
 .agents-empty {
@@ -2149,29 +2200,29 @@ function goToPage(page: number): void {
 
 .agents-empty strong {
   color: #46504b;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .agents-empty p {
   max-width: 320px;
   margin: 0;
   color: #929b96;
-  font-size: 8px;
+  font-size: 12px;
   line-height: 1.65;
 }
 
 .agents-empty button {
   display: inline-flex;
-  height: 32px;
+  height: 34px;
   align-items: center;
   gap: 5px;
   margin-top: 4px;
-  padding: 0 11px;
+  padding: 0 13px;
   border: 0;
   border-radius: 7px;
   background: #159c66;
   color: #fff;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 750;
   cursor: pointer;
 }
@@ -2201,26 +2252,26 @@ function goToPage(page: number): void {
 
 .agents-callout strong {
   color: #35413b;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .agents-callout p {
   margin: 5px 0 0;
   color: #7f8a84;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .agents-callout button {
   display: inline-flex;
-  height: 34px;
+  height: 36px;
   align-items: center;
   gap: 6px;
-  padding: 0 13px;
+  padding: 0 14px;
   border: 1px solid #9fd3bc;
   border-radius: 7px;
   background: #fff;
   color: #168d5f;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 780;
   cursor: pointer;
 }
@@ -2540,7 +2591,7 @@ function goToPage(page: number): void {
 
 .agent-builder-card {
   display: grid;
-  min-height: 244px;
+  min-height: 264px;
   overflow: hidden;
   grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
   border: 1px solid #e3ebe7;
@@ -2552,7 +2603,7 @@ function goToPage(page: number): void {
 .agent-builder-preview {
   position: relative;
   display: grid;
-  min-height: 244px;
+  min-height: 264px;
   place-items: center;
   overflow: hidden;
   padding: 24px;
@@ -2586,7 +2637,7 @@ function goToPage(page: number): void {
 
 .agent-builder-preview__eyebrow {
   color: #42556c;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 780;
 }
 
@@ -2610,14 +2661,14 @@ function goToPage(page: number): void {
 }
 
 .agent-builder-preview__window > button {
-  min-height: 26px;
+  min-height: 28px;
   margin-top: 3px;
   border: 0;
   border-radius: 6px;
   background: linear-gradient(90deg, #4f9cf7, #72b8ff);
   color: #fff;
   font: inherit;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -2632,7 +2683,7 @@ function goToPage(page: number): void {
 
 .agent-builder-card__copy > span {
   color: #232c28;
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 880;
 }
 
@@ -2640,7 +2691,7 @@ function goToPage(page: number): void {
   max-width: 260px;
   margin: 10px 0 0;
   color: #69746e;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   line-height: 1.75;
 }
@@ -2651,7 +2702,7 @@ function goToPage(page: number): void {
   margin: 14px 0 0;
   padding: 0;
   color: #5b6862;
-  font-size: 10px;
+  font-size: 12.5px;
   list-style: none;
 }
 
@@ -2673,17 +2724,17 @@ function goToPage(page: number): void {
 .agent-builder-card__copy > button {
   display: inline-flex;
   width: fit-content;
-  min-height: 38px;
+  min-height: 40px;
   align-items: center;
   gap: 6px;
   margin-top: 18px;
-  padding: 0 16px;
+  padding: 0 18px;
   border: 1px solid #25a466;
   border-radius: 7px;
   background: #28b574;
   color: #fff;
   font: inherit;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 7px 16px rgb(39 173 112 / 18%);
@@ -2732,14 +2783,14 @@ function goToPage(page: number): void {
   position: absolute;
   z-index: 2;
   display: grid;
-  width: 68px;
-  min-height: 34px;
+  width: 72px;
+  min-height: 36px;
   place-items: center;
   border: 1px solid #d8e8f5;
   border-radius: 6px;
   background: #fff;
   color: #3f5b70;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   box-shadow: 0 6px 14px rgb(58 113 156 / 10%);
 }
@@ -2802,7 +2853,7 @@ function goToPage(page: number): void {
   gap: 10px;
   margin: 24px 0 10px;
   color: #6f7c75;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 780;
 }
 
@@ -2962,12 +3013,12 @@ function goToPage(page: number): void {
 .agent-home__tabs button {
   position: relative;
   flex: 0 0 auto;
-  padding: 8px 13px 11px;
+  padding: 8px 14px 11px;
   border: 0;
   background: transparent;
   color: #53605a;
   font: inherit;
-  font-size: 11px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -3053,7 +3104,7 @@ function goToPage(page: number): void {
 .agent-home-history__header p {
   margin: 4px 0 0;
   color: #8b9691;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .agent-home-history__header > button {
@@ -3103,7 +3154,7 @@ function goToPage(page: number): void {
   background: transparent;
   color: #344039;
   font: inherit;
-  font-size: 10px;
+  font-size: 13px;
 }
 
 .agent-home-history__search input::placeholder {
@@ -3111,12 +3162,12 @@ function goToPage(page: number): void {
 }
 
 .agent-home-history__search > span {
-  min-width: 20px;
-  padding: 2px 5px;
+  min-width: 22px;
+  padding: 2px 6px;
   border-radius: 999px;
   background: #f0f4f2;
   color: #87928c;
-  font-size: 8px;
+  font-size: 10px;
   text-align: center;
 }
 
@@ -3134,7 +3185,7 @@ function goToPage(page: number): void {
 .agent-home-history__groups h3 {
   margin: 10px 0 7px;
   color: #909b95;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 760;
 }
 
@@ -3195,13 +3246,13 @@ function goToPage(page: number): void {
 
 .agent-home-history__copy strong {
   color: #303a35;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .agent-home-history__copy em {
   margin-top: 3px;
   color: #168d5f;
-  font-size: 8px;
+  font-size: 10px;
   font-style: normal;
   font-weight: 700;
 }
@@ -3209,7 +3260,7 @@ function goToPage(page: number): void {
 .agent-home-history__copy p {
   margin: 4px 0 0;
   color: #8c9691;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .agent-home-history__meta {
@@ -3220,7 +3271,7 @@ function goToPage(page: number): void {
 }
 
 .agent-home-history__meta time {
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .agent-home-history__meta :deep(svg) {
@@ -3250,27 +3301,27 @@ function goToPage(page: number): void {
 .agent-home-history__empty strong {
   margin-top: 14px;
   color: #35413b;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .agent-home-history__empty p {
   max-width: 260px;
   margin: 7px 0 0;
   color: #8d9892;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.7;
 }
 
 .agent-home-history__empty button {
-  height: 30px;
+  height: 32px;
   margin-top: 12px;
-  padding: 0 12px;
+  padding: 0 13px;
   border: 1px solid #dce8e2;
   border-radius: 7px;
   background: #fff;
   color: #168d5f;
   font: inherit;
-  font-size: 9px;
+  font-size: 11px;
   cursor: pointer;
 }
 
@@ -3319,7 +3370,7 @@ function goToPage(page: number): void {
   background: transparent;
   color: #168d5f;
   font: inherit;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 780;
   cursor: pointer;
 }
@@ -3332,7 +3383,7 @@ function goToPage(page: number): void {
 
 .agent-showcase-card {
   display: grid;
-  min-height: 154px;
+  min-height: 170px;
   overflow: hidden;
   grid-template-columns: minmax(0, 1fr) minmax(108px, 1.06fr);
   border: 1px solid #e5ebe8;
@@ -3359,14 +3410,14 @@ function goToPage(page: number): void {
   min-width: 0;
   align-content: space-between;
   gap: 12px;
-  padding: 13px 12px 11px;
+  padding: 14px 13px 12px;
 }
 
 .agent-showcase-card__copy strong {
   display: -webkit-box;
   overflow: hidden;
   color: #343d39;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
   line-height: 1.52;
   -webkit-box-orient: vertical;
@@ -3383,7 +3434,7 @@ function goToPage(page: number): void {
   background: transparent;
   color: #6b7771;
   font: inherit;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 650;
   cursor: pointer;
 }

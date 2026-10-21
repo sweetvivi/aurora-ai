@@ -1,11 +1,16 @@
+import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsIn,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 export class CreateAgentDto {
@@ -36,6 +41,32 @@ export class CreateAgentDto {
   @IsString()
   @MaxLength(500)
   opening?: string;
+
+  @IsOptional()
+  @IsIn(['chat', 'form', 'wizard'])
+  inputMode?: 'chat' | 'form' | 'wizard';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(256)
+  @Max(32_768)
+  maxTokens?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  @Matches(/^[a-zA-Z0-9._-]*$/, {
+    message: '模型别名只能包含字母、数字、点、下划线和连字符',
+  })
+  modelAlias?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(2)
+  temperature?: number;
 
   @IsOptional()
   @IsArray()

@@ -29,7 +29,7 @@ vi.mock('@/app/api', async () => {
 });
 
 import { getAgentById } from '@/data/agents';
-import { useAgentWorkspaceStore } from './agent-workspace';
+import { resolveAgentModelAlias, useAgentWorkspaceStore } from './agent-workspace';
 import { useSessionStore } from './session';
 
 const authenticatedUser = {
@@ -634,5 +634,154 @@ describe('agent workspace store', () => {
       }),
     ]);
     expect(apiMocks.streamChat).toHaveBeenCalledTimes(2);
+  });
+
+  it('applies agent preset params to the chat request', async () => {
+    const agent = {
+      ...getAgentById('code-mentor')!,
+      maxTokens: 4096,
+      modelAlias: 'openai-gpt-6-astra',
+      temperature: 0.2,
+    };
+
+    apiMocks.streamChat.mockImplementation(
+      async (
+        input: {
+          content: string;
+          maxTokens?: number;
+          modelAlias?: string;
+          systemPrompt?: string;
+          temperature?: number;
+        },
+        handlers: {
+          onDelta: (event: { content: string }) => void;
+          onDone: (event: { assistantMessageId: string; balance: number }) => void;
+          onMeta: (event: {
+            assistantMessageId: string;
+            balance: number;
+            conversationId: string;
+            modelAlias: string;
+            pointsCost: number;
+          }) => void;
+        },
+      ) => {
+        expect(input).toMatchObject({
+          content: '解释这段代码',
+          maxTokens: 4096,
+          modelAlias: 'openai-gpt-6-astra',
+          temperature: 0.2,
+        });
+
+        handlers.onMeta({
+          assistantMessageId: 'assistant-preset-1',
+          balance: 98,
+          conversationId: 'conversation-preset-1',
+          modelAlias: 'openai-gpt-6-astra',
+          pointsCost: 1,
+        });
+        handlers.onDelta({ content: '这是' });
+        handlers.onDelta({ content: '答案。' });
+        handlers.onDone({ assistantMessageId: 'assistant-preset-1', balance: 98 });
+      },
+    );
+
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+    const store = useAgentWorkspaceStore();
+
+    await store.initialize();
+    const session = await store.sendMessage(agent, '解释这段代码');
+
+    expect(session.modelAlias).toBe('openai-gpt-6-astra');
+    expect(session.messages[1]).toMatchObject({
+      content: '这是答案。',
+      status: 'COMPLETED',
+    });
+  });
+
+  it('falls back to the selected model when the agent preset alias is unavailable', async () => {
+    const agent = {
+      ...getAgentById('code-mentor')!,
+      modelAlias: 'retired-model-alias',
+    };
+
+    apiMocks.streamChat.mockImplementation(
+      async (
+        input: { modelAlias?: string },
+        handlers: {
+          onDelta: (event: { content: string }) => void;
+          onDone: (event: { assistantMessageId: string; balance: number }) => void;
+          onMeta: (event: {
+            assistantMessageId: string;
+            balance: number;
+            conversationId: string;
+            modelAlias: string;
+            pointsCost: number;
+          }) => void;
+        },
+      ) => {
+        expect(input.modelAlias).toBe('openai-gpt-6-astra');
+
+        handlers.onMeta({
+          assistantMessageId: 'assistant-fallback-1',
+          balance: 97,
+          conversationId: 'conversation-fallback-1',
+          modelAlias: 'openai-gpt-6-astra',
+          pointsCost: 1,
+        });
+        handlers.onDelta({ content: '回退成功' });
+        handlers.onDone({ assistantMessageId: 'assistant-fallback-1', balance: 97 });
+      },
+    );
+
+    const sessionStore = useSessionStore();
+    sessionStore.$patch({
+      status: 'authenticated',
+      user: authenticatedUser,
+    });
+    const store = useAgentWorkspaceStore();
+
+    await store.initialize();
+    const session = await store.sendMessage(agent, '解释这段代码');
+
+    expect(session.modelAlias).toBe('openai-gpt-6-astra');
+    expect(session.messages[1]).toMatchObject({ content: '回退成功' });
+  });
+});
+
+describe('resolveAgentModelAlias', () => {
+  it('prefers the agent preset when the alias is available', () => {
+    expect(
+      resolveAgentModelAlias({ modelAlias: 'qwen-3-8-max' }, 'openai-gpt-6-astra', [
+        'openai-gpt-6-astra',
+        'qwen-3-8-max',
+      ]),
+    ).toBe('qwen-3-8-max');
+  });
+
+  it('falls back when the preset alias is not in the model list', () => {
+    expect(
+      resolveAgentModelAlias({ modelAlias: 'retired-alias' }, 'openai-gpt-6-astra', [
+        'openai-gpt-6-astra',
+      ]),
+    ).toBe('openai-gpt-6-astra');
+  });
+
+  it('passes the preset through when the model list failed to load', () => {
+    expect(resolveAgentModelAlias({ modelAlias: 'qwen-3-8-max' }, 'openai-gpt-6-astra', [])).toBe(
+      'qwen-3-8-max',
+    );
+  });
+
+  it('uses the fallback when no preset is configured', () => {
+    expect(resolveAgentModelAlias({}, 'openai-gpt-6-astra', ['openai-gpt-6-astra'])).toBe(
+      'openai-gpt-6-astra',
+    );
+    expect(
+      resolveAgentModelAlias({ modelAlias: '   ' }, 'openai-gpt-6-astra', ['openai-gpt-6-astra']),
+    ).toBe('openai-gpt-6-astra');
   });
 });

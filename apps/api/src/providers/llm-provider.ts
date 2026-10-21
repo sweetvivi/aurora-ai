@@ -19,6 +19,7 @@ export interface ChatMessage {
 }
 
 export interface StreamChatRequest {
+  maxTokens?: number;
   messages: ChatMessage[];
   model: string;
   providerCode?: string;
