@@ -48,3 +48,6 @@ research/session/
 
 # Generated inspection artifacts
 outputs/
+
+# Local agent scratch/memory (machine-specific, not project source)
+.workbuddy/

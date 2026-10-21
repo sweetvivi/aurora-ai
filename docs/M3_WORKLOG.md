@@ -593,3 +593,255 @@
 - 新增 D-042：明确主开发工具可因上游可用性切换，D-033 的三档执行规则与红线继续适用于任何接管工具，并把「只在上一工具明确收工后提交」写入约束
 - 修正 `docs/PROJECT_CONTEXT.md` 中「本次交接另修改了 6 个文档，尚未提交」这句会在提交后失效的描述，改为记录交接文档已提交
 - 本轮只改文档，未修改业务代码、未读取或记录任何 Key/Token/Cookie、未调用真实第三方接口，因此未运行 `pnpm test` 和 `pnpm build`
+
+## 52. 2026-10-20 AI 画布视觉收口（聚焦单模块）
+
+- 环境限制：本机 Docker 依赖 WSL，`wsl.exe` 被沙箱 Program Blacklist 拦截，Docker Desktop 与 `initdb.exe` 均无法启动，真实 PostgreSQL/Redis 与 Nest API 在本轮不可用；改用 `outputs/runtime/mock-api.mjs`（端口 3006，只模拟 dev-login / image-tasks / video-tasks / canvas-workflows）+ vite（`node node_modules/vite/bin/vite.js`，端口 5173）做设计预览，`modules/display` 与 `models` 故意不模拟，由前端回退内置目录
+- 参考素材重定位：`outputs/ui-reference/live-reference/canvas.png` 与 `reference-canvas.png` 都被登录弹窗遮挡，改用 `Desktop/参考网站截图合集/AI画布参考样图1.png`（节点+创作区特写）和 `参考网站AI画布点击图片创建工作流的状态.png`（整页）
+- 现状核对：节点本身已接近参考产品（无内嵌 header、`8px` 圆角、外部 `11px` 灰色 `Image` 标签、圆点端口 + 加号），真正差距在点阵亮度、顶栏控件、创作区控件形态
+- 修改 `CanvasStudioView.vue`：点阵 `70% → 34%`（灵感态 `56% → 30%`）；保存态胶囊改为仅在 `saving/error` 渲染；网格按钮改为金色圆形；「展开」移到上右角；字数统计改为有输入才显示；发送按钮改白色圆形 + `ArrowUpOutlined` + 金色积分角标；模型下拉加紫色菱形品牌块；占位文案改「您想」
+- 交互冒烟：空态计数隐藏、发送禁用、高度 `168`；输入后计数 `9 / 1000`、发送启用、角标 `5`；展开后高度 `300`、标签「收起」
+- 验证：`prettier --check`、`oxlint --deny-warnings`、`vue-tsc --noEmit` 通过（`pnpm` 不在 PATH，改为直接调用 `node_modules` 下的二进制）；桌面 `1440x1000` 与移动 `390x844` 无横向溢出、无页面脚本错误
+- 未执行：`pnpm test` 与 `pnpm build` 未跑（本轮只改模板与样式，且 `pnpm` 不可用）；真实生图/生视频链路未验证（无后端）
+- 本轮未读取、输出或记录任何 Key/Token/Cookie，未访问参考产品，未消耗参考产品积分
+
+- 用户反馈追加：创作输入区不应常驻。参考产品默认看不到底部输入框，只有点中画布素材才弹出。新增 `composerVisible`（有锚点节点或正在提交时为真）并用 `v-show` 控制，取消选中即隐藏、草稿保留；补 `watch(composerVisible)` 在重新显示后调用 `syncComposerSize()`，否则锚点会按 0 宽高计算。验证：默认隐藏 → 点节点后出现在节点下方 18px（桌面 y=324 / 节点底 306）→ 点空白隐藏 → 重选草稿仍在；移动端 390x844 出现在 (70,362)、306x154、无横向溢出
+
+## 53. 2026-10-20 AI 画布视口深度（输入区下沉、网格随缩放、10% 下限）
+
+- 用户反馈三点：① 素材下方的创作输入区一旦超出屏幕不应继续浮在视口内，而应像素材框一样固定跟着素材一起下沉，超出视口的部分被遮挡；② 参考产品画布极大，可视界面完全看不到边界；③ 参考产品缩放最小 10%，该倍率下画布的点已经看不见（对照 `参考网站截图合集/参考网站AI画布的Zoom视口比较图（在该大小画布的点已经看不到了）.png`）
+- 输入区定位去掉垂直方向的 `Math.min(top, boardHeight - height - margin)` 夹取，`top` 恒等于 `viewport.y + (node.y + node.height) * scale + 18`；水平方向仍保留边界保护，避免整块移出视口后点不到发送按钮。实测：素材底 `939` → 输入框顶 `957`（间距 18px），输入框底 `1125` 已超出 1000 高视口，超出部分被 `.canvas-workspace` 的 `overflow: hidden` 裁掉
+- 网格改到世界坐标：新增 `canvasGridStyle` 计算 `--canvas-grid-size`（`22 * scale`）、`--canvas-grid-x/y`（等于 `viewport.x/y`）、`--canvas-grid-alpha`（基础 0.34 乘淡出系数）；点距 9px 及以上保持原不透明度，4px 以下线性淡到 0，`alpha <= 0.005` 时直接写 `backgroundImage: none`，避免密集重复渐变产生摩尔纹
+- 缩放下限 `clampCanvasZoom` 从 `0.25` 改为 `0.1`，滑杆 `min` 从 `25` 改为 `10`；画布世界从 `3400x2200` 扩到 `8000x6000`，10% 时视口内看不到工作区边界
+- 验证数据：初始 100%（`size 22px`、`alpha 0.340`、`backgroundPosition 30px 52px`）；缩到 10%（`size 2.20px`、`alpha 0`、`backgroundImage none`、标签 10%）；拉回 100% 时内联 `backgroundImage` 被移除、样式完全恢复；移动端 390x844 选中素材后输入框 `(70,527)` 宽 306、间距 18px，10% 时同样 `backgroundImage none`、`documentElement.scrollWidth 390` 无横向溢出
+- 质量门：`prettier --check`、`oxlint --deny-warnings`、`vue-tsc --noEmit` 全过；本轮只改 `CanvasStudioView.vue`，未跑 `pnpm test` / `pnpm build`
+- 本轮未读取、输出或记录任何 Key/Token/Cookie，未调用真实第三方接口；`outputs/runtime/mock-api-store.json` 的测试数据在验收后清空，保证下次打开是默认工作流
+
+## 54. 2026-10-20 移动端适配暂停与真实后端恢复
+
+- 用户决定：**暂时不做移动端适配**，把已完成的移动端工作记录下来并暂停，后续新改动只按桌面 `1440x1000` 验收
+- 已完成的移动端工作（截至暂停点，均已在 `390x844` 下实测）：
+  - 全局：五套 Shell 的移动底栏与抽屉导航、模块展示配置驱动移动入口；各主要页面无横向溢出（`documentElement.scrollWidth` 等于视口宽）
+  - AI 画布：窄屏首次进入的节点可见性验收（`m2-canvas-mobile-fit.png`，4 节点中 2 个可见，`ratio 0.5`）；创作输入区在移动端点选素材后出现在素材下方 18px，尺寸 `306x154`、坐标 `(70,362)`；本轮视口深度改动后复测为 `(70,527)`、宽 306、间距 18px，10% 缩放下同样 `backgroundImage: none`、无横向溢出
+  - 视频工作台、图片生成、智能修图、超级智能体、智能对话：均做过 `390x844` 回归（见第 47、48、49 节）
+- 暂停期间的约定：
+  - 新功能与视觉调整只保证桌面端，不再补写移动断点，也不把移动端问题当作阻塞项
+  - 若某改动会破坏现有移动断点，允许先把该断点里的相关声明一并删除（沿用第 49 节视频模型栏的做法），但需在提交说明里写明
+  - 恢复移动端时，优先处理：画布工具栏在窄屏的收折方式、创作输入区宽度与键盘遮挡、底部导航与浮动面板的层级冲突
+- 真实链路恢复（同日）：Docker 引擎在本机可用后，`compose.yaml` 的 `postgres` 与 `redis` 容器已 `Up (healthy)`（`127.0.0.1:5432`、`6379`），`prisma migrate deploy` 显示 12 个迁移全部已应用，库内保留历史数据（`users 12`、`canvas_workflows 4`、`image_tasks 15`、`file_assets 26`）
+- 因 `nest start` 会清空 `dist`（312 个文件）被安全策略拦截，改用 `node dist/main.js` 启动已编译产物；`GET /api/v1/health` 返回 `database: up, redis: up`
+- 前端 `apps/web/.env.local` 的 `WEB_API_PROXY_TARGET` 从 `http://127.0.0.1:3006` 改回 `http://127.0.0.1:3001`，`outputs/runtime/mock-api.mjs` 退出，画布、登录、工作流全部走真实 Nest + PostgreSQL
+- 根目录新建本地 `.env`（`.gitignore` 已忽略），由 `.env.example` 复制并把 `AUTH_TOKEN_SECRET` 换成随机 48 位；LLM/IMAGE/VIDEO 的 Key 全部留空，按 D-040 走 Mock，不读取 `本地密钥文件`
+- 本轮未调用任何真实付费接口，未读取、输出或记录任何 Key/Token/Cookie
+- 画布首屏空态（同日追加）：用户确认默认应是空画布，而不是前端内置的 4 个假素材节点。`createSeedCanvas()` 拆成两个函数——`createBlankCanvas()` 返回空文档，供 `loadCanvas()` 首次进入和 `createCanvas()` 新建使用；`createTemplateCanvas()` 保留原演示节点，只给「工作流」面板按模板节点数生成，不再进默认画布
+- 补空态引导 `.canvas-empty`：居中图标 + 「画布还是空的」+ 说明 + 两个入口「上传素材」（`beginCanvasUpload`）与「添加创作节点」（`addPromptNode`）；容器 `pointer-events: none` 保证不挡画布平移，只有按钮区 `pointer-events: auto`
+- 验证：新建后 `nodes 0 / emptyVisible true / composerVisible false / zoom 100%`；点「添加创作节点」后 `nodes 1 / emptyVisible false`；再次新建回到空态；工作流面板载入「4 个节点」模板仍正常（`nodes 4 / emptyVisible false`）；`scrollWidth 1440` 无横向溢出
+
+## 55. 2026-10-20 真实上游联调（对话 / 生图 / 视频）
+
+- 用户授权读取 `本地密钥文件`，按注释把 6 组配置映射进根目录 `.env`（`.gitignore` 第 2 行已忽略，不会进仓库）：`LLM_API_KEY`=第 6 组 gpt、`LLM_DEEPSEEK_API_KEY`=第 2 组 ds、`LLM_QWEN_API_KEY`=第 4 组千问、`IMAGE_API_KEY`=第 1 组生图、`IMAGE_FALLBACK_API_KEY`=第 3 组生图 2、`VIDEO_API_KEY`=grok 组；所有 base url 为 `https://api.example.com/v1`
+- 解析脚本 `outputs/runtime/apply-api-keys.cjs` 只打印掩码；坑：文件里「4（实际是grok）」标题没有点号，按行首 `数字+点` 解析会把 grok key 并进「生图测试2」那一节，所以 grok key 取该节 `keys[1]`
+- `/v1/models` 探测（只读）：`LLM_API_KEY` 20 个模型含 `gpt-6-astra`、`gpt-5.5`；`LLM_DEEPSEEK_API_KEY` 4 个含 `deepseek-v4-pro-0813`、`deepseek-v4.1-flash`、`deepseek-v4.1-flash-0910`；`LLM_QWEN_API_KEY` 含 `qwen3.8-max/flash/27b/max-0902`；`IMAGE_API_KEY` 只有 `gpt-image-*`（含 `gpt-image-2.5`）；`VIDEO_API_KEY` 只有 `grok-imagine-video` 与 `-1.5`
+- 对话：`openai-gpt-6-astra` 真实流式返回「真实链路通了」（3.9s）；`qwen3.8-max` 正常；`deepseek-v4-pro-0813` 返回 429 `All available accounts are currently rate-limited`（上游账号池限流，不是密钥或配置问题），同一密钥改用 `deepseek-v4.1-flash` 返回 200
+- 生图：`POST /image-tasks` 必须带 `Idempotency-Key`（前端 `api.ts` 用的是大写，已覆盖），任务 `SUCCEEDED`，积分 52→47，产出真实 PNG 2.7MB，图像内容与 prompt 一致（橘猫 + 雪窗）
+- 视频：首次跑 `xai-grok-imagine-video` 判为 `VIDEO_GENERATION_FAILED`，但用 `providerRequestId` 直接查上游是 `{"status":"done"}`，定位为 `xai-video.provider.ts` 的下载缺陷——上游给的是相对地址 `/v1/videos/<id>/content`，原实现直接 `fetch(相对地址)` 抛 URL 解析错误，且没带 `Authorization`（实测无鉴权返回 401，带 Bearer 返回 200 `video/mp4`）
+- 修复：新增 `resolveAbsoluteUrl()` 用 `new URL(url, base)` 解析相对地址，`downloadResult()` 增加 `apiKey` 参数并附加 `Bearer`；用 `tsc -p tsconfig.build.json` 直接覆盖 `dist`（`nest build` 会清空 dist 被 safe-delete 拦截），重启后重测 `SUCCEEDED`，积分 47→37，落盘 MP4 5.6MB
+- 不可用清单（本轮结论，交给用户换密钥）：`deepseek-v4-pro-0813` 上游限流；豆包系 `doubao-seedream-4-0`、`doubao-seedance-1-0-pro`、`doubao-seedance-2-0` 无对应密钥，且 `buildArkApiUrl()` 拼出的 `https://api.example.com/api/v3/images/generations` 实测 404（该网关没有火山方舟协议），选中这些模型会失败或回退 Mock
+- 本轮密钥只写入被忽略的 `.env`，未写进任何受版本控制的文件；未在任何输出中打印完整密钥
+- 验证：`tsc -p tsconfig.build.json` 通过；`/api/v1/health` 返回 `database: up, redis: up`
+
+## 56. 2026-10-20 图生图实测与画布图生视频缺口
+
+- 用户提问：能否做到「给猫图 + 指令加红帽子 → 只改帽子、其余保持原样」，以及画布素材节点如何做图生图/图生视频
+- 结论：图生图**已实现且实测通过**，链路是 `image-tasks.sourceFileId` → `task.sourceFile` → `sourceImages` → `OpenAiImageProvider.createPayload()` 判断 `sourceImages.length` 后走 `/images/edits`（multipart，单张字段 `image`、多张 `image[]`，附 `output_format=png`），不走 `/images/generations`
+- 实测：源图为上一轮生成的橘猫（fileId `cmvg260cs000dysqz8grmxf96`），指令「在这只橘猫的头上加一顶红色针织帽，其余内容（背景、姿态、光线）保持完全不变」，模型 `jiguang-gpt-image-2.5`，任务 `SUCCEEDED`，产物 `_real-image-edit.png` 2.7MB；帽子位置正确，窗外雪景、窗台、姿态与光线均保持一致，符合「按指令局部修改」的预期
+- 参数能力：当前支持 `model`、`prompt`、`n`、`size`（1K/2K/4K 映射到上游像素尺寸）、`quality`、`output_format`；多图参考通过 `referenceFileIds` 传 `image[]`（上限 13）；**未实现 mask 局部重绘**，保持原样主要靠 edits 接口与 prompt 约束
+- 画布侧：素材节点 → 图生图已接通（`prepareImageNodeGeneration()` → `createImageTask` 带 `sourceFileId`）；素材节点 → 图生视频**尚未接通**——`createVideoNodeFromSource()` 只创建 `kind='video'` 节点并把 `sourceFileId` 写进节点，但 `stores/draw-workspace.ts` 里没有任何 `createVideoTask` 调用（`grep -n "video"` 为空），所以该节点不会真正提交视频任务。视频的图生视频目前只在视频工作台可用（`stores/video-workspace.ts` 调 `createVideoTask`，后端 `video-tasks.service.ts` 用 `task.sourceFile` → `sourceImage` → xai provider 的 `payload.image`）
+- 模型列表事实核对：`GET /api/v1/models` 仍返回 14 个内置别名，其中 `doubao-seedream-4-0`、`doubao-seedance-1-0-pro`、`doubao-seedance-2-0` 依然在列表里（来自 `DEFAULT_MODELS`），画布创作区的模型下拉实测出现「Seedream 4.0」。这三个模型并未接入：无对应密钥，且 `buildArkApiUrl()` 拼出的 `https://api.example.com/api/v3/images/generations` 实测 404
+- 本轮未改代码，仅做真实验证；消耗 5 积分（37 → 32），未读取或输出任何密钥
+
+## 57. 2026-10-20 图生视频打通与新视频密钥
+
+- 用户新增第 7 组「生视频测试1」密钥（第 7 组），`/v1/models` 返回 4 个：`grok-imagine-image`、`grok-imagine-image-2.0`、`grok-imagine-video`、`grok-imagine-video-1.5`；已替换到 `.env` 的 `VIDEO_API_KEY`
+- 关键差异：**旧分组拒绝内联图片**（`image url must be http(s) or asset://; data URLs and uploads are not supported`），新分组接受 data URL；因此「素材传不过去、只有 prompt 生效」的根因不是包体大小，而是分组对图片字段的限制
+- 另一个坑：新分组带 `resolution` 会返回 422 `xAI upstream status 422`，去掉后 200；据此在 `XaiVideoProvider.createGeneration()` 里加「422 且带 resolution 就删掉重试一次」的兜底（422 不创建任务，不会重复扣费）
+- 首帧压缩：引入 `sharp`（`pnpm --filter @aurora/api add sharp`，`^0.35.5`），`prepareSourceImage()` 按 1280 长边 + JPEG 82 压缩，实测 2702KB → 246KB，日志 `Source image compressed 2702KB -> 246KB`
+- 结果下载：上游返回相对地址 `/v1/videos/<id>/content` 且需要 Bearer（无鉴权 401，带鉴权 200 `video/mp4`），新增 `resolveAbsoluteUrl()` 与 `downloadResult(url, signal, apiKey)`
+- 错误透传：`video-tasks.service.ts` 对 `VIDEO_*` 开头的错误优先使用原始 message，不再统一折叠成「视频生成失败，本次积分已退回」；实测能看到 `视频生成服务返回 HTTP 400：image url must be http(s) or asset://`
+- 画布接线：`CanvasStudioView` 中视频节点成为合法提交目标（`focusComposerForNode` 与 `submitComposer` 的 preparedTarget 兜底），提交走 `createVideoTask(..., idempotencyKey)`，新增 `scheduleVideoPoll()` 每 5 秒轮询、15 分钟超时，完成后把 `resultFileId` 与 `previewUrl` 写回节点
+- 模型清理：`DEFAULT_MODELS` 移除 `doubao-seedream-4-0`、`doubao-seedance-1-0-pro`、`doubao-seedance-2-0`（无密钥 + 网关无 `/api/v3`，实测 404），`/api/v1/models` 从 14 个降为 11 个；`model-registry.service.spec.ts` 的数量断言同步为 12/10/11，原来的 Seedance 注册用例改为「不再注册」，`test/video-tasks.e2e-spec.ts` 的 Seedance 用例改为「提交未注册模型返回 404」
+- 实测结果：API 直连图生视频 `SUCCEEDED`（积分 32 → 22，产出 6 秒 MP4，首帧就是戴红帽的橘猫）；画布端到端提交发出 `POST /api/v1/video-tasks`，body 含 `modelAlias: xai-grok-imagine-video`、`sourceFileId`、`parameters.duration=6`，节点进入「生成中」
+- 质量门：`tsc -p tsconfig.build.json`、`vue-tsc --noEmit`、`prettier`、`oxlint` 通过；API 全量 27 文件 116 项测试通过
+
+## 58. 2026-10-20 Grok 生图接入与模型能力分场景
+
+- 用户要求：接入 grok 生图；并且把「图生图 / 图生视频」的模型选择按真实能力区分（例如只能文生视频的 key 不能出现在图生视频的模型列表里）；整体检查 AI 绘画、图片生成、智能修图、视频、画布各处的模型选择
+- 探测结论（新视频分组「生视频测试1」）：
+  - `grok-imagine-image` / `grok-imagine-image-2.0` 均可生图，`response_format: 'b64_json'` 返回内联 base64（377KB / 422KB）
+  - 回链域名 `imgen.x.ai` 在本机 DNS 被污染（解析到 `108.160.165.53`，连接超时），因此必须固定请求 b64_json，不能走「返回 URL 再下载」
+  - 传图实测：输入「橘猫雪窗 + 加红帽子」，输出把背景换成秋日长椅、猫身姿态也重画，只保留了主体与帽子。说明 Grok 的图片输入是**参考图重绘**，不具备 gpt-image 的保真编辑能力
+- 能力模型扩展：
+  - `ImageCapabilityProfile.supportsImageEdit`：是否支持保留原图的编辑；`gpt-image-2.5` 为 true（实测 `/images/edits` 只改局部），两个 Grok 生图为 false
+  - `VideoCapabilityProfile.supportsImageInput`：是否支持首帧图片（图生视频）；两个 Grok 视频模型为 true，首尾帧 / 参考视频仍为 false
+- 后端：
+  - 新增 `XaiImageProvider`（`src/providers/xai-image/`）：`POST {base}/images/generations`，固定 `response_format: 'b64_json'`，参考图经 sharp 压到 1024 长边 + JPEG85 后以 data URL 传入；无 key 时报 `IMAGE_NOT_CONFIGURED`，只返回外链时报 `IMAGE_RESULT_DOWNLOAD_FAILED`
+  - `provider-protocol.ts` 增加图片协议 `xai`（按 `grok-imagine-image` / providerCode `xai` 命中），`ImageProviderRouter` 路由到新 provider，`IMAGE_PROVIDER` 也支持强制 `xai`
+  - `env.ts` 白名单补 `IMAGE_GROK_BASE_URL` / `IMAGE_GROK_API_KEY` / `IMAGE_GROK_DEFAULT_MODEL`，`IMAGE_PROVIDER` 枚举加 `xai`（最初漏登记导致变量被 zod 剥掉、provider 读不到 key，是这轮唯一的返工点）
+  - `DEFAULT_MODELS` 从 11 个增到 13 个；`model-capability.constraints.ts` 新增 `IMAGE_EDIT_UNSUPPORTED`（编辑模式 + 不支持保真编辑）与 `VIDEO_IMAGE_INPUT_UNSUPPORTED`（传首帧但模型不支持）
+- 前端：
+  - `model-catalog.ts` 新增 `ImageModelMode`（`text-to-image` / `image-to-image` / `image-edit`）、`VideoModelMode`（文生 / 图生 / 首尾帧 / 参考视频）与 `imageModelsFor` / `videoModelsFor` / `resolveImageAlias` / `resolveVideoAlias`；兜底清单与后端同步（移除 Seedream / Seedance，加入两个 Grok 生图）
+  - AI 绘画：模型列表按当前创作模式过滤，`局部编辑` / `商品图处理` 只列支持保真编辑的模型，`参考图重绘` 只列能吃参考图的模型
+  - 图片生成：上传素材后切到 `image-to-image` 列表；智能修图只列 `image-edit` 模型
+  - 视频工作台：模型列表跟随生成方式过滤；首尾帧 / 参考视频在无可用模型时直接禁用并标注「暂无可用模型」
+  - 画布：创作区按目标节点判断模型族（视频节点 → 图生视频模型；图片节点按有无素材 → 文生图 / 图生图）；修掉「只点选视频节点时不设置 composerTargetNodeId 导致列出图片模型」的问题；提交视频时用 `resolveVideoAlias('image-to-video')` 解析别名，不再写死
+- 验证：
+  - `GET /api/v1/models` 返回 13 个，图片 3 个、视频 2 个，profile 中的能力位正确
+  - 真实链路：`xai-grok-imagine-image` 文生图 `SUCCEEDED`，产物落到本地存储（285KB JPEG，内容与提示词一致）；`mode: '局部编辑'` + Grok 返回 409 `IMAGE_EDIT_UNSUPPORTED`
+  - 页面实测：AI 绘画文生图 3 个模型、局部编辑只剩 `GPT Image 2.5`；图片生成 3 个、智能修图 1 个；视频文生 / 图生均 2 个，首尾帧与参考视频禁用；画布图片节点 3 个、视频节点 2 个
+  - `pnpm` 口径等价：API `vitest` 121 项通过、Web `vitest` 91 项通过、`tsc -p tsconfig.build.json`、`vue-tsc --noEmit`、`prettier --check`、`oxlint --deny-warnings` 全部通过
+- 真实调用消耗 1 张图（另 1 次因未配置 key 失败已自动退回）；本地测试账号积分已从 2 补到 200，避免用户进入页面时无法生成
+
+## 59. 2026-10-20 AI 画布节点说明、视频进度与指令回填
+
+- 用户反馈三点：① 改视角是否也走图生图；② 生成视频时没有像生成图像那样的加载动画/提示；③ 每次创作应在对应素材下方保留文本，参考产品在素材左上角有一句简要说明（`参考网站截图合集/AI画布图生图橘猫1-4.png`）
+- 改视角：确认走的是同一条图生图链路（`createGenerationWorks` + `sourceFileId`，prompt 里拼接水平旋转/垂直俯仰角度，`mode: 'canvas-angle'`）。由于要求「保持材质、光线和身份一致」，本质是保真编辑，`generateAngleView` 改为 `resolveImageAlias('image-edit', selectedModel)`，避免参考重绘类模型把主体和背景一起重画
+- 节点左上角说明：`.canvas-node__meta` 原本显示 `Image/Video` 且固定在节点左侧 58px 宽，改为节点上方 6px、左对齐、宽度自适应，内容换成 `nodeCaption(node)`：
+  - 生成中显示「生成中」/「生成视频 42%」
+  - 普通节点显示创作指令的前 22 个字（超过截断），上传图（prompt 是文件名）显示「原图」
+  - 3D 视角的自动后缀（`；将镜头水平旋转…`）在说明里被剥掉，只留用户原话
+- 视频加载态：视频节点原本只有一行静态「等待视频任务生成」，没有任何动效。现在生成中显示旋转的加载图标、`LoadingOutlined` 旋转动画、「视频生成中」文案、进度条（宽度随 `node.progress`），节点背景也换成更亮的蓝色渐变以区分
+- 进度来源：`scheduleVideoPoll` 每次轮询把 `task.progress` 写回 `node.progress`（0-100），成功时置 100；`CanvasNode` 新增 `progress?: number`
+- 指令回填与草稿：新增 `composerDrafts`（节点 id → 未提交文本）与 `composerDraftNodeId`，`watch(composerAnchorNode)` 时切换：
+  - 离开节点时保存非空草稿，空内容不占位（否则点回来会被空串顶掉，看不到该节点自己的指令）
+  - 进入节点时优先取草稿，否则回填该节点的 `prompt`；上传图（文件名）不回填
+  - 已验证：点生成结果节点回填「在这只橘猫头上加一顶红色针织帽，其余内容保持完全不变」；点视频节点回填「戴红帽的橘猫转头看向镜头，窗外雪花飘落」
+- 视频节点创作区参数：原本沿用图片的比例 + `1K` 清晰度，对视频无意义。改为视频目标时显示时长（6/10/15s）与分辨率（720P/1080P），并直接作为 `createVideoTask` 的 `parameters`；积分角标也按视频任务显示 10
+- 验证：桌面 1440×1000 实测节点说明为「橘猫坐在雪窗前 / 在这只橘猫头上加一顶红色针织帽，其余内容保持… / 生成视频 42%」，视频节点 `spinner: true`、进度条 `width: 42%`；创作区回填与视频参数选择均正确；`vue-tsc --noEmit`、`prettier --check`、`oxlint --deny-warnings`、Web `vitest` 91 项全部通过
+- 说明：本轮用构造的工作流截图验证 UI，未真实提交视频任务，不产生额外计费
+
+## 60. 2026-10-20 画布连线语义：素材取节点产物，不再回溯原始素材
+
+- 用户提出三问：① 图生文本再用文本生成图/视频，结果基于哪张素材；② 本项目里「原图 → 图生图 → 图生视频」，视频却仍用原图，不合逻辑；③ 从视频节点出发做图像生成/视频生成应该是什么行为（参考 `参考网站截图合集/AI画布图生图橘猫5/6/7.png`）
+- 根因定位：`nodeSourceFileId()` 优先返回 `sourceFileId`（节点创建时写入的**输入**素材），`resultFileId`（节点**产物**）排在后面。于是生成类节点对外提供的永远是它的输入：`A(由 O 生成)` 交给下游的是 `O`，`createVideoNodeFromSource(A)` 拿到的也是 `O`，串联链路在第一跳就断了
+- 素材解析重写（`CanvasStudioView.vue`）：
+  - 新增 `nodeResultFileId()`：只认节点产物（`resultFileId` → 关联 work 的结果），`nodeSourceFileId()` 改为产物优先、`sourceFileId` 兜底（任务未完成 / 重试 / 上传素材时仍可用）
+  - 新增 `nodeArtifactKind()`：区分节点对外提供的是图片还是视频，为跨类型生成做前置判断
+  - `nodeImageUrl()` 同样改成结果优先，并且结果文件加载中宁可留空，也不再退回原图造成「生成没生效」的错觉
+- 创作区语义拆成两类，`focusComposerForNode()` 按「节点是否已有产物」分流：
+  - 已有产物的节点：这个输入框是「基于它继续创作」，素材 = 它自己的产物，提交时新建下游节点
+  - 还没有产物的目标节点：素材 = 入边来源，提交即填充它本身
+  - 多条入边时取**最后连上**的那条，用户手动改接另一张图后不会继续沿用旧素材
+  - `prepareImageNodeGeneration()` 的素材统一落到新节点自己的 `sourceFileId`，提交时不再二次回溯上游
+- 文本节点不传递素材：`prompt` 节点只贡献提示词，图文链路默认文生图；要延续主体必须把图片节点一起连到生成节点（避免「图 → 文 → 图」时素材被隐式穿透，行为不可预测）
+- 视频节点作为素材（对应参考产品 7.png 的「视频 → 图像生成」）：
+  - 图像接口只收图片，新增 `extractVideoFrameFile()` / `resolveVideoFrameFileId()`：浏览器里把视频首帧画成 JPEG 再当普通素材上传（按视频文件 id 缓存，避免重复上传），面板按普通图生图呈现
+  - 「视频 → 视频」当前无可用通道（两个 Grok 视频模型只支持首帧图片输入），菜单点选时直接提示，不再创建注定失败的节点
+  - 生成菜单按源节点类型改写说明：视频节点显示「截取视频首帧作为参考图」/「需要图片输入，请先由该视频生成图片」
+- 可见性：新建结果节点时同时画出「文本依赖」与「素材依赖」两条边，画布上能直接看出结果基于哪个节点；创作区顶部新增「参考素材」标签，把这次实际使用的素材名称写出来
+- 绑定规则收敛：新增 `resolveComposerBinding()`，点选节点（`handleNodePointerDown`）与「填写描述」按钮共用同一套 source/target 计算，点中素材的一瞬间就能看到「这次基于谁」。`composerMaterialLabel` 按「目标自身有产物 → 目标自身；否则目标入边 → 兜底目标」的顺序解析，和提交时的素材解析保持一致
+- 验证：`vue-tsc --noEmit` 通过、Web `vitest` 91 项全通过；`outputs/ui-reference/_chain-probe.mjs` 用 3 节点链路（原图 O → 生成结果 A → 空视频节点 V）实测：
+  - 点 A：参考素材显示 A 自己的指令「给这只橘猫戴一顶红色针织帽，其余保持不变」，模型为图片模型（16:9 / 1K / 5 积分），提交会新建下游节点
+  - 点 V：参考素材显示 A 的指令（来自入边，而不是 V 自己或原图），模型为视频模型（6s / 720P / 10 积分）
+  - 截图：`_chain-probe-a.png`、`_chain-probe-v.png`；本轮未提交真实任务，不产生计费
+- 已知差距：参考产品 6.png 的视频面板有「首帧 / 尾帧」两个槽位，本实现目前是单素材首帧；多素材（首尾帧、角色参考图）需要把 `referenceFileIds` 打通到视频任务与上游，列为下一步
+
+## 61. 2026-10-20 视频转文案（关键帧）与文案转视频（文生视频）
+
+- 用户报障：画布上对视频节点做「文本生成」会失败，提示「当前仅支持在对话中发送图片附件」。同时提出想把「尾帧图 → 图生文本（提取画面信息）→ 结合客户需求 → 生成视频」串起来
+- 失败原因：`chat.service.ts` 的附件校验只放行 `image/*`（`CHAT_ATTACHMENT_UNSUPPORTED`），而画布把视频节点的 `sourceFileId`（mp4）直接塞进 `fileIds`，必然 409。上游对话模型是 OpenAI 兼容的 `image_url` 协议，也不支持视频
+- 视频 → 文案（`resolveVideoKeyFrameFileIds` / `extractVideoFrames`）：
+  - 在浏览器里按 2% / 50% / 98% 抽三张关键帧（起始、中段、结束），分别当普通图片素材上传，再以 `fileIds: [起始, 中段, 结束]` 提交给带 `vision` 的对话模型
+  - 指令里明确说明「这三张是同一段视频按时间顺序截取的关键帧」，避免模型当成三个场景；按视频文件 id 缓存，重复生成文案不重复抽帧上传
+  - 重构了原来的单帧逻辑：`extractVideoFrameFile` → `openVideoElement` + `grabVideoFrame` + `extractVideoFrames`，一个 `<video>` 里连续 seek，不再为每帧重新加载
+- 文案 → 视频（画布补齐文生视频）：
+  - `createVideoNodeFromSource()` 不再对「无图片素材」一律拦截：文案节点派生视频节点时 `generationMode: 'text-to-video'`、`sourceFileId` 为空、标题「文生视频」；图片/结果节点仍是 `image-to-video`
+  - 新增 `composerVideoMode`：视频节点按自身 `generationMode` 选模型清单（`text-to-video` / `image-to-video`），`submitVideoGeneration()` 同口径解析别名，不再写死图生视频
+  - `submitComposer()` 的「视频必须有首帧」检查对 `text-to-video` 节点放行；视频任务因此可以不带 `sourceFileId` 提交（后端本来就允许，缺首帧只影响图生视频）
+  - 完成后标题按生成方式回写「文生视频 / 图生视频」；文案节点可能很长，创建视频节点时把 prompt 截到 1000 字
+- 文案内容补「画面描述」：`buildNodeTextInstruction` 的输出格式加第 4 项，要求给出一段可直接作为生图/生视频提示词的中文描述（主体、动作、镜头运动、光线、风格，≤120 字）。这样「图/视频 → 文本 → 再生成」时才有一份能直接复用为 prompt 的产物，而不是只有广告语
+- 语气修正：`composerMaterialLabel` 对 `prompt` 节点直接返回空，文案节点不再把自己的上游视频显示成「参考素材」
+- 验证：`outputs/ui-reference/_video-text-probe.mjs`（真实 mp4 + mock 上传/SSE/视频任务）实测：
+  - 视频节点「文本生成」→ 上传 3 张关键帧（262KB / 266KB / 205KB）、`chat/stream` 的 `fileIds` 长度为 3、文案节点流式写入「核心主张：让窗外的雪落进这一帧。」且状态为已完成
+  - 文案节点「视频生成」→ 新建节点标题「文生视频」、创作区无「参考素材」标签、模型清单为两个视频模型 + 时长 6/10/15s + 720P/1080P
+  - 提交体：`{ modelAlias: 'xai-grok-imagine-video', prompt: '橘猫在雪窗前缓慢转头…', parameters: { duration: 6, resolution: '720P' }, sourceFileId: null }`，即真正的文生视频
+  - 截图：`_video-text-probe.png`、`_video-text-to-video.png`；无页面脚本错误
+- 类型/测试：`vue-tsc --noEmit`、`oxlint --deny-warnings`、Web `vitest` 91 项通过
+- 边界说明（已告知用户）：关键帧文案不等于完整视频理解（没有音频、节奏与镜头连续性信息）；上游也不支持视频输入。真正「以尾帧收尾」仍需要 `supportsLastFrame` 的模型
+
+## 62. 2026-10-20 视频保存位置排查、视频历史面板、文案节点编辑模式与 Markdown 清洗
+
+- 用户反馈：生成的视频在历史记录里看不到（怀疑没保存）。排查结论：**视频一直有保存，问题在前端历史面板**
+  - 磁盘：`storage/users/<userId>/2026/10/<uuid>.mp4`（`file_assets.storagePath`），本地已有 7 个 mp4，单个 4-8MB
+  - 数据库：`video_tasks` 11 条（7 条 SUCCEEDED、其余 FAILED），成功任务都带 `resultFileId`；`file_assets` 中 7 条 `video/mp4`
+  - 访问：`GET /api/v1/files/<fileId>/content`（鉴权），画布节点的 `resultFileId` 就是这个 fileId
+  - 排查脚本：`apps/api/scripts/inspect-video-tasks.mjs`（Prisma 7 需要 `PrismaPg` adapter）
+- 根因：画布历史面板的「视频历史」是空壳——`visibleHistory` 只返回 `imageHistory`（works 队列），video 分支恒为 `[]`，计数还写死成 `0`；而视频任务走独立的 `/api/v1/video-tasks`，本来就不进 works 队列
+- 修复：
+  - 画布新增 `videoHistoryTasks` / `videoHistory` / `loadVideoHistory()`，用 `listVideoTasks(12)` 拉真实视频任务，只保留 `SUCCEEDED` 且有结果文件的任务
+  - 切到「视频历史」标签或打开历史面板时才加载（视频动辄好几 MB，页面一进来全量下载没意义）
+  - 缩略图用 `<video preload="metadata">` 播首帧；因为 `<video>` 标签带不了 Authorization 头，先经 `fetchFileBlob` 换成 blob URL（复用画布已有的 `loadFileUrl`）
+  - 计数显示真实数量；点击历史卡片会在画布上落成一个 `kind: 'video'` 的节点（带 `resultFileId`、`previewUrl`、原始 prompt 与来源图）
+  - 空状态区分「正在读取视频历史…」与「还没有视频历史」
+- 文案节点下方的框（用户问「是什么作用」）：此前它会按图片目标处理，提交后新建图片节点，语义含混。现在明确为**编辑器**：
+  - 新增 `composerEditingPrompt`（锚定节点是 `prompt` 时成立），`submitComposer()` 命中该分支就只回写节点文字，不发起任何生成；生成中的节点会提示先等完成
+  - 创作区在编辑模式下隐藏模型 / 比例 / 尺寸与积分角标，发送按钮换成对勾图标，placeholder 改为「修改这段文案，保存后会写回节点…」
+  - `editSelectedNode()` 对文案节点不再把它挂成提交目标；想用文案出图或出视频仍走节点菜单的「图像生成 / 视频生成」
+- Markdown 记号清理（用户反馈 `**` 之类不美观）：
+  - `utils/markdown.ts` 新增 `stripMarkdown()`：去掉加粗/斜体/删除线/标题井号/引用/代码围栏/链接语法，列表换成 `· `，并清掉流式输出到一半时残留的孤立记号
+  - 节点正文、节点说明（`nodeCaption`）、文案落盘（`onDone`）统一走纯文本；派生视频节点时 prompt 也先清洗
+  - `TEXT_GENERATION_PLACEHOLDER` 上移到 setup 早期（`composerPromptForNode` 会在 watch immediate 里读取它，留在后面会撞 const 暂时性死区），生成中的占位文字不再被回填进输入框
+- 验证：
+  - `outputs/ui-reference/_video-history-probe.mjs`（真实后端 + 真实 dev 账号）：历史面板列出 7 个视频卡片、7 个 `<video>` 缩略、计数正确；点击首张卡片在画布生成带 `<video>` 的节点，标题「视频」
+  - `outputs/ui-reference/_prompt-edit-probe.mjs`：选中文案节点后无模型下拉、placeholder 为编辑提示、无积分角标；保存后节点文本更新且**没有新增任何生成请求**（`chatRequestCount` 仍为 1）；模型返回带 `**` / `###` 的文案后，节点正文为纯文本（`hasMarkdownLeft: false`）
+  - `utils/markdown.spec.ts` 新增 3 个用例（连同原有共 6 项通过）；`vue-tsc --noEmit`、`oxlint --deny-warnings`、Web `vitest` 94 项全部通过
+- 本轮未提交真实生成任务，不产生计费
+
+## 63. 2026-10-20 刷新后视频素材裂图、点空白创作区不收起
+
+- 用户反馈两个现象：① 刷新页面后，视频素材变成「裂图图标 + 一段生成用的文本」，而图片素材正常；② 点击画布空白处，素材下方的输入框一直不消失
+- 裂图根因：`createCanvasDocument()` 刻意不保存 `previewUrl`（blob URL 刷新即失效），而视频节点模板的 `<video>` 分支要求 `node.previewUrl` 非空，刷新后条件不成立 → 落到通用 `<img>` 分支 → `<img src>` 指向的是 mp4 的 blob URL → 浏览器用图片解码器读 mp4，必然裂图
+- 修复：
+  - 新增 `nodeVideoUrl(node)`：优先用当次会话的 `previewUrl`，否则用 `resultFileId` 换来的 blob URL（顺带触发 `loadFileUrl` 拉取文件），没有则空
+  - `nodeImageUrl()` 遇到 `kind === 'video'` 直接返回空字符串，从根上杜绝「拿视频文件去渲染 `<img>`」
+  - 模板：视频分支改用 `nodeVideoUrl(node)`（并排除生成中的忙碌态），`<img>` 与 `GalleryArtwork` 分支加 `node.kind !== 'video'` 条件；视频节点在文件回取期间显示「正在加载视频 / 正在取回已保存的视频文件」而不是插画占位
+- 输入框不收起的根因：上一轮「点选节点即绑定素材」把 `composerSourceNodeId` / `composerTargetNodeId` 写成了节点 id，而 `clearSelection()` 只清选中态、不清这两个绑定 → `composerAnchorNode` 仍能解析出节点 → `composerVisible` 一直为真
+- 修复：在 `handleCanvasPointerDown()`（点画布空白）里同时清空 source/target 绑定；没有把清理放进 `clearSelection()`，因为删除节点等场景需要保留仍然有效的绑定
+- 验证（`outputs/ui-reference/_video-refresh-probe.mjs`，模拟刷新后只有 `resultFileId`、没有 `previewUrl` 的画布 + 真实 mp4）：
+  - 刷新后视频节点渲染 `<video src="blob:…">`，节点内无 `<img>`（`brokenImage: null`）
+  - 选中节点 → 创作区出现（true）；点画布空白 → 创作区收起（false）
+  - 截图：`_video-refresh-probe.png`、`_video-refresh-blank-click.png`
+- `vue-tsc --noEmit`、`oxlint --deny-warnings`、Web `vitest` 94 项全部通过；本轮未提交真实任务，不产生计费
+
+## 64. 2026-10-20 本轮存档与交接文档整理
+
+- 用户要求：把当天（上午 DeepSeek-V4.1-Flash、下午 MiniMax-M3.1-Flash）两段会话的工作整理成 docs 内的存档说明，防止进度丢失
+- 新增 `docs/SESSION_HANDOFF_2026-10-20.md`（本轮唯一新增文档），结构：
+  1. 一句话现状 + 环境与运行方式（端口、测试账号、密钥读取路径、沙箱限制、测试口径与数量）
+  2. **15 条工作主线对照表**（现象/需求 → 处理 → 验证 → `M3_WORKLOG` 对应章节），把第 51-63 节压缩成可检索的一张表
+  3. **四条可复用口径**：画布连线与素材语义、视频三个能力位的区别、跨媒体降级策略、文案节点语义
+  4. 按文件的代码改动清单（后端 8 项、前端 5 项）
+  5. 新增探针与排查脚本清单（5 个 playwright 探针 + 1 个查库脚本）
+  6. 真实上游可用性快照（含各密钥分组结论与限流情况）
+  7. 已知能力边界（无真视频理解 / 无首尾帧 / 无视频生视频 / 历史面板只拉 12 条 / 无双槽位）
+  8. **未提交工作区的准确状态**（32 个已跟踪文件 + 4 个未跟踪项、未提交原因与提交前约定）
+  9. 按优先级排的下一步待办（先提交 → 首尾帧双槽位 → 真视频理解 → 恢复移动端 → 限流模型替代）
+  10. 接手自检清单（6 步）
+  11. 文档索引
+- 同步更新既有文档（保证口径一致、不留过期描述）：
+  - `docs/AI_HANDOFF.md`：提交号改 `59bdf84`、Git 状态改为「大批未提交改动」并指向新存档、交接摘要重写为本轮三条主线、测试数更新为 API 121 项 / Web 94 项、进度与注意事项补本轮待办与口径提示
+  - `docs/PROJECT_CONTEXT.md`：当前阶段改写（未提交状态 + 存档指针）、已完成项补本轮成果、进行中补待办优先级
+  - `docs/DECISIONS.md`：新增 **D-043 画布连线与素材语义**、**D-044 视频能力位与跨媒体降级**，把本轮形成的行为规则决策化，避免下一任重新发明
+  - `docs/MODEL_CONTINUITY.md`、`README.md`：强制阅读顺序与主要文档列表加入新存档
+  - `docs/OPEN_QUESTIONS.md`：开头加存档索引（能力边界与待办优先级在存档里，本文只留待拍板问题与上游事实）
+  - `CHANGELOG.md`：新增存档条目，并恢复过程中误吞的「视频转文案与文案转视频」条目（已复核 314 条记录结构完整）
+- 校验：`prettier --check` 全部文档通过；`git diff --shortstat` 与文档内写的数字一致
+- 本轮为纯文档整理，未改业务代码、未调用上游、不产生计费
+
+## 65. 2026-10-20 后台 API 进程被回收与恢复
+
+- 现象：后台任务「`node dist/main.js`」在 17:42 报 failed，但**日志里没有任何错误或堆栈**，最后一条业务日志是 15:01:19 的视频任务完成；进程从 11:39 连续运行约 6 小时
+- 判定：不是代码故障，是**宿主回收了长时间运行的后台进程**。同一时刻 dist 被重新构建（`tsc`，17:42），新实例（PID 20612）在 17:42:59 拉起并接管 3001 端口
+- 验证新实例健康：`GET /api/v1/health` 200；真实 `dev-login` 后 `GET /api/v1/models` 返回 **13 个模型**（8 对话 + 3 生图含 `xai-grok-imagine-image`/`xai-grok-imagine-image-2.0` + 2 视频），说明本轮 provider 注册与能力配置都在位；前端 5173 的 Vite 进程（10:07 启动）仍存活
+- 结论与约定：判断服务是否在跑**不要看后台任务状态**，直接探端口；被回收后按「`tsc -p tsconfig.build.json` → 后台 `node dist/main.js`」恢复，并拉一次 `/api/v1/models` 核对模型数量。已写入 `docs/SESSION_HANDOFF_2026-10-20.md` 第 1 节
+- 本轮无业务代码改动，不产生计费
+- 补充发现（17:41 后核对工作区时）：**存在并发写入**。除本会话的改动外，17:20-17:41 另一工具/会话在改「智能体预设参数」（`custom_agents` 新增 `inputMode`/`maxTokens`/`modelAlias`/`temperature`，新迁移 `20261020092005_add_agent_preset_params`，前后端 `agents`/`chat`/`agent-directory`/`agent-workspace` 同步）。它同时重建了 `dist` 并重启 API——这才导致本会话的后台 API 任务被判 failed。工作区当前为 49 个已跟踪文件修改 + 5 个未跟踪项。**因此不提交、不推送**，等另一方收工后再按 D-033 说明范围后处理；该情况已写入 `docs/SESSION_HANDOFF_2026-10-20.md` 第 8 节

@@ -120,7 +120,9 @@ pnpm infra:down
 8. `docs/M1_WORKLOG.md`
 9. `docs/M2_WORKLOG.md`
 10. `docs/M3_WORKLOG.md`
-11. `docs/SESSION_HANDOFF_2026-10-16.md`
+11. `docs/SESSION_HANDOFF_2026-10-21.md`
+12. `docs/SESSION_HANDOFF_2026-10-20.md`
+13. `docs/SESSION_HANDOFF_2026-10-16.md`
 
 任何模型或开发者继续接管前，都必须先阅读以上文档，不得根据旧对话自行重置产品方向。
 
@@ -128,6 +130,8 @@ pnpm infra:down
 
 - `docs/PROJECT_CONTEXT.md`：项目事实、边界和事实优先级
 - `docs/RESEARCH_BASELINE.md`：参考产品研究基线
+- `docs/SESSION_HANDOFF_2026-10-21.md`：最近一轮（智能体预设参数 + 精选层扩充 + 超智页视觉调整）存档：口径、改动清单、能力边界、**视觉未获认可的记录**、接手自检清单
+- `docs/SESSION_HANDOFF_2026-10-20.md`：上一轮（AI 画布深度精修 + 真实模型接入）存档：工作区清单、行为口径、能力边界、接手自检清单
 - `docs/SESSION_HANDOFF_2026-10-16.md`：完整会话交接、DeepSeek 方案评审和修正建议
 - `docs/MODEL_CONTINUITY.md`：换模型后的续接和防止思路漂移规则
 - `docs/DECISIONS.md`：已确认和待确认的技术决策

@@ -7,6 +7,7 @@
 ## 2. 主开发工具与执行规则
 
 - 主开发工具（当前 WorkBuddy）按 `docs/IMPLEMENTATION_PLAN.md` 的分批计划持续实施。
+- 2026-10-20 晚 ~ 10-21 上午因模型队列限制，改由 WorkBuddy 的 Step-5-Preview 执行轨道承担开发，2026-10-21 上午移交回主对话 DeepSeek-V4.1-Flash；该段完整交接材料为 `docs/SESSION_HANDOFF_2026-10-21.md`，接手时先读其第 3 节（口径）与第 9 节（待办）。
 - 操作分为自动执行、先说明再做、单独确认三档。
 - 该规则是行为约束，不是系统权限边界。
 - 普通推送、密钥、部署、公网暴露和破坏性操作始终需要用户明确确认。
@@ -25,8 +26,10 @@
 8. `docs/M1_WORKLOG.md`
 9. `docs/M2_WORKLOG.md`
 10. `docs/M3_WORKLOG.md`
-11. `docs/SESSION_HANDOFF_2026-10-16.md`
-12. `CHANGELOG.md`
+11. `docs/SESSION_HANDOFF_2026-10-21.md`（最新一轮：智能体预设参数、精选层扩充、超智页视觉调整；**含用户对视觉结果不满意的明确记录**）
+12. `docs/SESSION_HANDOFF_2026-10-20.md`（AI 画布与模型接入存档，含工作区清单与行为口径）
+13. `docs/SESSION_HANDOFF_2026-10-16.md`
+14. `CHANGELOG.md`
 
 阅读后先输出：
 
