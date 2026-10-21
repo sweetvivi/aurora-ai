@@ -22,7 +22,7 @@
 | 验收口径             | 桌面 `1440x1000`；移动端自 2026-10-20 起暂停                                                                                       |
 | 测试基线（本轮结束） | **Web 22 文件 120 项通过**（2026-10-21 10:12 实测）；**API 27 文件 123 项**（2026-10-20 晚 DB 可用时实测，当前环境无法复验，见下） |
 
-**当前环境异常（接手第一件事）**：Docker Desktop 未运行，PostgreSQL / Redis 未监听，API e2e 全套会红（`PrismaClientKnownRequestError`，错误点在各 e2e 的 `beforeAll` 初始化），**这不是代码回归**。恢复顺序：
+**当前环境异常（接手第一件事）**：Docker Desktop 未运行，PostgreSQL / Redis 未监听，API e2e 全套会红（`PrismaClientKnownRequestError`，错误点在各 e2e 的 `beforeAll` 初始化），**这不是代码回归**。（2026-10-21 10:17 起 Docker 已启动、API 已恢复，API e2e 27 文件 123 项实测全绿。）恢复顺序：
 
 ```bash
 # 1. 手动启动 Docker Desktop，等容器 healthy
@@ -36,6 +36,14 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3001/api/v1/health
 ```
 
 沙箱老坑（沿用，已验证）：`pnpm` 不在 PATH → `npx --yes pnpm@11.25.0`；`/api/v1/image-tasks` 需大写 `Idempotency-Key`；长驻进程会被宿主回收，判断服务死活只看端口不看任务状态。
+
+**推送 GitHub（2026-10-21 实测可用写法）**：默认 schannel 后端在本机会报 `schannel: failed to receive handshake` 或 `Failed to connect to github.com:443`，**换成 OpenSSL 后端即可**；同时要清掉环境里注入的代理变量（`https_proxy=127.0.0.1:57214` 是工具自身的出口代理，不代理 GitHub）：
+
+```bash
+http_proxy= https_proxy= git -c http.sslBackend=openssl push origin main
+```
+
+`ls-remote` 偶发 21s 超时属线路抖动，重试一次通常可过；判断是否已推送成功看 push 输出的 `旧..新  main -> main`，以及 `git status -sb` 是否显示 `## main...origin/main`（无 ahead/behind）。
 
 **前端全量测试偶发「少一个文件」**：2026-10-21 上午同一份代码连跑两次，一次报 `21 文件 / 111 项`、一次报 `22 文件 / 120 项`。`vitest list` 显示收集到 22 个文件，说明是 worker 掉队而非漏收集。**判断标准看文件数是否为 22**，若是 21 就重跑一次，不要据此认为有测试丢失。
 
