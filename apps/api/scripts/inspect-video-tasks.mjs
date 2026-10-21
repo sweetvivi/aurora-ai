@@ -3,8 +3,7 @@ import { PrismaClient } from '@prisma/client';
 
 const adapter = new PrismaPg({
   connectionString:
-    process.env.DATABASE_URL ??
-    'postgresql://aurora:aurora@localhost:5432/aurora?schema=public',
+    process.env.DATABASE_URL ?? 'postgresql://aurora:aurora@localhost:5432/aurora?schema=public',
 });
 const prisma = new PrismaClient({ adapter });
 

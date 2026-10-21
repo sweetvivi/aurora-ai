@@ -33,6 +33,7 @@
 
 ### Fixed
 
+- 2026-10-21：修复 CI `format:check` 失败。`apps/api/scripts/inspect-video-tasks.mjs` 在 7aced5d 中作为新增文件提交时未按 Prettier 格式化，导致 GitHub Actions 在第 5 步 `pnpm format:check` 直接失败（后续 lint / typecheck / build / test 未执行）。已按项目 Prettier 配置重写该文件并复跑 `prettier --check .`（全仓通过）。教训：提交前的格式校验必须跑全仓 `prettier --check .`，只检查 `git status` 里的已跟踪改动会漏掉新增的未跟踪文件。
 - 2026-10-20：修复 AI 画布刷新后视频素材显示为裂图的问题。画布文档刻意不保存 `previewUrl`（blob URL 刷新即失效），而视频节点的 `<video>` 分支要求 `previewUrl` 非空，刷新后退回通用 `<img>` 分支，把 mp4 的 blob URL 交给图片解码器，必然裂图。现在新增 `nodeVideoUrl()`（优先 `previewUrl`，否则用 `resultFileId` 换 blob URL 并触发文件拉取），`nodeImageUrl()` 遇到视频节点直接返回空字符串，模板的视频分支改用 `nodeVideoUrl(node)` 且排除生成中的忙碌态，`<img>` / `GalleryArtwork` 分支加 `node.kind !== 'video'` 条件，文件回取期间显示「正在加载视频」。
 - 2026-10-20：修复点击画布空白后创作输入区不收起的问题。此前「点选节点即绑定素材」会把 `composerSourceNodeId` / `composerTargetNodeId` 写成节点 id，而 `clearSelection()` 只清选中态，`composerAnchorNode` 仍能解析出节点，输入框就一直钉在原地。现在在 `handleCanvasPointerDown()`（点画布空白）里一并清空这两个绑定；没有放进 `clearSelection()`，以免删除节点等场景丢掉仍然有效的绑定。
 - 2026-10-20：修复 AI 画布「视频历史」永远为空的问题。视频任务走独立的 `/api/v1/video-tasks`，不进 `works` 队列，而历史面板的 `visibleHistory` 只返回图片工作队列、视频分支恒为 `[]`、计数写死 `0`，用户看不到已保存的视频（视频其实一直正常落盘：`storage/users/<userId>/2026/10/*.mp4` + `video_tasks.resultFileId`）。现在新增 `loadVideoHistory()`，切到视频标签或打开历史面板时才用 `listVideoTasks(12)` 拉取已完成任务，缩略图用 `<video preload="metadata">` 播首帧（经 `fetchFileBlob` 转 blob URL 以携带鉴权），计数显示真实数量，点击卡片会在画布上落成视频节点。
