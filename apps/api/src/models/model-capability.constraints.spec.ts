@@ -135,4 +135,63 @@ describe('model capability constraints', () => {
       code: 'VIDEO_INPUT_UNSUPPORTED',
     });
   });
+
+  it('rejects image-to-video on models without first-frame input support', () => {
+    expect(
+      findVideoModelConstraintViolation({
+        hasLastFrame: false,
+        profile: { video: { ...videoProfile.video!, supportsImageInput: false } },
+        sourceFileId: 'image-1',
+      }),
+    ).toMatchObject({
+      code: 'VIDEO_IMAGE_INPUT_UNSUPPORTED',
+    });
+
+    expect(
+      findVideoModelConstraintViolation({
+        hasLastFrame: false,
+        profile: { video: { ...videoProfile.video!, supportsImageInput: true } },
+        sourceFileId: 'image-1',
+      }),
+    ).toBeNull();
+  });
+
+  it('rejects faithful editing on models that can only redraw from a reference', () => {
+    const redrawOnly: ModelCapabilityProfile = {
+      image: {
+        maxReferenceImages: 3,
+        sizePresets: ['1K'],
+        supportsImageEdit: false,
+      },
+    };
+
+    expect(
+      findImageModelConstraintViolation({
+        parameters: { mode: '局部编辑' },
+        profile: redrawOnly,
+        referenceFileIds: [],
+        sourceFileId: 'source-1',
+      }),
+    ).toMatchObject({
+      code: 'IMAGE_EDIT_UNSUPPORTED',
+    });
+
+    // 参考图重绘 / 画布里的「基于素材生成」不做保真要求，允许通过。
+    expect(
+      findImageModelConstraintViolation({
+        parameters: { mode: '参考图重绘' },
+        profile: redrawOnly,
+        referenceFileIds: [],
+        sourceFileId: 'source-1',
+      }),
+    ).toBeNull();
+    expect(
+      findImageModelConstraintViolation({
+        parameters: { mode: 'canvas' },
+        profile: redrawOnly,
+        referenceFileIds: [],
+        sourceFileId: 'source-1',
+      }),
+    ).toBeNull();
+  });
 });

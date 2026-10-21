@@ -9,6 +9,7 @@ import type { SeedanceVideoProvider } from './seedance-video/seedance-video.prov
 import type { SeedreamImageProvider } from './seedream-image/seedream-image.provider';
 import type { VideoProvider } from './video-provider';
 import { VideoProviderRouter } from './video-provider-router';
+import type { XaiImageProvider } from './xai-image/xai-image.provider';
 import type { XaiVideoProvider } from './xai-video/xai-video.provider';
 
 describe('provider routers', () => {
@@ -28,6 +29,7 @@ describe('provider routers', () => {
       createImageProvider('mock') as unknown as MockImageProvider,
       openAiImageProvider as unknown as OpenAiImageProvider,
       seedreamImageProvider as unknown as SeedreamImageProvider,
+      createImageProvider('xai') as unknown as XaiImageProvider,
     );
     const videoRouter = new VideoProviderRouter(
       new ConfigService({
@@ -85,6 +87,7 @@ describe('provider routers', () => {
       mockImageProvider as unknown as MockImageProvider,
       openAiImageProvider as unknown as OpenAiImageProvider,
       createImageProvider('seedream') as unknown as SeedreamImageProvider,
+      createImageProvider('xai') as unknown as XaiImageProvider,
     );
     const videoRouter = new VideoProviderRouter(
       config,
@@ -115,6 +118,7 @@ describe('provider routers', () => {
       mockImageProvider as unknown as MockImageProvider,
       openAiImageProvider as unknown as OpenAiImageProvider,
       createImageProvider('seedream') as unknown as SeedreamImageProvider,
+      createImageProvider('xai') as unknown as XaiImageProvider,
     );
     const forcedVideo = new VideoProviderRouter(
       new ConfigService({

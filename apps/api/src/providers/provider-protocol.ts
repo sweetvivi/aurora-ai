@@ -1,4 +1,4 @@
-export type ImageProviderProtocol = 'openai' | 'seedream';
+export type ImageProviderProtocol = 'openai' | 'seedream' | 'xai';
 export type VideoProviderProtocol = 'seedance' | 'xai';
 
 interface ProtocolCandidate {
@@ -9,8 +9,13 @@ interface ProtocolCandidate {
 
 const SEEDREAM_PATTERN = /(^|[-_/\s])(seedream|doubao|volcengine|volc)([-_/\s]|$)/i;
 const SEEDANCE_PATTERN = /(^|[-_/\s])(seedance|doubao|volcengine|volc)([-_/\s]|$)/i;
+const XAI_IMAGE_PATTERN = /(^|[-_/\s])(grok-imagine-image|xai)([-_/\s]|$)/i;
 
 export function resolveImageProviderProtocol(input: ProtocolCandidate): ImageProviderProtocol {
+  if (matchesProtocol(input, XAI_IMAGE_PATTERN)) {
+    return 'xai';
+  }
+
   return matchesProtocol(input, SEEDREAM_PATTERN) ? 'seedream' : 'openai';
 }
 

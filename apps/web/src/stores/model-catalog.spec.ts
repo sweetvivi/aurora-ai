@@ -236,4 +236,36 @@ describe('model catalog store', () => {
     expect(apiMocks.fetchModels).toHaveBeenCalledTimes(2);
     expect(store.modelsFor('image')[0]?.alias).toBe('image-new');
   });
+
+  it('filters image models by text / reference / edit modes', () => {
+    const store = useModelCatalogStore();
+
+    // 兜底清单里 GPT Image 支持保真编辑，Grok 只能参考重绘。
+    expect(store.imageModelsFor('text-to-image').map((model) => model.alias)).toEqual(
+      expect.arrayContaining(['jiguang-gpt-image-2.5', 'xai-grok-imagine-image']),
+    );
+    expect(store.imageModelsFor('image-edit').map((model) => model.alias)).toEqual([
+      'jiguang-gpt-image-2.5',
+    ]);
+    // 选中的 Grok 在编辑模式下会被解析到支持编辑的模型。
+    expect(store.resolveImageAlias('image-edit', 'xai-grok-imagine-image')).toBe(
+      'jiguang-gpt-image-2.5',
+    );
+    // 在参考图模式下 Grok 仍然可用，保持原选择。
+    expect(store.resolveImageAlias('image-to-image', 'xai-grok-imagine-image')).toBe(
+      'xai-grok-imagine-image',
+    );
+  });
+
+  it('filters video models by generation mode', () => {
+    const store = useModelCatalogStore();
+
+    expect(store.videoModelsFor('text-to-video').length).toBeGreaterThanOrEqual(2);
+    expect(store.videoModelsFor('image-to-video').map((model) => model.alias)).toEqual(
+      expect.arrayContaining(['xai-grok-imagine-video']),
+    );
+    // 当前没有模型支持首尾帧和参考视频，列表应为空而不是塞入不可用的模型。
+    expect(store.videoModelsFor('first-last-frame')).toHaveLength(0);
+    expect(store.videoModelsFor('reference-video')).toHaveLength(0);
+  });
 });

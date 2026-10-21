@@ -3,8 +3,53 @@ import { fetchModels, type ChatModel } from '@/app/api';
 
 export type ModelCapability = ChatModel['capabilities'][number];
 
+/** 生图场景：纯文生图 / 带参考图（可整体重绘）/ 需要保留原图的编辑。 */
+export type ImageModelMode = 'text-to-image' | 'image-to-image' | 'image-edit';
+/** 视频场景：与视频工作台的模式一一对应。 */
+export type VideoModelMode =
+  'text-to-video' | 'image-to-video' | 'first-last-frame' | 'reference-video';
+
 export interface ModelCatalogItem extends ChatModel {
   capabilities: ModelCapability[];
+}
+
+/**
+ * 判断模型能不能接住某个生图场景。
+ *
+ * - 图生图：至少要能吃 1 张参考图（maxReferenceImages > 0）
+ * - 编辑：必须支持保真编辑（supportsImageEdit 未声明时按支持处理，避免老模型被误伤）
+ */
+export function matchesImageMode(model: ModelCatalogItem, mode: ImageModelMode): boolean {
+  const profile = model.profile?.image;
+
+  if (mode === 'text-to-image') {
+    return true;
+  }
+
+  if (mode === 'image-to-image') {
+    return (profile?.maxReferenceImages ?? 1) > 0;
+  }
+
+  return profile?.supportsImageEdit !== false;
+}
+
+/** 判断模型能不能接住某个视频场景；未声明的能力按不支持处理。 */
+export function matchesVideoMode(model: ModelCatalogItem, mode: VideoModelMode): boolean {
+  const profile = model.profile?.video;
+
+  if (mode === 'text-to-video') {
+    return true;
+  }
+
+  if (mode === 'image-to-video') {
+    return profile?.supportsImageInput !== false;
+  }
+
+  if (mode === 'first-last-frame') {
+    return profile?.supportsLastFrame === true;
+  }
+
+  return profile?.supportsVideoInput === true;
 }
 
 interface ModelCatalogState {
@@ -64,18 +109,31 @@ const fallbackModels: ModelCatalogItem[] = [
       image: {
         maxReferenceImages: 10,
         sizePresets: ['1K', '2K', '4K'],
+        supportsImageEdit: true,
       },
     },
   },
   {
-    alias: 'doubao-seedream-4-0',
+    alias: 'xai-grok-imagine-image',
     capabilities: ['image'],
-    displayName: 'Seedream 4.0',
+    displayName: 'Grok Imagine Image',
     profile: {
       image: {
-        maxReferenceImages: 14,
-        sizePresets: ['1K', '2K', '4K'],
-        supportsSequentialGeneration: true,
+        maxReferenceImages: 3,
+        sizePresets: ['1K'],
+        supportsImageEdit: false,
+      },
+    },
+  },
+  {
+    alias: 'xai-grok-imagine-image-2.0',
+    capabilities: ['image'],
+    displayName: 'Grok Imagine Image 2.0',
+    profile: {
+      image: {
+        maxReferenceImages: 3,
+        sizePresets: ['1K'],
+        supportsImageEdit: false,
       },
     },
   },
@@ -88,6 +146,7 @@ const fallbackModels: ModelCatalogItem[] = [
         maxDuration: 15,
         resolutions: ['720P', '1080P'],
         supportsAudio: false,
+        supportsImageInput: true,
         supportsLastFrame: false,
         supportsVideoInput: false,
       },
@@ -102,36 +161,9 @@ const fallbackModels: ModelCatalogItem[] = [
         maxDuration: 15,
         resolutions: ['720P', '1080P'],
         supportsAudio: false,
+        supportsImageInput: true,
         supportsLastFrame: false,
         supportsVideoInput: false,
-      },
-    },
-  },
-  {
-    alias: 'doubao-seedance-1-0-pro',
-    capabilities: ['video'],
-    displayName: 'Seedance 1.0 Pro',
-    profile: {
-      video: {
-        maxDuration: 12,
-        resolutions: ['480P', '720P', '1080P'],
-        supportsAudio: false,
-        supportsLastFrame: true,
-        supportsVideoInput: false,
-      },
-    },
-  },
-  {
-    alias: 'doubao-seedance-2-0',
-    capabilities: ['video'],
-    displayName: 'Seedance 2.0',
-    profile: {
-      video: {
-        maxDuration: 15,
-        resolutions: ['480P', '720P', '1080P', '4K'],
-        supportsAudio: false,
-        supportsLastFrame: true,
-        supportsVideoInput: true,
       },
     },
   },
@@ -156,6 +188,44 @@ export const useModelCatalogStore = defineStore('model-catalog', {
       (state) =>
       (capability: ModelCapability, preferredAlias?: string): string => {
         const models = state.items.filter((model) => model.capabilities.includes(capability));
+
+        if (preferredAlias && models.some((model) => model.alias === preferredAlias)) {
+          return preferredAlias;
+        }
+
+        return models[0]?.alias ?? '';
+      },
+    imageModelsFor:
+      (state) =>
+      (mode: ImageModelMode): ModelCatalogItem[] =>
+        state.items.filter(
+          (model) => model.capabilities.includes('image') && matchesImageMode(model, mode),
+        ),
+    videoModelsFor:
+      (state) =>
+      (mode: VideoModelMode): ModelCatalogItem[] =>
+        state.items.filter(
+          (model) => model.capabilities.includes('video') && matchesVideoMode(model, mode),
+        ),
+    resolveImageAlias:
+      (state) =>
+      (mode: ImageModelMode, preferredAlias?: string): string => {
+        const models = state.items.filter(
+          (model) => model.capabilities.includes('image') && matchesImageMode(model, mode),
+        );
+
+        if (preferredAlias && models.some((model) => model.alias === preferredAlias)) {
+          return preferredAlias;
+        }
+
+        return models[0]?.alias ?? '';
+      },
+    resolveVideoAlias:
+      (state) =>
+      (mode: VideoModelMode, preferredAlias?: string): string => {
+        const models = state.items.filter(
+          (model) => model.capabilities.includes('video') && matchesVideoMode(model, mode),
+        );
 
         if (preferredAlias && models.some((model) => model.alias === preferredAlias)) {
           return preferredAlias;

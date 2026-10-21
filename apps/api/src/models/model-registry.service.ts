@@ -7,6 +7,11 @@ export type ModelCapability = 'chat' | 'embedding' | 'image' | 'video' | 'vision
 export interface ImageCapabilityProfile {
   maxReferenceImages: number;
   sizePresets: string[];
+  /**
+   * 是否支持「保真编辑」：把传入图片当作要改的原图，只改指令涉及的部分。
+   * false 表示只能把图片当参考图重新生成（画面会整体重绘）。
+   */
+  supportsImageEdit?: boolean;
   supportsLayerDecomposition?: boolean;
   supportsSequentialGeneration?: boolean;
 }
@@ -15,6 +20,8 @@ export interface VideoCapabilityProfile {
   maxDuration: number;
   resolutions: string[];
   supportsAudio?: boolean;
+  /** 是否支持首帧图片输入（图生视频）。 */
+  supportsImageInput?: boolean;
   supportsLastFrame?: boolean;
   supportsVideoInput?: boolean;
 }
@@ -100,25 +107,45 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
       image: {
         maxReferenceImages: 10,
         sizePresets: ['1K', '2K', '4K'],
+        supportsImageEdit: true,
       },
     },
     providerCode: 'jiguang',
     providerModel: 'gpt-image-2.5',
   },
+  // Grok 生图走 x.ai 的 images/generations：接受图片输入，但输入图只作为参考，
+  // 输出会整体重绘（实测传猫图 +「加红帽子」，背景从雪窗变成了秋日长椅）。
+  // 因此 supportsImageEdit 明确为 false，不允许出现在「保真编辑 / 智能修图」的模型列表里。
   {
-    alias: 'doubao-seedream-4-0',
+    alias: 'xai-grok-imagine-image',
     capabilities: ['image'],
-    displayName: 'Seedream 4.0',
+    displayName: 'Grok Imagine Image',
     profile: {
       image: {
-        maxReferenceImages: 14,
-        sizePresets: ['1K', '2K', '4K'],
-        supportsSequentialGeneration: true,
+        maxReferenceImages: 3,
+        sizePresets: ['1K'],
+        supportsImageEdit: false,
       },
     },
-    providerCode: 'volcengine',
-    providerModel: 'doubao-seedream-4-0-250828',
+    providerCode: 'xai',
+    providerModel: 'grok-imagine-image',
   },
+  {
+    alias: 'xai-grok-imagine-image-2.0',
+    capabilities: ['image'],
+    displayName: 'Grok Imagine Image 2.0',
+    profile: {
+      image: {
+        maxReferenceImages: 3,
+        sizePresets: ['1K'],
+        supportsImageEdit: false,
+      },
+    },
+    providerCode: 'xai',
+    providerModel: 'grok-imagine-image-2.0',
+  },
+  // 豆包 Seedream / Seedance 尚未接入：没有对应密钥，当前网关也没有火山方舟的 /api/v3 路径，
+  // 因此不再注册为可选模型，避免用户在下拉里选中后必然失败。
   {
     alias: 'xai-grok-imagine-video',
     capabilities: ['video'],
@@ -128,6 +155,7 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
         maxDuration: 15,
         resolutions: ['720P', '1080P'],
         supportsAudio: false,
+        supportsImageInput: true,
         supportsLastFrame: false,
         supportsVideoInput: false,
       },
@@ -144,44 +172,13 @@ export const DEFAULT_MODELS: RegisteredModel[] = [
         maxDuration: 15,
         resolutions: ['720P', '1080P'],
         supportsAudio: false,
+        supportsImageInput: true,
         supportsLastFrame: false,
         supportsVideoInput: false,
       },
     },
     providerCode: 'xai',
     providerModel: 'grok-imagine-video-1.5',
-  },
-  {
-    alias: 'doubao-seedance-1-0-pro',
-    capabilities: ['video'],
-    displayName: 'Seedance 1.0 Pro',
-    profile: {
-      video: {
-        maxDuration: 12,
-        resolutions: ['480P', '720P', '1080P'],
-        supportsAudio: false,
-        supportsLastFrame: true,
-        supportsVideoInput: false,
-      },
-    },
-    providerCode: 'volcengine',
-    providerModel: 'doubao-seedance-1-0-pro-250528',
-  },
-  {
-    alias: 'doubao-seedance-2-0',
-    capabilities: ['video'],
-    displayName: 'Seedance 2.0',
-    profile: {
-      video: {
-        maxDuration: 15,
-        resolutions: ['480P', '720P', '1080P', '4K'],
-        supportsAudio: false,
-        supportsLastFrame: true,
-        supportsVideoInput: true,
-      },
-    },
-    providerCode: 'volcengine',
-    providerModel: 'doubao-seedance-2-0-260128',
   },
 ];
 
@@ -218,6 +215,16 @@ function resolveImageCapabilityProfile(identity: string): ImageCapabilityProfile
     return {
       maxReferenceImages: 10,
       sizePresets: ['1K', '2K', '4K'],
+      supportsImageEdit: true,
+    };
+  }
+
+  // Grok 生图：能吃参考图，但输出是整体重绘，不具备保真编辑能力。
+  if (identity.includes('grok-imagine-image')) {
+    return {
+      maxReferenceImages: 3,
+      sizePresets: ['1K'],
+      supportsImageEdit: false,
     };
   }
 
@@ -270,6 +277,7 @@ function resolveVideoCapabilityProfile(identity: string): VideoCapabilityProfile
       maxDuration: 15,
       resolutions: ['720P', '1080P'],
       supportsAudio: false,
+      supportsImageInput: true,
       supportsLastFrame: false,
       supportsVideoInput: false,
     };

@@ -30,6 +30,26 @@ describe('provider protocol routing', () => {
     ).toBe('xai');
   });
 
+  it('routes Grok image models to the x.ai image protocol', () => {
+    expect(
+      resolveImageProviderProtocol({
+        model: 'grok-imagine-image',
+        providerCode: 'xai',
+      }),
+    ).toBe('xai');
+    expect(
+      resolveImageProviderProtocol({
+        model: 'xai-grok-imagine-image-2.0',
+      }),
+    ).toBe('xai');
+    expect(
+      resolveImageProviderProtocol({
+        model: 'gpt-image-2.5',
+        providerCode: 'jiguang',
+      }),
+    ).toBe('openai');
+  });
+
   it('builds Ark URLs without duplicating or dropping the API version', () => {
     expect(buildArkApiUrl('https://ark.example/api/v3/', '/images/generations')).toBe(
       'https://ark.example/api/v3/images/generations',

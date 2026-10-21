@@ -144,6 +144,10 @@ describe('video tasks', () => {
     expect(task).not.toHaveProperty('idempotencyKey');
     expect(task).not.toHaveProperty('providerRequestId');
 
+    // 这是纯文生视频：provider 收到的提示词要原样透传，且不能带首帧素材。
+    expect(lastVideoInput?.prompt).toBe(payload.prompt);
+    expect(lastVideoInput?.sourceImage).toBeUndefined();
+
     const resultFileId = task.resultFile?.id;
 
     expect(resultFileId).toBeTypeOf('string');
@@ -185,48 +189,21 @@ describe('video tasks', () => {
     ).toBe(1);
   });
 
-  it('creates a Seedance task with a reference video and passes it to the provider', async () => {
-    providerMode = 'success';
-    lastVideoInput = undefined;
+  it('rejects a model that is no longer registered', async () => {
+    // 豆包 Seedance 尚未接入，已从默认注册表移除，提交时应当直接找不到模型。
     const { accessToken } = await registerUser();
-    const referenceVideoFileId = await uploadReferenceVideo(accessToken, 'reference.mp4');
 
-    const createResponse = await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post('/api/v1/video-tasks')
       .set('authorization', `Bearer ${accessToken}`)
       .set('idempotency-key', randomUUID())
       .send({
         modelAlias: 'doubao-seedance-2-0',
-        parameters: {
-          duration: 5,
-          ratio: '16:9',
-          resolution: '720P',
-        },
-        prompt: '保留参考视频的镜头运动并生成极光',
-        referenceVideoFileId,
+        prompt: '未接入的模型不应可提交',
       })
-      .expect(202);
+      .expect(404);
 
-    const task = await waitForTerminalTask(accessToken, createResponse.body.data.id as string);
-
-    expect(task).toMatchObject({
-      modelAlias: 'doubao-seedance-2-0',
-      referenceVideoFile: {
-        id: referenceVideoFileId,
-        mimeType: 'video/mp4',
-      },
-      status: 'SUCCEEDED',
-    });
-    const observedVideoInput = lastVideoInput as GenerateVideoInput | undefined;
-
-    expect(observedVideoInput).toMatchObject({
-      model: 'doubao-seedance-2-0-260128',
-      referenceVideo: {
-        mimeType: 'video/mp4',
-        originalName: 'reference.mp4',
-      },
-    });
-    expect(observedVideoInput?.referenceVideo?.buffer).toEqual(MP4_BUFFER);
+    expect(response.body.error).toBeTruthy();
   });
 
   it('rejects a reference video on a model that does not support video input', async () => {

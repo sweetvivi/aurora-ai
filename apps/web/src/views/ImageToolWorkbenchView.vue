@@ -41,7 +41,7 @@ import {
   type DrawWork,
   type DrawWorkStatus,
 } from '@/stores/draw-workspace';
-import { useModelCatalogStore } from '@/stores/model-catalog';
+import { useModelCatalogStore, type ImageModelMode } from '@/stores/model-catalog';
 import { useSessionStore } from '@/stores/session';
 import { isImeComposing } from '@/utils/keyboard';
 import { clampImageSizePreset, getImageSizePresets } from '@/utils/model-capabilities';
@@ -312,15 +312,19 @@ const sourceInput = ref<HTMLInputElement | null>(null);
 const uploading = ref(false);
 const consumedRouteContext = ref('');
 
+const generationModelMode = computed<ImageModelMode>(() =>
+  sourceImage.value ? 'image-to-image' : 'text-to-image',
+);
 const generationModels = computed<ModelOption[]>(() =>
-  modelCatalog.modelsFor('image').map((model, index) => ({
+  modelCatalog.imageModelsFor(generationModelMode.value).map((model, index) => ({
     accent: modelAccents[index % modelAccents.length] ?? '#7157e8',
     label: model.displayName,
     value: model.alias,
   })),
 );
+// 智能修图需要「保留原图、只改指定部分」的保真编辑能力，只列支持编辑的模型。
 const retouchModels = computed<RetouchModelOption[]>(() =>
-  modelCatalog.modelsFor('image').map((model, index) => ({
+  modelCatalog.imageModelsFor('image-edit').map((model, index) => ({
     description: index === 0 ? '快速修图与日常增强' : '更精细的人像、商品与场景细节',
     label: model.displayName,
     value: model.alias,
@@ -831,14 +835,19 @@ onMounted(() => {
 });
 
 watch(
-  () =>
-    modelCatalog
-      .modelsFor('image')
-      .map((model) => model.alias)
-      .join('|'),
+  () => [
+    generationModels.value.map((model) => model.value).join('|'),
+    retouchModels.value.map((model) => model.value).join('|'),
+  ],
   () => {
-    selectedModel.value = modelCatalog.resolveAlias('image', selectedModel.value);
-    selectedRetouchModel.value = modelCatalog.resolveAlias('image', selectedRetouchModel.value);
+    selectedModel.value = modelCatalog.resolveImageAlias(
+      generationModelMode.value,
+      selectedModel.value,
+    );
+    selectedRetouchModel.value = modelCatalog.resolveImageAlias(
+      'image-edit',
+      selectedRetouchModel.value,
+    );
   },
   { immediate: true },
 );

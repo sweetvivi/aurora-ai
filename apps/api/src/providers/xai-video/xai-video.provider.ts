@@ -1,5 +1,6 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import sharp from 'sharp';
 import type {
   GeneratedVideo,
   GenerateVideoInput,
@@ -9,10 +10,17 @@ import type {
 } from '../video-provider';
 
 const DEFAULT_RESULT_MIME_TYPE = 'video/mp4';
+// 首帧图片会以 base64 data URL 塞进 JSON 请求体，原图动辄 2-3MB，base64 后更大，
+// 上游网关会因为包体过大把 image 丢掉，最后只剩 prompt 生效（生成的视频与原图无关）。
+const SOURCE_IMAGE_MAX_EDGE = 1280;
+const SOURCE_IMAGE_TARGET_BYTES = 900 * 1024;
+const SOURCE_IMAGE_JPEG_QUALITY = 82;
 
 @Injectable()
 export class XaiVideoProvider implements VideoProvider {
   readonly supportsLastFrame = false;
+
+  private readonly logger = new Logger(XaiVideoProvider.name);
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -40,20 +48,36 @@ export class XaiVideoProvider implements VideoProvider {
     const timeoutController = this.createTimeoutController();
 
     try {
-      const response = await fetch(`${this.baseUrl(input.providerBaseUrl)}/videos/generations`, {
-        body: JSON.stringify(this.createPayload(input)),
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          'content-type': 'application/json',
-        },
-        method: 'POST',
-        signal: timeoutController.signal,
-      });
+      const requestPayload = await this.createPayload(input);
+      let response = await this.postGeneration(
+        requestPayload,
+        apiKey,
+        timeoutController.signal,
+        input.providerBaseUrl,
+      );
+
+      // 当前 Sub2API 分组不接受 resolution 字段，带上会直接 422；而 422 不会创建任务，
+      // 所以退回不带分辨率的请求重试一次，既不丢其他网关节点的能力，也不多扣一次额度。
+      if (response.status === 422 && 'resolution' in requestPayload) {
+        delete requestPayload.resolution;
+        response = await this.postGeneration(
+          requestPayload,
+          apiKey,
+          timeoutController.signal,
+          input.providerBaseUrl,
+        );
+      }
 
       if (!response.ok) {
+        // 上游把具体原因放在 body.error.message 里，例如「image url must be http(s)」。
+        // 只报 HTTP 状态码会让「素材没被采纳」这类问题完全看不出来，所以透传原文。
+        const detail = await readProviderErrorMessage(response);
+
         throw this.createError(
           this.providerErrorCode(response.status),
-          `视频生成服务返回 HTTP ${response.status}`,
+          detail
+            ? `视频生成服务返回 HTTP ${response.status}：${detail}`
+            : `视频生成服务返回 HTTP ${response.status}`,
         );
       }
 
@@ -137,7 +161,11 @@ export class XaiVideoProvider implements VideoProvider {
         return {
           progress: 100,
           requestId,
-          result: await this.downloadResult(url, timeoutController.signal),
+          result: await this.downloadResult(
+            this.resolveAbsoluteUrl(url, options?.providerBaseUrl),
+            timeoutController.signal,
+            apiKey,
+          ),
           status: 'SUCCEEDED',
         };
       }
@@ -170,7 +198,24 @@ export class XaiVideoProvider implements VideoProvider {
     }
   }
 
-  private createPayload(input: GenerateVideoInput): Record<string, unknown> {
+  private postGeneration(
+    payload: Record<string, unknown>,
+    apiKey: string,
+    signal: AbortSignal,
+    providerBaseUrl?: string,
+  ): Promise<Response> {
+    return fetch(`${this.baseUrl(providerBaseUrl)}/videos/generations`, {
+      body: JSON.stringify(payload),
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+      signal,
+    });
+  }
+
+  private async createPayload(input: GenerateVideoInput): Promise<Record<string, unknown>> {
     const payload: Record<string, unknown> = {
       model:
         input.model ?? this.configService.get<string>('VIDEO_DEFAULT_MODEL', 'grok-imagine-video'),
@@ -194,17 +239,63 @@ export class XaiVideoProvider implements VideoProvider {
 
     if (input.sourceImage) {
       payload.image = {
-        url: toDataUrl(input.sourceImage),
+        url: toDataUrl(await this.prepareSourceImage(input.sourceImage)),
       };
     }
 
     return payload;
   }
 
-  private async downloadResult(url: string, signal: AbortSignal): Promise<GeneratedVideo> {
+  /**
+   * 把首帧图压到网关能接受的体积。原实现直接把原图转 base64 塞进 JSON，
+   * 2-3MB 的 PNG 会变成 4MB 以上的请求体，上游会把 image 丢弃、只按 prompt 生成。
+   */
+  private async prepareSourceImage(image: VideoSourceImage): Promise<VideoSourceImage> {
+    if (image.buffer.length <= SOURCE_IMAGE_TARGET_BYTES && image.mimeType === 'image/jpeg') {
+      return image;
+    }
+
+    try {
+      const buffer = await sharp(image.buffer)
+        .rotate()
+        .resize(SOURCE_IMAGE_MAX_EDGE, SOURCE_IMAGE_MAX_EDGE, {
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .jpeg({ mozjpeg: true, quality: SOURCE_IMAGE_JPEG_QUALITY })
+        .toBuffer();
+
+      this.logger.log(
+        `Source image compressed ${formatKilobytes(image.buffer.length)} -> ${formatKilobytes(buffer.length)}`,
+      );
+
+      return {
+        buffer,
+        mimeType: 'image/jpeg',
+        originalName: image.originalName.replace(/\.[^.]+$/, '') + '.jpg',
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Source image compression failed, sending original: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+
+      return image;
+    }
+  }
+
+  private async downloadResult(
+    url: string,
+    signal: AbortSignal,
+    apiKey: string,
+  ): Promise<GeneratedVideo> {
+    // 上游返回的是站内相对地址（例如 /v1/videos/<id>/content），且该地址需要 Bearer 鉴权，
+    // 直接把相对地址交给 fetch 会抛 URL 解析错误，最终被上层误判成「视频生成失败」。
     const response = await fetch(url, {
       headers: {
         accept: 'video/*,application/octet-stream;q=0.9,*/*;q=0.5',
+        authorization: `Bearer ${apiKey}`,
       },
       signal,
     });
@@ -251,6 +342,16 @@ export class XaiVideoProvider implements VideoProvider {
     return (
       providerBaseUrl?.trim() || this.configService.getOrThrow<string>('VIDEO_BASE_URL')
     ).replace(/\/+$/, '');
+  }
+
+  private resolveAbsoluteUrl(url: string, providerBaseUrl?: string): string {
+    if (/^https?:\/\//i.test(url)) {
+      return url;
+    }
+
+    // base 已带 /v1，上游给的相对地址也以 /v1 开头，用 URL 解析而不是字符串拼接，
+    // 避免出现 /v1/v1/... 或丢掉前缀。
+    return new URL(url, `${this.baseUrl(providerBaseUrl)}/`).toString();
   }
 
   private resolveApiKey(providerKeyRef?: string): string | undefined {
@@ -315,6 +416,23 @@ export class XaiVideoProvider implements VideoProvider {
 
 function toDataUrl(image: VideoSourceImage): string {
   return `data:${image.mimeType};base64,${image.buffer.toString('base64')}`;
+}
+
+function formatKilobytes(bytes: number): string {
+  return `${Math.round(bytes / 1024)}KB`;
+}
+
+async function readProviderErrorMessage(response: Response): Promise<string> {
+  try {
+    const text = await response.text();
+    const payload = JSON.parse(text) as unknown;
+    const record = readRecord(payload);
+    const error = readRecord(record?.error);
+
+    return readString(error?.message) ?? readString(record?.message) ?? text.slice(0, 200);
+  } catch {
+    return '';
+  }
 }
 
 function resolveDuration(parameters: Record<string, unknown> | undefined): number | undefined {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { CODE_COPY_BUTTON_CLASS, readCodeBlockText, renderSafeMarkdown } from './markdown';
+import {
+  CODE_COPY_BUTTON_CLASS,
+  readCodeBlockText,
+  renderSafeMarkdown,
+  stripMarkdown,
+} from './markdown';
 
 describe('safe markdown rendering', () => {
   it('renders structured markdown and adds code copy controls', () => {
@@ -43,5 +48,37 @@ describe('safe markdown rendering', () => {
     expect(link?.getAttribute('href')).toBe('https://openai.com');
     expect(link?.getAttribute('rel')).toBe('noopener noreferrer');
     expect(link?.getAttribute('target')).toBe('_blank');
+  });
+});
+
+describe('plain text extraction', () => {
+  it('drops emphasis, headings and list markers from generated copy', () => {
+    const text = stripMarkdown(
+      [
+        '**核心主张：** 把清晨的自然光收进主视觉',
+        '',
+        '### 备选文案',
+        '- **方案 A**：让产品先被阳光看见',
+        '- **方案 B**：每天第一束光，留给它',
+      ].join('\n'),
+    );
+
+    expect(text).not.toContain('**');
+    expect(text).not.toContain('###');
+    expect(text).not.toContain('- ');
+    expect(text).toContain('核心主张： 把清晨的自然光收进主视觉');
+    expect(text).toContain('· 方案 A：让产品先被阳光看见');
+  });
+
+  it('keeps code content and drops link targets', () => {
+    expect(stripMarkdown('用 `sourceFileId` 关联，详见 [文档](https://example.com)。')).toBe(
+      '用 sourceFileId 关联，详见 文档。',
+    );
+    expect(stripMarkdown('```js\nconst a = 1;\n```')).toBe('const a = 1;');
+  });
+
+  it('cleans dangling markers while a stream is still arriving', () => {
+    expect(stripMarkdown('核心主张：把光收进来 **')).toBe('核心主张：把光收进来');
+    expect(stripMarkdown('**核心主张：把光收进来')).toBe('核心主张：把光收进来');
   });
 });

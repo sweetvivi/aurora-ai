@@ -752,11 +752,21 @@ export class VideoTasksService implements OnModuleInit {
       VIDEO_WORKER_RESTARTED: '视频任务因服务重启中断，本次积分已退回',
     };
 
+    // 上游 400/401 的原因（例如「image url must be http(s)」）只写在 error.message 里，
+    // 全部替换成中文兜底文案会让「素材没被采纳」这类问题彻底看不见，因此在 VIDEO_* 前缀的
+    // 错误上优先透传原始信息。
+    const rawMessage =
+      typeof payload?.message === 'string'
+        ? payload.message
+        : typeof (error as { message?: unknown })?.message === 'string'
+          ? String((error as { message: string }).message)
+          : '';
+
     return {
       code,
       message:
-        typeof payload?.message === 'string'
-          ? payload.message
+        rawMessage.trim() && code.startsWith('VIDEO_')
+          ? rawMessage
           : (messages[code] ?? '视频生成失败，本次积分已退回'),
     };
   }

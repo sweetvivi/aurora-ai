@@ -74,3 +74,32 @@ export function readCodeBlockText(container: Element, button: Element): string {
 
   return preformatted.querySelector('code')?.textContent ?? preformatted.textContent ?? '';
 }
+
+/**
+ * 把 Markdown 压成纯文本，用于画布节点这类不支持富文本、也不该暴露语法的位置。
+ *
+ * 文案生成返回的「**核心主张**」「### 关键词」直接塞进节点会很难看，复制出去也带记号；
+ * 这里只去掉排版记号，保留换行与列表层级。
+ */
+export function stripMarkdown(source: string): string {
+  return (
+    source
+      .replace(/```[a-zA-Z0-9_-]*\n?([\s\S]*?)```/g, '$1')
+      .replace(/`([^`\n]+)`/g, '$1')
+      .replace(/!\[[^\]]*]\([^)]*\)/g, '')
+      .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+      .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+      .replace(/^\s{0,3}>\s?/gm, '')
+      .replace(/^\s{0,3}[-*+]\s+/gm, '· ')
+      .replace(/^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/gm, '')
+      .replace(/\*\*([^*\n]+)\*\*/g, '$1')
+      .replace(/__([^_\n]+)__/g, '$1')
+      .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1$2')
+      .replace(/~~([^~\n]+)~~/g, '$1')
+      // 流式输出到一半时可能停在一对记号的中间，收尾再把孤立记号清掉。
+      .replace(/[*_]{1,3}(?=\s|$)/gm, '')
+      .replace(/^[*_]{1,3}(?=\S)/gm, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  );
+}

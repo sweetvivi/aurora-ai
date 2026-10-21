@@ -48,7 +48,7 @@ import {
   useDrawWorkspaceStore,
   type DrawWorkStatus,
 } from '@/stores/draw-workspace';
-import { useModelCatalogStore } from '@/stores/model-catalog';
+import { useModelCatalogStore, type ImageModelMode } from '@/stores/model-catalog';
 import { useSessionStore } from '@/stores/session';
 
 interface NavigationItem {
@@ -444,8 +444,17 @@ const router = useRouter();
 const sessionStore = useSessionStore();
 const workspace = useDrawWorkspaceStore();
 
+// 模型列表按当前创作场景过滤：局部编辑 / 商品图处理需要「保留原图」的能力，
+// 参考图重绘需要能吃参考图；Grok 生图只能整体重绘，因此不会出现在前两类的列表里。
+const activeModelMode = computed<ImageModelMode>(() => {
+  if (selectedMode.value === '局部编辑' || selectedMode.value === '商品图处理') {
+    return 'image-edit';
+  }
+
+  return referenceImages.value.length > 0 ? 'image-to-image' : 'text-to-image';
+});
 const models = computed<ModelItem[]>(() =>
-  modelCatalog.modelsFor('image').map((model, index) => ({
+  modelCatalog.imageModelsFor(activeModelMode.value).map((model, index) => ({
     accent: modelAccents[index % modelAccents.length] ?? '#7a5cff',
     badge: index === 0 ? '推荐' : undefined,
     label: model.displayName,
@@ -1285,7 +1294,7 @@ onMounted(() => {
 watch(
   () => models.value.map((model) => model.value).join('|'),
   () => {
-    currentModel.value = modelCatalog.resolveAlias('image', currentModel.value);
+    currentModel.value = modelCatalog.resolveImageAlias(activeModelMode.value, currentModel.value);
   },
   { immediate: true },
 );

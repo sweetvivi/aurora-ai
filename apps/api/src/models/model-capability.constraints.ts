@@ -5,6 +5,15 @@ export interface ModelConstraintViolation {
   message: string;
 }
 
+/** 需要「保留原图、只改指定区域」的编辑类模式；只有支持保真编辑的模型能接。 */
+const IMAGE_EDIT_MODES = new Set([
+  '局部编辑',
+  '商品图处理',
+  'image-edit',
+  'image-to-image',
+  'retouch',
+]);
+
 export function findImageModelConstraintViolation(input: {
   parameters?: Record<string, unknown>;
   profile?: ModelCapabilityProfile;
@@ -18,6 +27,19 @@ export function findImageModelConstraintViolation(input: {
   }
 
   const inputImageCount = input.referenceFileIds.length + (input.sourceFileId ? 1 : 0);
+  const mode = readString(input.parameters?.mode);
+
+  if (
+    profile.supportsImageEdit === false &&
+    inputImageCount > 0 &&
+    mode !== undefined &&
+    IMAGE_EDIT_MODES.has(mode.toLowerCase())
+  ) {
+    return {
+      code: 'IMAGE_EDIT_UNSUPPORTED',
+      message: '当前模型只能用参考图重新绘制，不支持保留原图的编辑，请切换到支持编辑的模型',
+    };
+  }
 
   if (inputImageCount > profile.maxReferenceImages) {
     return {
@@ -97,6 +119,13 @@ export function findVideoModelConstraintViolation(input: {
     };
   }
 
+  if (input.sourceFileId && profile.supportsImageInput === false) {
+    return {
+      code: 'VIDEO_IMAGE_INPUT_UNSUPPORTED',
+      message: '当前视频模型不支持图生视频，请切换为文生视频或换用支持首帧输入的模型',
+    };
+  }
+
   if (input.hasLastFrame && profile.supportsLastFrame === false) {
     return {
       code: 'VIDEO_LAST_FRAME_UNSUPPORTED',
@@ -129,6 +158,10 @@ export function findVideoModelConstraintViolation(input: {
   }
 
   return null;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function readUppercaseString(

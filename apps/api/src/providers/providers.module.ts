@@ -10,6 +10,7 @@ import { SeedreamImageProvider } from './seedream-image/seedream-image.provider'
 import { VIDEO_PROVIDER } from './video-provider';
 import { VideoProviderRouter } from './video-provider-router';
 import { MockVideoProvider } from './mock-video/mock-video.provider';
+import { XaiImageProvider } from './xai-image/xai-image.provider';
 import { XaiVideoProvider } from './xai-video/xai-video.provider';
 
 @Module({
@@ -20,6 +21,7 @@ import { XaiVideoProvider } from './xai-video/xai-video.provider';
     MockVideoProvider,
     SeedanceVideoProvider,
     SeedreamImageProvider,
+    XaiImageProvider,
     XaiVideoProvider,
     ImageProviderRouter,
     VideoProviderRouter,
@@ -48,6 +50,7 @@ import { XaiVideoProvider } from './xai-video/xai-video.provider';
     VIDEO_PROVIDER,
     MockVideoProvider,
     SeedanceVideoProvider,
+    XaiImageProvider,
     XaiVideoProvider,
   ],
 })

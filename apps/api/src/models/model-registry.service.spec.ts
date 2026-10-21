@@ -39,22 +39,45 @@ describe('model registry', () => {
     });
   });
 
-  it('registers a reference-video capable Seedance model by default', () => {
+  it('keeps Seedance out of the default registry until it is actually wired', () => {
+    // 豆包 Seedream / Seedance 尚未接入：没有密钥，网关也没有火山方舟的 /api/v3 路径。
+    // 这里锁住「不再注册」这个决定，避免以后误加回可选列表。
     const registry = createRegistry();
-    const model = registry.getByAlias('doubao-seedance-2-0');
+    const aliases = registry.list().map((model) => model.alias);
+
+    expect(aliases).not.toContain('doubao-seedance-1-0-pro');
+    expect(aliases).not.toContain('doubao-seedance-2-0');
+    expect(aliases).not.toContain('doubao-seedream-4-0');
+  });
+
+  it('registers Grok image models as reference-capable but not edit-capable', () => {
+    const registry = createRegistry();
+    const model = registry.getByAlias('xai-grok-imagine-image');
 
     expect(model).toMatchObject({
-      providerCode: 'volcengine',
-      providerModel: 'doubao-seedance-2-0-260128',
+      capabilities: ['image'],
+      providerCode: 'xai',
+      providerModel: 'grok-imagine-image',
       profile: {
-        video: {
-          maxDuration: 15,
-          resolutions: ['480P', '720P', '1080P', '4K'],
-          supportsLastFrame: true,
-          supportsVideoInput: true,
+        image: {
+          maxReferenceImages: 3,
+          sizePresets: ['1K'],
+          supportsImageEdit: false,
         },
       },
     });
+    expect(registry.getByAlias('xai-grok-imagine-image-2.0')).toMatchObject({
+      providerModel: 'grok-imagine-image-2.0',
+    });
+  });
+
+  it('marks video models with first-frame input support', () => {
+    const registry = createRegistry();
+
+    for (const alias of ['xai-grok-imagine-video', 'xai-grok-imagine-video-1.5']) {
+      expect(registry.getByAlias(alias).profile?.video?.supportsImageInput).toBe(true);
+      expect(registry.getByAlias(alias).profile?.video?.supportsLastFrame).toBe(false);
+    }
   });
 
   it('loads enabled database models and keeps provider connection metadata', async () => {
@@ -75,7 +98,7 @@ describe('model registry', () => {
     ]);
 
     await expect(registry.reload()).resolves.toEqual({
-      count: 15,
+      count: 14,
       source: 'database',
     });
     expect(registry.list()).toEqual(
@@ -89,12 +112,9 @@ describe('model registry', () => {
           providerCode: 'database-provider',
           providerModel: 'provider-chat-v1',
         },
-        expect.objectContaining({
-          alias: 'doubao-seedance-2-0',
-        }),
       ]),
     );
-    expect(registry.list()).toHaveLength(15);
+    expect(registry.list()).toHaveLength(14);
   });
 
   it('lets an enabled database model override the default alias', async () => {
@@ -144,7 +164,7 @@ describe('model registry', () => {
     await registry.reload();
 
     expect(() => registry.getByAlias('openai-gpt-6-astra')).toThrow();
-    expect(registry.list()).toHaveLength(13);
+    expect(registry.list()).toHaveLength(12);
   });
 
   it('derives capability profiles for known image and video model families', () => {
@@ -321,7 +341,7 @@ describe('model registry', () => {
       count: expect.any(Number),
       source: 'defaults',
     });
-    expect(registry.list()).toHaveLength(14);
+    expect(registry.list()).toHaveLength(13);
   });
 
   it('falls back to defaults when the initial database load fails', async () => {
@@ -333,7 +353,7 @@ describe('model registry', () => {
     const registry = new ModelRegistryService(new ConfigService({}), prisma);
 
     await expect(registry.reload()).resolves.toMatchObject({
-      count: 14,
+      count: 13,
       source: 'defaults',
     });
     expect(registry.getByAlias('openai-gpt-6-astra').providerModel).toBe('gpt-6-astra');

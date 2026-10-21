@@ -182,8 +182,10 @@ const consumedRouteContext = ref('');
 const uploadingSource = ref(false);
 let noticeTimer: number | undefined;
 
+// 模型列表跟随生成模式过滤：不支持图生视频的模型不会出现在「图生视频」的列表里，
+// 首尾帧 / 参考视频同理，避免选中后必然失败。
 const models = computed<VideoModel[]>(() =>
-  modelCatalog.modelsFor('video').map((model, index) => ({
+  modelCatalog.videoModelsFor(mode.value).map((model, index) => ({
     accent: modelAccents[index % modelAccents.length] ?? '#7c72ff',
     badge: index === 0 ? '推荐' : undefined,
     description:
@@ -255,10 +257,20 @@ const audioAvailability = computed<'supported' | 'unknown' | 'unsupported'>(() =
 });
 const availableModes = computed<VideoModeOption[]>(() =>
   modes.map((item) => {
+    // 当前没有任何模型能接住这个模式时直接标为不可用；只要存在可用模型就允许切换，
+    // 切换后模型列表会随之收窄并自动选中兼容模型。
+    if (modelCatalog.videoModelsFor(item.value).length === 0) {
+      return {
+        ...item,
+        available: false,
+        availabilityLabel: '暂无可用模型',
+      };
+    }
+
     if (item.value === 'first-last-frame') {
       return {
         ...item,
-        available: firstLastFrameAvailability.value.available,
+        available: true,
         availabilityLabel: firstLastFrameAvailability.value.availabilityLabel,
       };
     }
@@ -266,7 +278,7 @@ const availableModes = computed<VideoModeOption[]>(() =>
     if (item.value === 'reference-video') {
       return {
         ...item,
-        available: referenceVideoAvailability.value.available,
+        available: true,
         availabilityLabel: referenceVideoAvailability.value.availabilityLabel,
       };
     }
@@ -469,17 +481,10 @@ function changeMode(nextMode: VideoMode): void {
   const nextModeOption = availableModes.value.find((item) => item.value === nextMode);
 
   if (nextModeOption?.available === false) {
-    const unavailableMessage =
-      nextMode === 'reference-video'
-        ? '当前模型不支持参考视频，请切换到支持视频输入的模型'
-        : nextMode === 'first-last-frame'
-          ? '当前模型不支持首尾帧，请切换为文生视频或图生视频'
-          : '当前模型的视频能力待确认';
-
     showNotice(
-      nextModeOption.availabilityLabel === '模型不支持'
-        ? unavailableMessage
-        : '当前模型的视频能力待确认',
+      nextModeOption.availabilityLabel === '暂无可用模型'
+        ? '当前没有支持该模式的视频模型，请换一种生成方式'
+        : (nextModeOption.availabilityLabel ?? '当前模式的视频能力待确认'),
     );
     return;
   }
@@ -747,10 +752,15 @@ onMounted(() => {
 });
 
 watch(
-  () =>
-    JSON.stringify(modelCatalog.modelsFor('video').map((model) => [model.alias, model.profile])),
+  () => [
+    mode.value,
+    modelCatalog
+      .videoModelsFor(mode.value)
+      .map((model) => `${model.alias}:${JSON.stringify(model.profile)}`)
+      .join('|'),
+  ],
   () => {
-    selectedModel.value = modelCatalog.resolveAlias('video', selectedModel.value);
+    selectedModel.value = modelCatalog.resolveVideoAlias(mode.value, selectedModel.value);
     applyActiveModelConstraints();
   },
   { immediate: true },

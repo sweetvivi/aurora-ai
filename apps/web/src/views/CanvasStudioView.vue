@@ -2,6 +2,7 @@
 import {
   AppstoreOutlined,
   ArrowRightOutlined,
+  ArrowUpOutlined,
   BgColorsOutlined,
   BulbOutlined,
   CheckOutlined,
@@ -38,23 +39,33 @@ import {
 import type { Component } from 'vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
+  createVideoTask,
   deleteCanvasWorkflow,
   fetchCanvasWorkflows,
   fetchFileBlob,
+  getVideoTask,
+  listVideoTasks,
   saveCanvasWorkflow,
   streamChat,
   type CanvasWorkflowRecord,
+  type VideoTask,
 } from '@/app/api';
 import GalleryArtwork from '@/components/GalleryArtwork.vue';
+import { VIDEO_TASK_POINTS_COST } from '@/stores/video-workspace';
 import {
   IMAGE_TASK_POINTS_COST,
   useDrawWorkspaceStore,
   type DrawWork,
   type DrawWorkStatus,
 } from '@/stores/draw-workspace';
-import { useModelCatalogStore } from '@/stores/model-catalog';
+import {
+  useModelCatalogStore,
+  type ImageModelMode,
+  type VideoModelMode,
+} from '@/stores/model-catalog';
 import { parseLocalCanvasWorkflow, serializeLocalCanvasWorkflow } from '@/utils/canvas-persistence';
 import { isImeComposing } from '@/utils/keyboard';
+import { stripMarkdown } from '@/utils/markdown';
 import { clampImageSizePreset, getImageSizePresets } from '@/utils/model-capabilities';
 
 type CanvasNodeKind = 'image' | 'output' | 'prompt' | 'video';
@@ -72,11 +83,14 @@ interface CanvasNode {
   id: string;
   kind: CanvasNodeKind;
   previewUrl?: string;
+  /** 0-100，视频任务轮询时回写，用于节点左下角的进度展示。 */
+  progress?: number;
   prompt: string;
   resultFileId?: string;
   sourceFileId?: string;
   status?: CanvasNodeStatus;
   title: string;
+  videoTaskId?: string;
   width: number;
   workId?: string;
   x: number;
@@ -158,8 +172,16 @@ interface GenerationModel {
 
 const CANVAS_STORAGE_KEY = 'aurora-canvas-workflows-v1';
 const CANVAS_ASSET_STORAGE_KEY = 'aurora-canvas-assets-v1';
-const WORLD_WIDTH = 3400;
-const WORLD_HEIGHT = 2200;
+// 画布世界按「看不到边界」的量级铺开，配合 10% 下限的缩放，缩到最小时仍有充足的
+// 可平移空间，视口内不会出现工作区边框。
+const WORLD_WIDTH = 8000;
+const WORLD_HEIGHT = 6000;
+// 网格点在世界坐标里是固定间距：缩放时点距同步变化，缩得过小时点会先变淡再消失，
+// 和参考产品缩小到极小倍率时「看不到点」的表现一致。
+const CANVAS_GRID_SIZE = 22;
+const CANVAS_GRID_OPACITY = 0.34;
+const CANVAS_GRID_FADE_MIN = 4;
+const CANVAS_GRID_FADE_MAX = 9;
 
 const railActions: RailAction[] = [
   { icon: PlusOutlined, label: '添加', value: 'add' },
@@ -265,11 +287,23 @@ const historyPanelExpanded = ref(false);
 const pendingNodeQuickAction = ref<'image' | 'video' | ''>('');
 const inspirationMessage = ref('');
 const composerPrompt = ref('');
+// 每个节点各留一份未提交的草稿：切换素材时把上一份存起来，回来还能接着写。
+// 没有草稿时回填节点自己的创作指令（参考产品「素材下方带着这段说明」的效果）。
+const composerDrafts = new Map<string, string>();
+let composerDraftNodeId = '';
 const composerSourceNodeId = ref('');
 const composerTargetNodeId = ref('');
 const selectedModel = ref(modelCatalog.resolveAlias('image'));
 const selectedRatio = ref('16:9');
 const selectedSize = ref('1K');
+// 视频节点的创作区改用时长/分辨率，避免出现对视频无意义的「1K」清晰度。
+const selectedVideoDuration = ref(6);
+const selectedVideoResolution = ref('720P');
+const canvasVideoDurations = [6, 10, 15];
+const canvasVideoResolutions = ['720P', '1080P'];
+// 文案生成期间的占位文字。它会在 setup 早期就被输入框回填逻辑读到，
+// 必须定义在使用点之前，否则会撞上 const 的暂时性死区。
+const TEXT_GENERATION_PLACEHOLDER = '正在读取节点素材并生成文案…';
 const uploadCategory = ref<Exclude<CanvasAssetCategory, 'all'>>('other');
 const uploadingAssets = ref(false);
 const uploadingNodeImage = ref(false);
@@ -328,12 +362,68 @@ let cloudSavePromise: Promise<void> | null = null;
 let cloudSaveQueued = false;
 let composerResizeObserver: ResizeObserver | undefined;
 
-const generationModels = computed<GenerationModel[]>(() =>
-  modelCatalog.modelsFor('image').map((model) => ({
+// 目标节点决定模型族：显式指定的提交目标优先，其次回退到当前单选节点。
+// 只点选不提交时 composerTargetNodeId 为空，这里必须兜底，否则视频节点会列出图片模型。
+const composerTargetNode = computed(() => {
+  const candidates = [
+    composerTargetNodeId.value,
+    selectedNodeIds.value.length === 1 ? selectedNodeId.value : '',
+  ];
+
+  for (const id of candidates) {
+    if (!id) {
+      continue;
+    }
+
+    const node = nodes.value.find((item) => item.id === id);
+
+    if (node) {
+      return node;
+    }
+  }
+
+  return undefined;
+});
+const composerSourceNode = computed(() =>
+  nodes.value.find((node) => node.id === composerSourceNodeId.value),
+);
+// 创作区提交按「目标节点」决定模型族：视频节点走图生视频模型，图片节点按有没有素材
+// 分成文生图 / 图生图。这样不支持图生视频的模型不会出现在视频节点的下拉里。
+const composerIsVideoTarget = computed(() => composerTargetNode.value?.kind === 'video');
+// 选中文案节点时，下方那个框不是用来「生成」的，而是用来「改这段文字」的。
+// 想拿文案去出图或出视频，走节点菜单里的「图像生成 / 视频生成」。
+const composerEditingPrompt = computed(() =>
+  composerAnchorNode.value?.kind === 'prompt' ? composerAnchorNode.value : undefined,
+);
+// 视频节点有两类：带首帧的图生视频，和不带素材的文生视频（由文案节点派生）。
+// 两者可用的模型清单不同，必须跟着节点走，不能一律按图生视频过滤。
+const composerVideoMode = computed<VideoModelMode>(() =>
+  composerTargetNode.value?.generationMode === 'text-to-video' ? 'text-to-video' : 'image-to-video',
+);
+const composerImageMode = computed<ImageModelMode>(() => {
+  const source =
+    composerSourceNode.value ??
+    (selectedNodeIds.value.length === 1
+      ? nodes.value.find((node) => node.id === selectedNodeId.value)
+      : undefined);
+
+  return nodeSourceFileId(source) || composerTargetNode.value?.sourceFileId
+    ? 'image-to-image'
+    : 'text-to-image';
+});
+const generationModels = computed<GenerationModel[]>(() => {
+  if (composerIsVideoTarget.value) {
+    return modelCatalog.videoModelsFor(composerVideoMode.value).map((model) => ({
+      label: model.displayName,
+      value: model.alias,
+    }));
+  }
+
+  return modelCatalog.imageModelsFor(composerImageMode.value).map((model) => ({
     label: model.displayName,
     value: model.alias,
-  })),
-);
+  }));
+});
 const activeImageProfile = computed(
   () =>
     modelCatalog.modelsFor('image').find((model) => model.alias === selectedModel.value)?.profile
@@ -367,6 +457,7 @@ const composerAnchorNode = computed(() => {
 
   return undefined;
 });
+watch(composerAnchorNode, (node) => syncComposerDraft(node), { immediate: true });
 const composerAnchorStyle = computed<Record<string, string> | undefined>(() => {
   const node = composerAnchorNode.value;
 
@@ -374,36 +465,81 @@ const composerAnchorStyle = computed<Record<string, string> | undefined>(() => {
     return undefined;
   }
 
-  const { height, width } = composerSize.value;
+  const { width } = composerSize.value;
   const gap = 18;
   const margin = 14;
   const centerX = viewport.value.x + (node.x + node.width / 2) * viewport.value.scale;
   const nodeBottom = viewport.value.y + (node.y + node.height) * viewport.value.scale;
   const boardWidth = workspaceSize.value.width;
-  const boardHeight = workspaceSize.value.height;
   let left = centerX - width / 2;
-  let top = nodeBottom + gap;
 
   if (boardWidth > 0) {
     left = Math.min(left, boardWidth - width - margin);
   }
 
-  if (boardHeight > 0) {
-    top = Math.min(top, boardHeight - height - margin);
-  }
-
+  // 垂直方向严格跟随节点：素材沉到视口下方时输入区一起沉下去，被画布裁掉而不是被
+  // clamp 回屏幕内「浮」在底部；水平方向仍保留边界保护，避免整块移出视口点不到。
   return {
     bottom: 'auto',
     left: `${Math.round(Math.max(left, margin))}px`,
     right: 'auto',
-    top: `${Math.round(Math.max(top, margin))}px`,
+    top: `${Math.round(nodeBottom + gap)}px`,
   };
 });
-const composerPlaceholder = computed(() =>
-  composerSourceNodeId.value
-    ? '描述你想生成的内容，例如：让图中男女位置对调...'
-    : '描述你想生成的内容...',
-);
+const composerPlaceholder = computed(() => {
+  if (composerEditingPrompt.value) {
+    return '修改这段文案，保存后会写回节点…';
+  }
+
+  return composerSourceNodeId.value
+    ? '描述您想要生成的内容，例如：让图中男女位置对调...'
+    : '描述您想要生成的内容...';
+});
+// 把「这次到底拿哪张素材在生成」直接写出来，避免用户误以为是另一张图。
+const composerMaterialLabel = computed(() => {
+  const target = composerTargetNode.value;
+  const source = composerSourceNode.value;
+  const candidates: CanvasNode[] = [];
+
+  // 文案节点编辑的是文字，不消费任何画面素材，别把它的上游图片算成「参考素材」。
+  if (target?.kind === 'prompt') {
+    return '';
+  }
+
+  if (target) {
+    if (nodeResultFileId(target) || target.kind === 'image') {
+      candidates.push(target);
+    } else {
+      // 还没产出的目标节点：素材来自它的入边，而不是它自己（它还是空的）。
+      const linked = edges.value.filter((item) => item.to === target.id).at(-1);
+      const linkedNode = linked ? nodes.value.find((node) => node.id === linked.from) : undefined;
+
+      if (linkedNode) {
+        candidates.push(linkedNode);
+      }
+
+      if (nodeSourceFileId(target)) {
+        candidates.push(target);
+      }
+    }
+  }
+
+  if (source) {
+    candidates.push(source);
+  }
+
+  for (const node of candidates) {
+    if (node.kind === 'video') {
+      return '该视频的首帧';
+    }
+
+    if (node.kind !== 'prompt' && nodeSourceFileId(node)) {
+      return nodeCaption(node);
+    }
+  }
+
+  return '';
+});
 const angleDialogNode = computed(() =>
   nodes.value.find((node) => node.id === angleDialogNodeId.value),
 );
@@ -438,6 +574,13 @@ const filteredAssets = computed(() => {
   return assets.value.filter((asset) => asset.category === activeAssetCategory.value);
 });
 const imageHistory = computed(() => workspace.works.filter((work) => work.status === 'done'));
+// 视频任务走独立的 /api/v1/video-tasks，不进 works 队列，历史面板必须单独取，
+// 否则「视频历史」永远为空，用户会以为视频没保存。
+const videoHistoryTasks = ref<VideoTask[]>([]);
+const videoHistoryLoading = ref(false);
+const videoHistory = computed(() =>
+  videoHistoryTasks.value.filter((task) => task.status === 'SUCCEEDED' && task.resultFile?.id),
+);
 const visibleHistory = computed(() =>
   activeHistoryTab.value === 'image' ? imageHistory.value : [],
 );
@@ -462,14 +605,58 @@ const selectedBatchNodes = computed(() =>
   ),
 );
 const batchCost = computed(() => selectedBatchNodes.value.length * IMAGE_TASK_POINTS_COST);
-const composerCost = IMAGE_TASK_POINTS_COST;
+// 视频节点按视频任务的积分计价，避免角标还写着图片的 5 积分。
+const composerCost = computed(() =>
+  composerIsVideoTarget.value ? VIDEO_TASK_POINTS_COST : IMAGE_TASK_POINTS_COST,
+);
 const submitting = computed(() => workspace.submitting);
+// 参考产品行为：创作输入区默认不常驻在画布左下角，只有点击画布素材（选中节点或从节点
+// 发起生成）后，才吸附到该节点下方出现。取消选中时隐藏但保留草稿，重新选中会带回来。
+const composerVisible = computed(() => Boolean(composerAnchorNode.value) || submitting.value);
+
+watch(composerVisible, async (visible) => {
+  if (!visible) {
+    return;
+  }
+
+  await nextTick();
+  syncComposerSize();
+});
+
+// 切到「视频历史」时再去拉视频任务：单个视频文件动辄好几 MB，
+// 页面一进来就全量下载既慢又没必要。
+watch([activeHistoryTab, activeRailMenu], ([tab, rail]) => {
+  if (tab === 'video' && rail === 'history') {
+    void loadVideoHistory();
+  }
+});
 const canvasClipboard = ref<CanvasSnapshot | null>(null);
 const canvasClipboardPasteCount = ref(0);
 const canvasTransform = computed(
   () =>
     `translate3d(${viewport.value.x}px, ${viewport.value.y}px, 0) scale(${viewport.value.scale})`,
 );
+// 网格跟着视口一起平移、一起缩放，才有「点钉在画布上」的物理感；点距小于阈值时按
+// 线性关系淡出，缩到 10% 附近点已经完全不可见。
+const canvasGridStyle = computed<Record<string, string>>(() => {
+  const size = CANVAS_GRID_SIZE * viewport.value.scale;
+  const range = CANVAS_GRID_FADE_MAX - CANVAS_GRID_FADE_MIN;
+  const fade = Math.min(1, Math.max(0, (size - CANVAS_GRID_FADE_MIN) / range));
+  const alpha = CANVAS_GRID_OPACITY * fade;
+  const style: Record<string, string> = {
+    '--canvas-grid-alpha': alpha.toFixed(3),
+    '--canvas-grid-size': `${size.toFixed(2)}px`,
+    '--canvas-grid-x': `${viewport.value.x}px`,
+    '--canvas-grid-y': `${viewport.value.y}px`,
+  };
+
+  if (alpha <= 0.005) {
+    // 点距过密时彻底关掉渐变，避免密集重复渐变造成的摩尔纹和高光栅化开销。
+    style.backgroundImage = 'none';
+  }
+
+  return style;
+});
 const connectionPreview = computed(() => {
   const drag = connectionDrag.value;
 
@@ -558,7 +745,14 @@ function showCanvasNotice(message: string): void {
   }, 2600);
 }
 
-function createSeedCanvas(): CanvasSnapshot {
+function createBlankCanvas(): CanvasSnapshot {
+  // 参考产品的空白画布就是纯点阵背景，没有任何预置节点；首屏与「新建」都从这里开始，
+  // 避免用假素材冒充用户作品。
+  return { edges: [], groups: [], nodes: [] };
+}
+
+// 仅用于「工作流模板」面板：按模板要求的节点数量裁剪出示例工作流，不属于首屏默认内容。
+function createTemplateCanvas(): CanvasSnapshot {
   const firstId = 'node-seed-image';
   const secondId = 'node-seed-detail';
   const promptId = 'node-seed-prompt';
@@ -872,11 +1066,11 @@ async function loadCanvas(): Promise<void> {
     canvasId = local.id;
     lastSavedAt.value = local.savedAt ? formatSavedAt(local.savedAt) : '';
   } else {
-    const seed = createSeedCanvas();
+    const blank = createBlankCanvas();
 
-    nodes.value = seed.nodes;
-    edges.value = seed.edges;
-    groups.value = seed.groups;
+    nodes.value = blank.nodes;
+    edges.value = blank.edges;
+    groups.value = blank.groups;
     canvasId = createId('canvas');
   }
 
@@ -981,13 +1175,13 @@ function toggleHistoryPanel(): void {
 
 function createCanvas(): void {
   commitHistory();
-  const seed = createSeedCanvas();
+  const blank = createBlankCanvas();
 
   canvasId = createId('canvas');
   canvasTitle.value = '新建画布';
-  nodes.value = seed.nodes;
-  edges.value = seed.edges;
-  groups.value = seed.groups;
+  nodes.value = blank.nodes;
+  edges.value = blank.edges;
+  groups.value = blank.groups;
   clearSelection();
   nodeMenuNodeId.value = '';
   contextMenu.value = null;
@@ -1001,12 +1195,12 @@ function createCanvas(): void {
 
 function loadWorkflow(workflow: CanvasWorkflowTemplate): void {
   commitHistory();
-  const seed = createSeedCanvas();
+  const template = createTemplateCanvas();
 
   canvasId = createId('canvas');
   canvasTitle.value = workflow.name;
-  nodes.value = seed.nodes.slice(0, Math.min(workflow.nodes, seed.nodes.length));
-  edges.value = seed.edges.filter(
+  nodes.value = template.nodes.slice(0, Math.min(workflow.nodes, template.nodes.length));
+  edges.value = template.edges.filter(
     (edge) =>
       nodes.value.some((node) => node.id === edge.from) &&
       nodes.value.some((node) => node.id === edge.to),
@@ -1505,6 +1699,15 @@ function handleNodePointerDown(event: PointerEvent, node: CanvasNode): void {
     selectedNodeId.value = node.id;
   }
 
+  // 点选即切换创作区的素材绑定，让「现在写的东西会基于哪张图」立刻可见；
+  // 多选时保持原绑定，避免输入框在几个节点之间跳来跳去。
+  if (!event.shiftKey && !event.ctrlKey && !event.metaKey && selectedNodeIds.value.length === 1) {
+    const binding = resolveComposerBinding(node);
+
+    composerSourceNodeId.value = binding.source;
+    composerTargetNodeId.value = binding.target;
+  }
+
   nodeMenuNodeId.value = '';
   nodeToolbarMenuNodeId.value = '';
   contextMenu.value = null;
@@ -1540,6 +1743,10 @@ function handleCanvasPointerDown(event: PointerEvent): void {
 
   event.preventDefault();
   clearSelection();
+  // 点画布空白 = 放弃当前素材：创作区必须跟着收起，否则输入框会一直钉在
+  // 上一个节点下面，看起来像没反应。
+  composerSourceNodeId.value = '';
+  composerTargetNodeId.value = '';
   connectionFromId.value = '';
   connectionDrag.value = null;
   connectionHover.value = null;
@@ -1604,7 +1811,7 @@ function finishPointerAction(): void {
 }
 
 function clampCanvasZoom(value: number): number {
-  return Math.min(2, Math.max(0.25, Number(value.toFixed(3))));
+  return Math.min(2, Math.max(0.1, Number(value.toFixed(3))));
 }
 
 function setZoomAroundPoint(nextZoom: number, clientX: number, clientY: number): void {
@@ -1676,12 +1883,31 @@ function handleWheel(event: WheelEvent): void {
 }
 
 function nodeImageUrl(node: CanvasNode): string {
+  // 视频节点的文件是 mp4，交给 <img> 只会渲染成裂图，必须走 <video> 分支。
+  if (node.kind === 'video') {
+    return '';
+  }
+
   if (node.workId) {
     const work = workspace.works.find((item) => item.id === node.workId);
 
     if (work?.artworkUrl) {
       return work.artworkUrl;
     }
+  }
+
+  // 生成结果的展示优先级必须高于输入素材：否则任务结果还没同步到 work 时，
+  // 节点会短暂显示成它自己的「原图」，看起来就像生成没生效。
+  if (node.resultFileId) {
+    const resultUrl = fileUrls.value[node.resultFileId];
+
+    if (resultUrl) {
+      return resultUrl;
+    }
+
+    void loadFileUrl(node.resultFileId);
+    // 结果文件还在加载时宁可先空着，也不要退回原图造成「生成没生效」的错觉。
+    return node.previewUrl ?? '';
   }
 
   if (node.sourceFileId) {
@@ -1694,17 +1920,31 @@ function nodeImageUrl(node: CanvasNode): string {
     void loadFileUrl(node.sourceFileId);
   }
 
-  if (node.resultFileId) {
-    const resultUrl = fileUrls.value[node.resultFileId];
+  return node.previewUrl ?? '';
+}
 
-    if (resultUrl) {
-      return resultUrl;
-    }
-
-    void loadFileUrl(node.resultFileId);
+// 视频节点要的是可播放的视频地址。画布文档不保存 blob URL（刷新后必然失效），
+// 所以刷新后只能靠 resultFileId 重新拉一次文件换 blob URL。
+function nodeVideoUrl(node: CanvasNode): string {
+  if (node.previewUrl) {
+    return node.previewUrl;
   }
 
-  return node.previewUrl ?? '';
+  const resultFileId = node.resultFileId;
+
+  if (!resultFileId) {
+    return '';
+  }
+
+  const cached = fileUrls.value[resultFileId];
+
+  if (cached) {
+    return cached;
+  }
+
+  void loadFileUrl(resultFileId);
+
+  return '';
 }
 
 async function loadFileUrl(fileId: string): Promise<void> {
@@ -1750,6 +1990,86 @@ function statusLabel(status: CanvasNodeStatus): string {
   };
 
   return labels[status];
+}
+
+function isNodeBusy(node: CanvasNode): boolean {
+  const status = nodeStatus(node);
+
+  return status === 'queued' || status === 'generating';
+}
+
+/** 节点左上角的一句说明：优先用创作指令，其次退回标题。 */
+// 节点不支持富文本：展示与下游复用都走纯文本，避免 ** / ### 这类记号露出来。
+function nodePlainText(text: string | undefined): string {
+  return stripMarkdown(text ?? '');
+}
+
+function nodeCaption(node: CanvasNode): string {
+  if (isNodeBusy(node)) {
+    const base = node.kind === 'video' ? '生成视频' : '生成中';
+    const progress =
+      node.kind === 'video' && typeof node.progress === 'number'
+        ? ` ${Math.round(node.progress)}%`
+        : '';
+
+    return `${base}${progress}`;
+  }
+
+  if (node.kind === 'prompt') {
+    return node.generationMode === 'node-text' ? '文案生成' : '创作指令';
+  }
+
+  const prompt = nodePlainText(node.prompt).replace(/\s+/g, ' ').trim();
+  // 上传素材的 prompt 一般是文件名；「3D 视角控制」会拼接自动后缀，两者都不适合当说明。
+  const looksLikeFile = /\.(png|jpe?g|webp|gif|mp4|mov)$/i.test(prompt);
+  const userPrompt = prompt.split('；将镜头水平旋转')[0]?.trim() ?? prompt;
+
+  if (userPrompt && !looksLikeFile) {
+    return userPrompt.length > 22 ? `${userPrompt.slice(0, 22)}…` : userPrompt;
+  }
+
+  if (node.kind === 'image') {
+    return '原图';
+  }
+
+  return node.kind === 'video' ? '视频' : (node.title ?? '素材');
+}
+
+/** 选中节点时，创作区要带出该节点自己的指令，方便在原素材下继续修改。 */
+function composerPromptForNode(node: CanvasNode): string {
+  const prompt = node.prompt?.trim() ?? '';
+
+  // 上传素材的 prompt 一般是文件名，填进输入框反而要先删掉。
+  if (node.kind === 'image' && /\.(png|jpe?g|webp|gif|mp4|mov)$/i.test(prompt)) {
+    return '';
+  }
+
+  // 文案生成期间的占位文字不是用户内容，别塞进输入框冒充可编辑文本。
+  if (prompt === TEXT_GENERATION_PLACEHOLDER) {
+    return '';
+  }
+
+  return prompt;
+}
+
+function syncComposerDraft(node: CanvasNode | undefined): void {
+  const nextId = node?.id ?? '';
+
+  if (nextId === composerDraftNodeId) {
+    return;
+  }
+
+  // 空内容不占草稿位，否则下次点回该节点会被空串顶掉，看不到它自己的指令。
+  if (composerDraftNodeId) {
+    if (composerPrompt.value.trim()) {
+      composerDrafts.set(composerDraftNodeId, composerPrompt.value);
+    } else {
+      composerDrafts.delete(composerDraftNodeId);
+    }
+  }
+
+  composerDraftNodeId = nextId;
+  composerPrompt.value = node ? (composerDrafts.get(node.id) ?? composerPromptForNode(node)) : '';
 }
 
 function formatTime(timestamp: number): string {
@@ -1844,11 +2164,18 @@ function downloadSelectedNode(): void {
 function editSelectedNode(): void {
   if (selectedNode.value?.prompt) {
     composerPrompt.value = selectedNode.value.prompt;
-    composerTargetNodeId.value = selectedNode.value.id;
-    composerSourceNodeId.value =
-      selectedNode.value.kind === 'image' || selectedNode.value.kind === 'output'
-        ? selectedNode.value.id
-        : '';
+
+    if (selectedNode.value.kind === 'prompt') {
+      // 文案节点的输入框是编辑器，不是生成目标，别把它挂成提交目标。
+      composerSourceNodeId.value = '';
+      composerTargetNodeId.value = '';
+    } else {
+      composerTargetNodeId.value = selectedNode.value.id;
+      composerSourceNodeId.value =
+        selectedNode.value.kind === 'image' || selectedNode.value.kind === 'output'
+          ? selectedNode.value.id
+          : '';
+    }
   }
 
   closeRailMenu();
@@ -1896,20 +2223,35 @@ function beginCanvasUpload(): void {
   nodeUploadInput.value?.click();
 }
 
-function nodeSourceFileId(node: CanvasNode | undefined): string | undefined {
+// 节点的「产物」= 下游生成真正要消费的素材。生成类节点一旦有结果，产物就是结果文件；
+// 只有还没产出结果时（待提交 / 重试 / 上传素材）才回退到 sourceFileId。
+// 之前这里反过来优先 sourceFileId，导致「原图 → 图生图 → 图生视频」时视频悄悄退回原图。
+function nodeResultFileId(node: CanvasNode | undefined): string | undefined {
   if (!node) {
     return undefined;
   }
 
   // resultFileId 在任务未完成时是空字符串，不能当作有效来源文件，否则会把空值
   // 提交给后端并触发外键约束错误。节点自身的字段也可能没有回写，因此再回退到作品结果。
-  const direct = node.sourceFileId || node.resultFileId;
+  return node.resultFileId || nodeWork(node)?.resultFileId || undefined;
+}
 
-  if (direct) {
-    return direct;
+function nodeSourceFileId(node: CanvasNode | undefined): string | undefined {
+  if (!node) {
+    return undefined;
   }
 
-  return nodeWork(node)?.resultFileId || undefined;
+  return nodeResultFileId(node) || node.sourceFileId || undefined;
+}
+
+// 连线传递的是「素材」而不是「任务」：视频节点对外提供的是视频，图片/生成节点提供图片。
+// 图片类接口不收视频，跨类型时必须先降级成一张代表帧。
+function nodeArtifactKind(node: CanvasNode | undefined): 'image' | 'video' | undefined {
+  if (!node || !nodeSourceFileId(node)) {
+    return undefined;
+  }
+
+  return node.kind === 'video' ? 'video' : 'image';
 }
 
 function appendNodeWithEdge(
@@ -1943,6 +2285,8 @@ function createOutputNodeFromSource(
     prompt: string;
     status?: CanvasNodeStatus;
     title: string;
+    /** 视频节点没有图片产物时，用截取的首帧文件替代节点自身产物。 */
+    materialFileId?: string;
   },
 ): CanvasNode {
   const sourceX = sourceNode?.x ?? 430 - viewport.value.x / viewport.value.scale;
@@ -1955,7 +2299,7 @@ function createOutputNodeFromSource(
     id: createId('output'),
     kind: 'output',
     prompt: options.prompt,
-    sourceFileId: nodeSourceFileId(sourceNode),
+    sourceFileId: options.materialFileId ?? nodeSourceFileId(sourceNode),
     status: options.status ?? 'idle',
     title: options.title,
     width: 330,
@@ -1964,19 +2308,246 @@ function createOutputNodeFromSource(
   };
 }
 
-function prepareImageNodeGeneration(sourceNode: CanvasNode, title = '图像生成'): void {
+function prepareImageNodeGeneration(
+  sourceNode: CanvasNode,
+  title = '图像生成',
+  materialFileId?: string,
+): void {
   const outputNode = createOutputNodeFromSource(sourceNode, {
+    materialFileId,
     prompt: sourceNode.prompt,
     title,
   });
 
   appendNodeWithEdge(outputNode, sourceNode);
   // 图片节点的 prompt 往往就是文件名，直接填进输入框反而要先删掉；只有基于生成结果
-  // 继续创作时才把上一轮指令带过去。
-  composerPrompt.value = sourceNode.kind === 'output' ? sourceNode.prompt : '';
-  composerSourceNodeId.value = sourceNode.id;
+  // 或文案节点继续创作时，才把上一次的文字带过去。
+  if (sourceNode.kind === 'output') {
+    composerPrompt.value = sourceNode.prompt;
+  } else if (sourceNode.kind === 'prompt') {
+    composerPrompt.value = (sourceNode.prompt ?? '').slice(0, 1000);
+  } else {
+    composerPrompt.value = '';
+  }
+  // 素材解析统一收敛到「目标节点自己的 sourceFileId」：新节点创建时已经把上游产物
+  // （或视频首帧）写进去了，提交时不再二次回溯上游，避免又一次拿错素材。
+  composerSourceNodeId.value = outputNode.id;
   composerTargetNodeId.value = outputNode.id;
   focusComposer();
+}
+
+// 视频节点对外只有视频文件，而图像/对话接口只收图片。这里在浏览器里把画面画成
+// JPEG 再当普通素材上传，既不需要后端新增视频输入能力，也不受厂商接口限制。
+const videoFrameAssetCache = new Map<string, string>();
+const videoKeyFrameCache = new Map<string, string[]>();
+
+async function ensureFileUrl(fileId: string): Promise<string | undefined> {
+  if (fileUrls.value[fileId]) {
+    return fileUrls.value[fileId];
+  }
+
+  await loadFileUrl(fileId);
+
+  return fileUrls.value[fileId];
+}
+
+async function openVideoElement(videoUrl: string): Promise<HTMLVideoElement> {
+  const video = document.createElement('video');
+
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.src = videoUrl;
+
+  await new Promise<void>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error('读取视频超时')), 15_000);
+
+    video.onloadeddata = () => {
+      window.clearTimeout(timer);
+      resolve();
+    };
+    video.onerror = () => {
+      window.clearTimeout(timer);
+      reject(new Error('视频无法解码'));
+    };
+  });
+
+  return video;
+}
+
+async function grabVideoFrame(video: HTMLVideoElement, time: number, name: string): Promise<File> {
+  await new Promise<void>((resolve) => {
+    const done = (): void => resolve();
+
+    video.onseeked = done;
+    try {
+      video.currentTime = time;
+    } catch {
+      done();
+    }
+    // 已经停在目标时间时不会再触发 seeked，兜一个定时器。
+    window.setTimeout(done, 1_500);
+  });
+
+  const width = video.videoWidth || 1280;
+  const height = video.videoHeight || 720;
+  const canvas = document.createElement('canvas');
+
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext('2d');
+
+  if (!context) {
+    throw new Error('浏览器不支持画布绘制');
+  }
+
+  context.drawImage(video, 0, 0, width, height);
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/jpeg', 0.92);
+  });
+
+  if (!blob) {
+    throw new Error('画面导出失败');
+  }
+
+  return new File([blob], name, { type: 'image/jpeg' });
+}
+
+// ratios 是相对时长的位置（0-1）。第 0 帧常是黑场，调用方避免用 0。
+async function extractVideoFrames(videoUrl: string, ratios: number[]): Promise<File[]> {
+  const video = await openVideoElement(videoUrl);
+
+  try {
+    const duration = Number.isFinite(video.duration) ? video.duration : 0;
+    const files: File[] = [];
+
+    for (const [index, ratio] of ratios.entries()) {
+      const time =
+        duration > 0 ? Math.min(Math.max(duration * ratio, 0), Math.max(duration - 0.05, 0)) : 0;
+
+      files.push(await grabVideoFrame(video, time, `video-frame-${index + 1}.jpg`));
+    }
+
+    return files;
+  } finally {
+    video.removeAttribute('src');
+    video.load();
+  }
+}
+
+async function resolveVideoFrameFileId(node: CanvasNode): Promise<string | undefined> {
+  const videoFileId = nodeSourceFileId(node);
+
+  if (!videoFileId) {
+    showCanvasNotice('该视频节点还没有可用的视频文件，请等生成完成后再试');
+    return undefined;
+  }
+
+  const cached = videoFrameAssetCache.get(videoFileId);
+
+  if (cached) {
+    return cached;
+  }
+
+  const url = await ensureFileUrl(videoFileId);
+
+  if (!url) {
+    showCanvasNotice('视频还没加载完成，请稍后再试');
+    return undefined;
+  }
+
+  try {
+    // 2% 处开始，避开部分视频开头的黑场/淡入。
+    const [file] = await extractVideoFrames(url, [0.02]);
+
+    if (!file) {
+      throw new Error('没有取到画面');
+    }
+
+    const asset = await workspace.uploadReference(file);
+
+    videoFrameAssetCache.set(videoFileId, asset.id);
+    void loadFileUrl(asset.id);
+    return asset.id;
+  } catch (error) {
+    showCanvasNotice(`视频首帧提取失败：${error instanceof Error ? error.message : '请稍后重试'}`);
+    return undefined;
+  }
+}
+
+// 「视频 → 文案」需要模型看到画面。对话接口只收图片，所以抽起始/中段/结束三帧一起发，
+// 让模型能感知到镜头内的变化，而不是只凭一张静止画面猜。
+async function resolveVideoKeyFrameFileIds(
+  node: CanvasNode,
+  count = 3,
+): Promise<string[] | undefined> {
+  const videoFileId = nodeSourceFileId(node);
+
+  if (!videoFileId) {
+    showCanvasNotice('该视频节点还没有可用的视频文件，请等生成完成后再试');
+    return undefined;
+  }
+
+  const cached = videoKeyFrameCache.get(videoFileId);
+
+  if (cached) {
+    return cached;
+  }
+
+  const url = await ensureFileUrl(videoFileId);
+
+  if (!url) {
+    showCanvasNotice('视频还没加载完成，请稍后再试');
+    return undefined;
+  }
+
+  const ratios = count >= 3 ? [0.02, 0.5, 0.98] : [0.02, 0.98].slice(0, count);
+
+  try {
+    const files = await extractVideoFrames(url, ratios);
+    const ids: string[] = [];
+
+    for (const file of files) {
+      const asset = await workspace.uploadReference(file);
+
+      ids.push(asset.id);
+      void loadFileUrl(asset.id);
+    }
+
+    if (ids.length === 0) {
+      throw new Error('没有取到画面');
+    }
+
+    videoKeyFrameCache.set(videoFileId, ids);
+    return ids;
+  } catch (error) {
+    showCanvasNotice(
+      `视频关键帧提取失败：${error instanceof Error ? error.message : '请稍后重试'}`,
+    );
+    return undefined;
+  }
+}
+
+// 「视频 → 图像生成」按参考产品的做法：仍然是一次普通的图生图，只是参考图换成首帧。
+async function prepareImageGenerationFromNode(
+  sourceNode: CanvasNode,
+  title: string,
+): Promise<void> {
+  if (sourceNode.kind === 'video') {
+    const frameFileId = await resolveVideoFrameFileId(sourceNode);
+
+    if (!frameFileId) {
+      return;
+    }
+
+    showCanvasNotice('已截取该视频的首帧，作为图像生成的参考图');
+    prepareImageNodeGeneration(sourceNode, title, frameFileId);
+    return;
+  }
+
+  prepareImageNodeGeneration(sourceNode, title);
 }
 
 // 创作输入区已经吸附到节点下方，直接把光标放进输入框，用户点完「图像生成」就能写指令。
@@ -1986,33 +2557,78 @@ function focusComposer(): void {
   });
 }
 
+// 创作区和节点之间的绑定规则只写一处，点选节点、点「填写描述」、创建下游节点都用它，
+// 避免不同入口算出不同的素材。
+function resolveComposerBinding(node: CanvasNode): { source: string; target: string } {
+  if (node.kind === 'prompt') {
+    return { source: '', target: '' };
+  }
+
+  // 已经有产物的节点（上传图 / 已生成结果）：输入框表示「基于它继续创作」，
+  // 素材取它自己，提交时新建下游节点，绝不能再拿它的上游素材。
+  const hasArtifact = Boolean(nodeResultFileId(node)) || node.kind === 'image';
+  // 多条入边时取最新连的那条：用户手动改接另一张图后，期望换成刚连的素材。
+  const edge = edges.value.filter((item) => item.to === node.id).at(-1);
+
+  return {
+    source: hasArtifact ? node.id : (edge?.from ?? ''),
+    target: !hasArtifact && (node.kind === 'output' || node.kind === 'video') ? node.id : '',
+  };
+}
+
 function focusComposerForNode(node: CanvasNode): void {
   setSelection([node.id], node.id);
 
-  const edge = edges.value.find((item) => item.to === node.id);
+  const binding = resolveComposerBinding(node);
 
-  composerSourceNodeId.value = edge?.from ?? '';
-  composerTargetNodeId.value = node.kind === 'output' ? node.id : '';
+  composerSourceNodeId.value = binding.source;
+  composerTargetNodeId.value = binding.target;
   focusComposer();
 }
 
-const TEXT_GENERATION_PLACEHOLDER = '正在读取节点素材并生成文案…';
+function buildNodeTextInstruction(sourceNode: CanvasNode, frameCount = 0): string {
+  // 视频没法直接上传给对话模型，改送关键帧，必须把「这是同一段视频的第几帧」讲清楚，
+  // 否则模型会把三张图当成三个不同场景。
+  const materialLine =
+    frameCount > 0
+      ? `随附的 ${frameCount} 张图片是同一段视频按时间顺序截取的关键帧（起始、中段、结束），请结合画面之间的变化理解这段视频的内容、主体动作与镜头运动。`
+      : '请阅读随附的节点素材，并结合下面的节点说明，输出可以直接使用的创意文案。';
 
-function buildNodeTextInstruction(sourceNode: CanvasNode): string {
   return [
-    '请阅读随附的节点素材，并结合下面的节点说明，输出可以直接使用的创意文案。',
+    materialLine,
     `节点说明：${sourceNode.prompt?.trim() || '（该节点没有额外文字说明，请以随附素材为准）'}`,
     '输出格式：',
     '1. 一句核心主张；',
     '2. 三条不同风格的备选文案；',
-    '3. 五个关键词标签。',
+    '3. 五个关键词标签；',
+    '4. 画面描述：一段可直接作为生图/生视频提示词的中文描述，写清主体、动作、镜头运动、光线与风格，不超过 120 字。',
   ].join('\n');
 }
 
 // 与「从该节点生成 → 文本生成」对应：把节点上的图片/文字一起送给多模态模型，
 // 流式写回一个新的文案节点，而不是只在前端拼一句提示词。
 async function generateTextFromNode(sourceNode: CanvasNode): Promise<void> {
-  const sourceFileId = nodeSourceFileId(sourceNode);
+  let fileIds: string[] | undefined;
+  let frameCount = 0;
+
+  if (sourceNode.kind === 'video') {
+    // 对话接口只收 image/*，视频节点要把画面抽成关键帧再送，否则后端会直接拒绝。
+    showCanvasNotice('正在抽取视频关键帧…');
+
+    const frames = await resolveVideoKeyFrameFileIds(sourceNode);
+
+    if (!frames) {
+      return;
+    }
+
+    fileIds = frames;
+    frameCount = frames.length;
+  } else {
+    const sourceFileId = nodeSourceFileId(sourceNode);
+
+    fileIds = sourceFileId ? [sourceFileId] : undefined;
+  }
+
   const promptNode = addPromptNode(TEXT_GENERATION_PLACEHOLDER);
   const promptNodeId = promptNode.id;
 
@@ -2050,8 +2666,8 @@ async function generateTextFromNode(sourceNode: CanvasNode): Promise<void> {
   try {
     await streamChat(
       {
-        content: buildNodeTextInstruction(sourceNode),
-        fileIds: sourceFileId ? [sourceFileId] : undefined,
+        content: buildNodeTextInstruction(sourceNode, frameCount),
+        fileIds,
         modelAlias: nodeTextModel.value?.alias,
         systemPrompt:
           '你是资深中文创意文案，需要先理解随附的素材画面内容，再产出可以直接使用的文案。',
@@ -2062,7 +2678,8 @@ async function generateTextFromNode(sourceNode: CanvasNode): Promise<void> {
           syncNode(accumulated, 'generating');
         },
         onDone: () => {
-          syncNode(accumulated || '模型没有返回文案内容，请重试。', 'done');
+          // 落进节点的是纯文本：节点不支持富文本，复制出去或再喂给生成接口也都不需要记号。
+          syncNode(stripMarkdown(accumulated) || '模型没有返回文案内容，请重试。', 'done');
           persistCanvas();
         },
         onError: (event) => {
@@ -2084,16 +2701,36 @@ async function generateTextFromNode(sourceNode: CanvasNode): Promise<void> {
 }
 
 function createVideoNodeFromSource(sourceNode: CanvasNode, local = false): void {
+  // 当前的图生视频通道只接受一张图片作为首帧，视频文件不能直接当输入。
+  // 与其创建一个注定失败的节点，不如明确告诉用户下一步该怎么走。
+  if (sourceNode.kind === 'video') {
+    showCanvasNotice('视频模型只接受图片输入：请先用这个视频生成一张图片，或连接一张图片作为首帧');
+    closeNodeGenerationMenu();
+    return;
+  }
+
+  // 没有图片素材时不再一律拦死：文案节点可以走纯文本的视频生成。
+  // 视频模型本身支持文生视频，只是此前画布只建了图生视频节点。
+  const materialFileId = nodeSourceFileId(sourceNode);
+  const textOnly = !materialFileId && sourceNode.kind === 'prompt';
+
+  if (!materialFileId && !textOnly) {
+    showCanvasNotice('图生视频需要一张图片作为首帧：请先选择图片节点，或用文案先生成图片');
+    closeNodeGenerationMenu();
+    return;
+  }
+
   const videoNode: CanvasNode = {
     createdAt: Date.now(),
-    generationMode: local ? 'local-video' : 'image-to-video',
+    generationMode: local ? 'local-video' : textOnly ? 'text-to-video' : 'image-to-video',
     height: 225,
     id: createId('video'),
     kind: 'video',
-    prompt: sourceNode.prompt,
-    sourceFileId: nodeSourceFileId(sourceNode),
+    // 文案节点可能很长，视频提示词有长度上限，创建时就截断，避免提交时才被拒。
+    prompt: (sourceNode.prompt ?? '').slice(0, 1000),
+    sourceFileId: materialFileId,
     status: 'idle',
-    title: local ? '本地视频模型' : '图生视频',
+    title: local ? '本地视频模型' : textOnly ? '文生视频' : '图生视频',
     width: 330,
     x: sourceNode.x + 390,
     y: sourceNode.y + 62,
@@ -2142,7 +2779,10 @@ function runNodeGenerationAction(action: NodeGenerationAction, sourceNode: Canva
     return;
   }
 
-  prepareImageNodeGeneration(sourceNode, action === 'local-image' ? '本地图像模型' : '图生图');
+  void prepareImageGenerationFromNode(
+    sourceNode,
+    action === 'local-image' ? '本地图像模型' : '图生图',
+  );
 }
 
 async function generateAngleView(): Promise<void> {
@@ -2175,6 +2815,10 @@ async function generateAngleView(): Promise<void> {
   try {
     await workspace.initialize();
 
+    // 新视角要「保持材质、光线和身份一致」，本质是保真编辑；统一收窄到支持编辑的模型，
+    // 避免参考重绘类模型把主体和背景一起重画。
+    const modelAlias = modelCatalog.resolveImageAlias('image-edit', selectedModel.value);
+
     const createdWorks = await workspace.createGenerationWorks({
       amount: 1,
       extraParameters: {
@@ -2183,8 +2827,8 @@ async function generateAngleView(): Promise<void> {
         rotation: angleRotation.value,
         tilt: angleTilt.value,
       },
-      model: selectedModel.value,
-      modelAlias: selectedModel.value,
+      model: modelAlias,
+      modelAlias,
       modelLabel: '3D 视角控制',
       prompt,
       ratio: selectedRatio.value,
@@ -2376,25 +3020,72 @@ async function submitComposer(): Promise<void> {
     return;
   }
 
+  // 选中文案节点时，这个框是编辑器：只回写文字，不触发任何生成。
+  const editingPrompt = composerEditingPrompt.value;
+
+  if (editingPrompt) {
+    if (isNodeBusy(editingPrompt)) {
+      showCanvasNotice('这段文案还在生成中，等生成结束后再修改');
+      return;
+    }
+
+    commitHistory();
+    editingPrompt.prompt = prompt;
+    persistCanvas();
+    showCanvasNotice('文案已更新');
+    return;
+  }
+
   const sourceNode =
     nodes.value.find((node) => node.id === composerSourceNodeId.value) ??
     (selectedNode.value?.kind === 'image' || selectedNode.value?.kind === 'output'
       ? selectedNode.value
       : undefined);
-  const preparedTarget = nodes.value.find(
-    (node) => node.id === composerTargetNodeId.value && node.kind === 'output',
-  );
-  const sourceFileId = nodeSourceFileId(sourceNode);
+  const preparedTarget =
+    nodes.value.find(
+      (node) =>
+        node.id === composerTargetNodeId.value && (node.kind === 'output' || node.kind === 'video'),
+    ) ?? (selectedNode.value?.kind === 'video' ? selectedNode.value : undefined);
+  let sourceFileId = nodeSourceFileId(sourceNode);
   let outputNode = preparedTarget;
+  const targetIsVideo =
+    outputNode?.kind === 'video' || (!outputNode && composerIsVideoTarget.value);
 
-  // 画布里的「从当前节点生成」必须带上节点素材；缺少有效素材时提前提示，
-  // 避免把空来源文件提交给后端并拿到 500。
-  if (sourceNode && !sourceFileId) {
+  // 素材与目标类型不匹配时提前拦住，而不是把一个必败的任务提交上去。
+  if (sourceNode?.kind === 'video' && targetIsVideo) {
+    showCanvasNotice('视频模型只接受图片输入：请先用这个视频生成一张图片，再基于图片生成视频');
+    return;
+  }
+
+  // 从视频节点生成图片时，把首帧截出来当参考图，避免把 mp4 直接塞给图片接口。
+  if (sourceNode?.kind === 'video') {
+    const frameFileId = await resolveVideoFrameFileId(sourceNode);
+
+    if (!frameFileId) {
+      return;
+    }
+
+    sourceFileId = frameFileId;
+  }
+
+  // 图生视频必须有一张图片当首帧，缺了直接拦住，别让上游返回一个看不懂的 400。
+  // 但文生视频节点本来就没有素材，不能按同一标准拦。
+  const effectiveSourceFileId = sourceFileId ?? outputNode?.sourceFileId;
+  const targetAllowsTextOnly = outputNode?.generationMode === 'text-to-video';
+
+  if (targetIsVideo && !effectiveSourceFileId && !targetAllowsTextOnly) {
+    showCanvasNotice('图生视频需要一张图片作为首帧，请先连接或上传一张图片');
+    return;
+  }
+
+  // 上传类素材还在处理中时文件还没拿到，提示等待比提交一个空来源更清楚。
+  // 文生图没有素材是合法的，所以只在「图片节点本应有文件」时拦截。
+  if (sourceNode?.kind === 'image' && !sourceFileId) {
     const status = nodeStatus(sourceNode);
 
     showCanvasNotice(
       status === 'queued' || status === 'generating'
-        ? '该节点仍在生成中，请等待完成后再基于它继续生成'
+        ? '该节点仍在处理中，请等待完成后再基于它继续生成'
         : '该节点还没有可用的图片素材，请先上传图片后再试',
     );
     return;
@@ -2404,11 +3095,22 @@ async function submitComposer(): Promise<void> {
     commitHistory();
     Object.assign(outputNode, {
       prompt,
-      sourceFileId: sourceFileId ?? outputNode.sourceFileId,
+      sourceFileId: effectiveSourceFileId,
       status: 'queued',
-      title: selectedModelLabel.value,
+      title:
+        outputNode.kind === 'video'
+          ? outputNode.generationMode === 'text-to-video'
+            ? '文生视频'
+            : '图生视频'
+          : selectedModelLabel.value,
     });
     setSelection([outputNode.id], outputNode.id);
+
+    // 视频节点走独立的任务接口与轮询，不进入图像任务的 works 队列。
+    if (outputNode.kind === 'video') {
+      await submitVideoGeneration(outputNode, prompt, effectiveSourceFileId);
+      return;
+    }
   } else {
     const promptNode = addPromptNode(prompt);
 
@@ -2418,7 +3120,7 @@ async function submitComposer(): Promise<void> {
       id: createId('output'),
       kind: 'output',
       prompt,
-      sourceFileId,
+      sourceFileId: effectiveSourceFileId,
       status: 'queued',
       title: selectedModelLabel.value,
       width: 330,
@@ -2426,6 +3128,14 @@ async function submitComposer(): Promise<void> {
       y: promptNode.y - 70,
     };
     appendNodeWithEdge(outputNode, promptNode, { commit: false });
+    // 素材依赖也要画出来：画布上能直接看出这个结果基于哪个节点，
+    // 而不是靠一个看不见的 sourceFileId 字段在后台传递。
+    if (sourceNode && sourceNode.id !== promptNode.id && sourceNode.id !== outputNode.id) {
+      edges.value = [
+        ...edges.value,
+        { from: sourceNode.id, id: createId('edge'), to: outputNode.id },
+      ];
+    }
   }
 
   try {
@@ -2443,7 +3153,7 @@ async function submitComposer(): Promise<void> {
       prompt,
       ratio: selectedRatio.value,
       size: selectedSize.value,
-      sourceFileId,
+      sourceFileId: effectiveSourceFileId,
       toolKey: 'canvas',
     });
     const createdWork = createdWorks[0];
@@ -2462,6 +3172,121 @@ async function submitComposer(): Promise<void> {
   } catch (error) {
     outputNode.status = 'failed';
     showCanvasNotice(error instanceof Error ? error.message : '生成提交失败，请稍后重试');
+  }
+
+  persistCanvas();
+}
+
+const videoPollTimers = new Map<string, number>();
+// 画布里的图生视频固定用当前唯一可用的真实视频模型，避免把不可用的别名写进节点。
+const CANVAS_VIDEO_MODEL_ALIAS = 'xai-grok-imagine-video';
+const CANVAS_VIDEO_POLL_INTERVAL_MS = 5000;
+const CANVAS_VIDEO_POLL_TIMEOUT_MS = 15 * 60 * 1000;
+
+function clearVideoPollTimers(): void {
+  for (const timer of videoPollTimers.values()) {
+    window.clearTimeout(timer);
+  }
+
+  videoPollTimers.clear();
+}
+
+// 视频任务不在 draw-workspace 的 works 队列里，需要自己轮询并把结果写回节点。
+function scheduleVideoPoll(taskId: string, nodeId: string): void {
+  const startedAt = Date.now();
+
+  const tick = async (): Promise<void> => {
+    const node = nodes.value.find((item) => item.id === nodeId);
+
+    if (!node) {
+      return;
+    }
+
+    try {
+      const task = await getVideoTask(taskId);
+
+      // 进度直接驱动节点上的百分比和进度条，避免视频生成时只有一句静态「等待」。
+      node.progress = Math.max(0, Math.min(100, Math.round(task.progress ?? 0)));
+
+      if (task.status === 'SUCCEEDED') {
+        node.status = 'done';
+        node.progress = 100;
+        node.title = node.generationMode === 'text-to-video' ? '文生视频' : '图生视频';
+        node.resultFileId = task.resultFile?.id ?? node.resultFileId;
+
+        if (node.resultFileId) {
+          await loadFileUrl(node.resultFileId);
+          // 视频节点走 <video> 渲染，模板读的是 previewUrl 而不是 nodeImageUrl()。
+          node.previewUrl = fileUrls.value[node.resultFileId] ?? node.previewUrl;
+        }
+
+        persistCanvas();
+        return;
+      }
+
+      if (task.status === 'FAILED' || task.status === 'CANCELLED') {
+        node.status = 'failed';
+        showCanvasNotice(task.errorMessage ?? '视频生成失败，请稍后重试');
+        persistCanvas();
+        return;
+      }
+
+      if (Date.now() - startedAt > CANVAS_VIDEO_POLL_TIMEOUT_MS) {
+        node.status = 'failed';
+        showCanvasNotice('视频生成超时，请稍后重试');
+        persistCanvas();
+        return;
+      }
+
+      node.status = 'generating';
+      videoPollTimers.set(
+        taskId,
+        window.setTimeout(() => void tick(), CANVAS_VIDEO_POLL_INTERVAL_MS),
+      );
+    } catch (error) {
+      node.status = 'failed';
+      showCanvasNotice(error instanceof Error ? error.message : '视频状态查询失败，请稍后重试');
+      persistCanvas();
+    }
+  };
+
+  void tick();
+}
+
+async function submitVideoGeneration(
+  node: CanvasNode,
+  prompt: string,
+  sourceFileId: string | undefined,
+): Promise<void> {
+  persistCanvas();
+
+  try {
+    // 节点自己的生成方式决定用哪套模型清单：文生视频节点不该被解析成图生视频别名。
+    const videoMode: VideoModelMode =
+      node.generationMode === 'text-to-video' ? 'text-to-video' : 'image-to-video';
+    const task = await createVideoTask(
+      {
+        modelAlias: modelCatalog.resolveVideoAlias(videoMode, CANVAS_VIDEO_MODEL_ALIAS),
+        parameters: {
+          duration: selectedVideoDuration.value,
+          resolution: selectedVideoResolution.value,
+        },
+        prompt,
+        sourceFileId: sourceFileId ?? node.sourceFileId,
+      },
+      createId('video-task'),
+    );
+
+    node.videoTaskId = task.id;
+    node.status = 'generating';
+    node.progress = 0;
+    composerPrompt.value = '';
+    composerSourceNodeId.value = '';
+    composerTargetNodeId.value = '';
+    scheduleVideoPoll(task.id, node.id);
+  } catch (error) {
+    node.status = 'failed';
+    showCanvasNotice(error instanceof Error ? error.message : '视频生成提交失败，请稍后重试');
   }
 
   persistCanvas();
@@ -2617,6 +3442,62 @@ function chooseAsset(asset: CanvasAsset): void {
 
 function chooseGeneratedWork(work: DrawWork): void {
   addImageNodeFromWork(work);
+}
+
+async function loadVideoHistory(): Promise<void> {
+  if (videoHistoryLoading.value || videoHistoryTasks.value.length > 0) {
+    return;
+  }
+
+  videoHistoryLoading.value = true;
+
+  try {
+    const tasks = await listVideoTasks(12);
+
+    videoHistoryTasks.value = tasks;
+
+    // 缩略图要带鉴权，<video> 标签自己带不了 header，只能先换成 blob URL。
+    for (const task of tasks) {
+      if (task.resultFile?.id) {
+        void loadFileUrl(task.resultFile.id);
+      }
+    }
+  } catch {
+    videoHistoryTasks.value = [];
+  } finally {
+    videoHistoryLoading.value = false;
+  }
+}
+
+function insertVideoNodeFromHistory(task: VideoTask): void {
+  const fileId = task.resultFile?.id;
+
+  if (!fileId) {
+    return;
+  }
+
+  const node: CanvasNode = {
+    createdAt: Date.now(),
+    generationMode: task.sourceFile ? 'image-to-video' : 'text-to-video',
+    height: 225,
+    id: createId('video'),
+    kind: 'video',
+    previewUrl: fileUrls.value[fileId] ?? '',
+    prompt: task.prompt,
+    resultFileId: fileId,
+    sourceFileId: task.sourceFile?.id,
+    status: 'done',
+    title: '视频',
+    width: 330,
+    x: Math.round(430 - viewport.value.x / viewport.value.scale + nodes.value.length * 20),
+    y: Math.round(200 - viewport.value.y / viewport.value.scale + nodes.value.length * 16),
+  };
+
+  commitHistory();
+  nodes.value = [...nodes.value, node];
+  setSelection([node.id], node.id);
+  activeRailMenu.value = null;
+  persistCanvas();
 }
 
 function assetPreviewUrl(asset: CanvasAsset): string {
@@ -3188,13 +4069,15 @@ watch(
 );
 
 watch(
-  () =>
-    modelCatalog
-      .modelsFor('image')
-      .map((model) => model.alias)
-      .join('|'),
+  () => [
+    composerIsVideoTarget.value,
+    composerImageMode.value,
+    generationModels.value.map((model) => model.value).join('|'),
+  ],
   () => {
-    selectedModel.value = modelCatalog.resolveAlias('image', selectedModel.value);
+    selectedModel.value = composerIsVideoTarget.value
+      ? modelCatalog.resolveVideoAlias('image-to-video', selectedModel.value)
+      : modelCatalog.resolveImageAlias(composerImageMode.value, selectedModel.value);
   },
   { immediate: true },
 );
@@ -3272,6 +4155,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointerup', finishPointerAction);
   window.removeEventListener('keydown', handleKeyboard);
   window.removeEventListener('resize', syncWorkspaceSize);
+  clearVideoPollTimers();
   composerResizeObserver?.disconnect();
   composerResizeObserver = undefined;
   window.clearTimeout(saveTimer);
@@ -3295,6 +4179,7 @@ onBeforeUnmount(() => {
         'canvas-workspace--grid-hidden': !canvasGridVisible,
         'canvas-workspace--plain': activeRailMenu === 'inspiration',
       }"
+      :style="canvasGridStyle"
       @pointerdown="handleCanvasPointerDown"
       @contextmenu.prevent="openCanvasContextMenu"
       @wheel="handleWheel"
@@ -3311,7 +4196,11 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="canvas-topbar__actions">
-          <span class="canvas-save-state" :class="`canvas-save-state--${saveState}`">
+          <span
+            v-if="saveState === 'saving' || saveState === 'error'"
+            class="canvas-save-state"
+            :class="`canvas-save-state--${saveState}`"
+          >
             <CloudSyncOutlined v-if="saveState === 'saving' || saveState === 'error'" />
             <CheckOutlined v-else />
             {{
@@ -3671,7 +4560,7 @@ onBeforeUnmount(() => {
               >
                 <VideoCameraOutlined />
                 视频历史
-                <span>0</span>
+                <span>{{ videoHistory.length }}</span>
               </button>
             </div>
             <button
@@ -3685,7 +4574,35 @@ onBeforeUnmount(() => {
               <CloseOutlined />
             </button>
           </header>
-          <div v-if="visibleHistory.length > 0" class="canvas-history-groups">
+          <div
+            v-if="activeHistoryTab === 'video' && videoHistory.length > 0"
+            class="canvas-history-groups"
+          >
+            <section>
+              <h3>{{ historyDate(Date.parse(videoHistory[0]?.createdAt ?? '') || Date.now()) }}</h3>
+              <div>
+                <button
+                  v-for="task in videoHistory"
+                  :key="task.id"
+                  type="button"
+                  @click="insertVideoNodeFromHistory(task)"
+                >
+                  <span>
+                    <video
+                      v-if="task.resultFile?.id && fileUrls[task.resultFile.id]"
+                      :src="fileUrls[task.resultFile.id]"
+                      muted
+                      preload="metadata"
+                      playsinline
+                    />
+                  </span>
+                  <strong>{{ task.prompt }}</strong>
+                  <small>{{ formatTime(Date.parse(task.createdAt) || Date.now()) }}</small>
+                </button>
+              </div>
+            </section>
+          </div>
+          <div v-else-if="visibleHistory.length > 0" class="canvas-history-groups">
             <section>
               <h3>{{ historyDate(visibleHistory[0]?.createdAt ?? Date.now()) }}</h3>
               <div>
@@ -3707,7 +4624,11 @@ onBeforeUnmount(() => {
           <div v-else class="canvas-panel-empty">
             <HistoryOutlined />
             <strong>{{
-              activeHistoryTab === 'image' ? '还没有图片历史' : '还没有视频历史'
+              activeHistoryTab === 'image'
+                ? '还没有图片历史'
+                : videoHistoryLoading
+                  ? '正在读取视频历史…'
+                  : '还没有视频历史'
             }}</strong>
             <small>完成的创作结果会自动出现在这里。</small>
           </div>
@@ -3858,6 +4779,24 @@ onBeforeUnmount(() => {
           </footer>
         </section>
       </Transition>
+
+      <div v-if="nodes.length === 0" class="canvas-empty" @pointerdown.stop>
+        <span class="canvas-empty__icon">
+          <PictureOutlined />
+        </span>
+        <strong>画布还是空的</strong>
+        <p>上传一张图片作为起点，或先添加一个创作节点，再描述你想生成的内容。</p>
+        <div class="canvas-empty__actions">
+          <button type="button" class="primary" @click="beginCanvasUpload">
+            <UploadOutlined />
+            上传素材
+          </button>
+          <button type="button" @click="addPromptNode()">
+            <PlusOutlined />
+            添加创作节点
+          </button>
+        </div>
+      </div>
 
       <div
         class="canvas-world"
@@ -4067,21 +5006,33 @@ onBeforeUnmount(() => {
                   <span><EditOutlined /></span>
                   <span>
                     <strong>文本生成</strong>
-                    <small>提炼文案、广告语与品牌表达</small>
+                    <small>{{
+                      node.kind === 'video'
+                        ? '抽取关键帧理解画面后输出文案'
+                        : '提炼文案、广告语与品牌表达'
+                    }}</small>
                   </span>
                 </button>
                 <button type="button" @click="runNodeGenerationAction('image', node)">
                   <span><PictureOutlined /></span>
                   <span>
                     <strong>图像生成</strong>
-                    <small>基于当前图片继续创作</small>
+                    <small>{{
+                      node.kind === 'video' ? '截取视频首帧作为参考图' : '基于当前图片继续创作'
+                    }}</small>
                   </span>
                 </button>
                 <button type="button" @click="runNodeGenerationAction('video', node)">
                   <span><VideoCameraOutlined /></span>
                   <span>
                     <strong>视频生成</strong>
-                    <small>将当前画面延展为视频任务</small>
+                    <small>{{
+                      node.kind === 'video'
+                        ? '需要图片输入，请先由该视频生成图片'
+                        : node.kind === 'prompt'
+                          ? '用这段文案直接生成视频'
+                          : '将当前画面延展为视频任务'
+                    }}</small>
                   </span>
                 </button>
               </div>
@@ -4169,7 +5120,7 @@ onBeforeUnmount(() => {
                 {{ statusLabel(nodeStatus(node)) }}
               </em>
             </span>
-            <p>{{ node.prompt }}</p>
+            <p>{{ nodePlainText(node.prompt) }}</p>
             <footer>
               <small>{{ formatTime(node.createdAt) }}</small>
               <button type="button" @pointerdown.stop @click.stop="editSelectedNode">编辑</button>
@@ -4178,19 +5129,20 @@ onBeforeUnmount(() => {
 
           <div v-else class="canvas-node__visual">
             <video
-              v-if="node.kind === 'video' && nodeStatus(node) === 'done' && node.previewUrl"
-              :src="node.previewUrl"
+              v-if="node.kind === 'video' && !isNodeBusy(node) && nodeVideoUrl(node)"
+              :src="nodeVideoUrl(node)"
               controls
               muted
+              playsinline
             />
             <img
-              v-else-if="nodeImageUrl(node) && nodeStatus(node) === 'done'"
+              v-else-if="node.kind !== 'video' && nodeImageUrl(node) && nodeStatus(node) === 'done'"
               :src="nodeImageUrl(node)"
               :alt="node.prompt"
               draggable="false"
             />
             <GalleryArtwork
-              v-else-if="nodeStatus(node) === 'done'"
+              v-else-if="node.kind !== 'video' && nodeStatus(node) === 'done'"
               :title="node.prompt"
               :variant="node.id.length % 8"
             />
@@ -4233,10 +5185,33 @@ onBeforeUnmount(() => {
             <div
               v-else-if="node.kind === 'video'"
               class="canvas-node__state canvas-node__state--video"
+              :class="{ 'is-generating': isNodeBusy(node) }"
             >
-              <VideoCameraOutlined />
-              <strong>{{ node.title }}</strong>
-              <small>等待视频任务生成</small>
+              <span class="canvas-node__video-spinner" :class="{ spinning: isNodeBusy(node) }">
+                <LoadingOutlined v-if="isNodeBusy(node)" />
+                <VideoCameraOutlined v-else />
+              </span>
+              <strong>{{
+                isNodeBusy(node)
+                  ? '视频生成中'
+                  : nodeStatus(node) === 'done'
+                    ? '正在加载视频'
+                    : '等待视频任务生成'
+              }}</strong>
+              <small>
+                {{
+                  isNodeBusy(node)
+                    ? node.progress
+                      ? '视频生成中，完成后自动填入当前节点'
+                      : '任务已提交，正在排队'
+                    : nodeStatus(node) === 'done'
+                      ? '正在取回已保存的视频文件'
+                      : '等待视频任务生成'
+                }}
+              </small>
+              <div v-if="isNodeBusy(node)" class="canvas-node__progress">
+                <i :style="{ width: `${Math.max(6, Math.round(node.progress ?? 0))}%` }" />
+              </div>
             </div>
             <div
               v-else-if="node.kind === 'output' && nodeStatus(node) === 'idle'"
@@ -4265,7 +5240,7 @@ onBeforeUnmount(() => {
           </div>
 
           <footer v-if="node.kind !== 'prompt'" class="canvas-node__meta">
-            <span>{{ node.kind === 'video' ? 'Video' : 'Image' }}</span>
+            <span :title="node.prompt">{{ nodeCaption(node) }}</span>
             <small>{{ node.width }} × {{ node.height }}</small>
           </footer>
         </article>
@@ -4275,7 +5250,7 @@ onBeforeUnmount(() => {
         <span>Zoom</span>
         <input
           type="range"
-          min="25"
+          min="10"
           max="200"
           :value="Math.round(viewport.scale * 100)"
           @input="setZoom(Number(($event.target as HTMLInputElement).value) / 100)"
@@ -4290,6 +5265,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div
+        v-show="composerVisible"
         ref="composerElement"
         class="canvas-composer"
         :class="{
@@ -4299,6 +5275,9 @@ onBeforeUnmount(() => {
         :style="composerAnchorStyle"
         @pointerdown.stop
       >
+        <p v-if="composerMaterialLabel" class="canvas-composer__material">
+          <span>参考素材</span>{{ composerMaterialLabel }}
+        </p>
         <textarea
           ref="composerInput"
           v-model="composerPrompt"
@@ -4315,40 +5294,63 @@ onBeforeUnmount(() => {
           <ExpandOutlined :class="{ 'panel-collapse-icon': composerExpanded }" />
           <span>{{ composerExpanded ? '收起' : '展开' }}</span>
         </button>
-        <small>{{ composerPrompt.length }} / 1000</small>
+        <small v-if="composerPrompt.length > 0">{{ composerPrompt.length }} / 1000</small>
         <footer>
-          <label>
-            <select v-model="selectedModel">
-              <option v-for="model in generationModels" :key="model.value" :value="model.value">
-                {{ model.label }}
-              </option>
-            </select>
-          </label>
-          <label>
-            <select v-model="selectedRatio">
-              <option v-for="ratio in ['16:9', '9:16', '1:1', '4:3', '3:4']" :key="ratio">
-                {{ ratio }}
-              </option>
-            </select>
-          </label>
-          <label>
-            <select v-model="selectedSize">
-              <option v-for="size in availableSizes" :key="size">
-                {{ size }}
-              </option>
-            </select>
-          </label>
-          <span>
-            <ThunderboltFilled />
-            {{ composerCost }}
-          </span>
+          <template v-if="!composerEditingPrompt">
+            <label>
+              <select v-model="selectedModel">
+                <option v-for="model in generationModels" :key="model.value" :value="model.value">
+                  {{ model.label }}
+                </option>
+              </select>
+            </label>
+            <template v-if="composerIsVideoTarget">
+              <label>
+                <select v-model.number="selectedVideoDuration" aria-label="视频时长">
+                  <option
+                    v-for="duration in canvasVideoDurations"
+                    :key="duration"
+                    :value="duration"
+                  >
+                    {{ duration }}s
+                  </option>
+                </select>
+              </label>
+              <label>
+                <select v-model="selectedVideoResolution" aria-label="视频分辨率">
+                  <option v-for="resolution in canvasVideoResolutions" :key="resolution">
+                    {{ resolution }}
+                  </option>
+                </select>
+              </label>
+            </template>
+            <template v-else>
+              <label>
+                <select v-model="selectedRatio">
+                  <option v-for="ratio in ['16:9', '9:16', '1:1', '4:3', '3:4']" :key="ratio">
+                    {{ ratio }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <select v-model="selectedSize">
+                  <option v-for="size in availableSizes" :key="size">
+                    {{ size }}
+                  </option>
+                </select>
+              </label>
+            </template>
+          </template>
           <button
             type="button"
+            class="canvas-composer__send"
             :disabled="!composerPrompt.trim() || submitting"
             @click="submitComposer"
           >
             <LoadingOutlined v-if="submitting" />
-            <ArrowRightOutlined v-else />
+            <CheckOutlined v-else-if="composerEditingPrompt" />
+            <ArrowUpOutlined v-else />
+            <em v-if="!composerEditingPrompt" class="canvas-composer__cost">{{ composerCost }}</em>
           </button>
         </footer>
       </div>
@@ -4635,12 +5637,21 @@ onBeforeUnmount(() => {
 }
 
 .canvas-workspace {
+  --canvas-grid-alpha: 0.34;
+  --canvas-grid-size: 22px;
+  --canvas-grid-x: 0px;
+  --canvas-grid-y: 0px;
   position: relative;
   min-width: 0;
   overflow: hidden;
   background-color: #050506;
-  background-image: radial-gradient(circle, rgb(96 98 108 / 70%) 1px, transparent 1px);
-  background-size: 22px 22px;
+  background-image: radial-gradient(
+    circle,
+    rgb(96 98 108 / var(--canvas-grid-alpha)) 1px,
+    transparent 1px
+  );
+  background-position: var(--canvas-grid-x) var(--canvas-grid-y);
+  background-size: var(--canvas-grid-size) var(--canvas-grid-size);
   cursor: grab;
   user-select: none;
 }
@@ -4651,12 +5662,88 @@ onBeforeUnmount(() => {
 
 .canvas-workspace--plain {
   background-image:
-    radial-gradient(circle, rgb(96 98 108 / 56%) 1px, transparent 1px),
+    radial-gradient(circle, rgb(96 98 108 / var(--canvas-grid-alpha)) 1px, transparent 1px),
     radial-gradient(circle at 42% 35%, rgb(92 68 208 / 7%), transparent 360px);
 }
 
 .canvas-workspace--grid-hidden {
   background-image: none;
+}
+
+.canvas-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  width: min(360px, calc(100% - 96px));
+  transform: translate(-50%, -50%);
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #9aa0ab;
+  text-align: center;
+  pointer-events: none;
+}
+
+.canvas-empty__icon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 4%);
+  color: #6f7580;
+  font-size: 22px;
+}
+
+.canvas-empty strong {
+  color: #e8eaf0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.canvas-empty p {
+  max-width: 300px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.canvas-empty__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  pointer-events: auto;
+}
+
+.canvas-empty__actions button {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 5%);
+  color: #dfe2ea;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.canvas-empty__actions button:hover {
+  border-color: rgb(255 255 255 / 18%);
+  background: rgb(255 255 255 / 9%);
+}
+
+.canvas-empty__actions button.primary {
+  border-color: transparent;
+  background: linear-gradient(145deg, #168bdc, #2975ec);
+  color: #fff;
 }
 
 .canvas-topbar {
@@ -4765,14 +5852,15 @@ onBeforeUnmount(() => {
 .canvas-topbar__icon-button {
   width: 34px;
   padding: 0;
+  border-radius: 999px;
   cursor: pointer;
 }
 
 .canvas-topbar__icon-button.active {
-  border-color: rgb(64 142 255 / 62%);
-  background: #286ac7;
-  color: #fff;
-  box-shadow: 0 0 0 1px rgb(64 142 255 / 16%);
+  border-color: rgb(248 206 106 / 55%);
+  background: linear-gradient(160deg, #f8d274, #e3a933);
+  color: #2b1e00;
+  box-shadow: 0 0 16px rgb(240 180 60 / 26%);
 }
 
 .canvas-rail {
@@ -5510,6 +6598,14 @@ onBeforeUnmount(() => {
 }
 
 .canvas-history-groups img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 视频历史卡片用 <video> 播首帧当封面，尺寸与图片卡片保持一致。 */
+.canvas-history-groups video {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -6311,6 +7407,54 @@ onBeforeUnmount(() => {
   font-size: 24px;
 }
 
+.canvas-node__state--video.is-generating {
+  background:
+    radial-gradient(circle at 50% 22%, rgb(81 120 255 / 42%), transparent 46%),
+    linear-gradient(145deg, #151a29, #232744 58%, #171a29);
+}
+
+.canvas-node__video-spinner {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgb(122 148 255 / 26%);
+  border-radius: 999px;
+  background: rgb(86 116 255 / 14%);
+  color: #87a4ff;
+}
+
+.canvas-node__video-spinner.spinning {
+  border-color: rgb(122 148 255 / 54%);
+  box-shadow: 0 0 0 4px rgb(86 116 255 / 10%);
+}
+
+.canvas-node__video-spinner.spinning :deep(svg) {
+  animation: canvas-node-spin 1s linear infinite;
+}
+
+.canvas-node__progress {
+  width: 62%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 12%);
+}
+
+.canvas-node__progress i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4b8dff, #8a6bff);
+  transition: width 0.45s ease;
+}
+
+@keyframes canvas-node-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes canvas-node-loading {
   0% {
     background-position: 130% 0;
@@ -6335,22 +7479,28 @@ onBeforeUnmount(() => {
 .canvas-node--image .canvas-node__meta,
 .canvas-node--output .canvas-node__meta,
 .canvas-node--video .canvas-node__meta {
-  top: 9px;
+  top: auto;
   right: auto;
-  bottom: auto;
-  left: -64px;
-  width: 58px;
-  height: 18px;
-  justify-content: flex-end;
+  bottom: calc(100% + 6px);
+  left: 2px;
+  width: auto;
+  max-width: calc(100% - 4px);
+  height: 16px;
+  justify-content: flex-start;
+  overflow: hidden;
 }
 
 .canvas-node--image .canvas-node__meta span,
 .canvas-node--output .canvas-node__meta span,
 .canvas-node--video .canvas-node__meta span {
+  max-width: 100%;
+  overflow: hidden;
   padding: 0;
   background: transparent;
   color: #8c929e;
   font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   backdrop-filter: none;
 }
 
@@ -6824,6 +7974,29 @@ onBeforeUnmount(() => {
   min-height: 210px;
 }
 
+.canvas-composer__material {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin: 0 0 6px;
+  overflow: hidden;
+  color: #9ba3b4;
+  font-size: 10px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-composer__material span {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid rgb(140 158 255 / 32%);
+  border-radius: 4px;
+  color: #aeb8ff;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
 .canvas-composer textarea {
   width: 100%;
   min-height: 82px;
@@ -6851,10 +8024,10 @@ onBeforeUnmount(() => {
 
 .canvas-composer__expand {
   position: absolute;
-  right: 14px;
-  bottom: 43px;
+  top: 12px;
+  right: 12px;
   display: inline-flex;
-  height: 26px;
+  height: 24px;
   align-items: center;
   gap: 4px;
   padding: 0 7px;
@@ -6906,6 +8079,22 @@ onBeforeUnmount(() => {
   max-width: 78px;
 }
 
+.canvas-composer label:first-of-type select {
+  padding-left: 24px;
+}
+
+.canvas-composer label:first-of-type::before {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: linear-gradient(140deg, #a99bff, #6b5bff);
+  content: '';
+  transform: translateY(-50%) rotate(45deg);
+}
+
 .canvas-composer footer > span {
   display: inline-flex;
   align-items: center;
@@ -6916,21 +8105,48 @@ onBeforeUnmount(() => {
 }
 
 .canvas-composer footer > button {
+  position: relative;
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
   place-items: center;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(145deg, #168bdc, #2975ec);
-  color: #fff;
+  background: #f6f7f9;
+  color: #14161a;
   cursor: pointer;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 30%);
+  font-size: 14px;
+}
+
+.canvas-composer footer > button:hover:not(:disabled) {
+  background: #fff;
 }
 
 .canvas-composer footer > button:disabled {
-  background: #4c5058;
-  color: #838792;
+  background: #f6f7f9;
+  color: #14161a;
   cursor: not-allowed;
+  opacity: 0.38;
+  box-shadow: none;
+}
+
+.canvas-composer__cost {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  display: grid;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  place-items: center;
+  border-radius: 999px;
+  background: linear-gradient(150deg, #ffd873, #e9a93a);
+  color: #2a1c00;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .canvas-context-menu {

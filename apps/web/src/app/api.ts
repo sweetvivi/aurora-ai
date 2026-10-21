@@ -1,6 +1,6 @@
 import axios from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import type { AgentCapabilityId, AgentCatalogItem } from '@/data/agents';
+import type { AgentCapabilityId, AgentCatalogItem, AgentInputMode } from '@/data/agents';
 import { createSseParser } from './sse';
 
 const ACCESS_TOKEN_KEY = 'aurora.auth.accessToken';
@@ -154,6 +154,7 @@ export interface AuthResult {
 export interface ImageCapabilityProfile {
   maxReferenceImages: number;
   sizePresets: string[];
+  supportsImageEdit?: boolean;
   supportsLayerDecomposition?: boolean;
   supportsSequentialGeneration?: boolean;
 }
@@ -162,6 +163,7 @@ export interface VideoCapabilityProfile {
   maxDuration: number;
   resolutions: string[];
   supportsAudio?: boolean;
+  supportsImageInput?: boolean;
   supportsLastFrame?: boolean;
   supportsVideoInput?: boolean;
 }
@@ -178,12 +180,19 @@ export interface ChatModel {
   profile?: ModelCapabilityProfile;
 }
 
-export interface PersistedAgent extends AgentCatalogItem {
+export interface PersistedAgent extends Omit<
+  AgentCatalogItem,
+  'inputMode' | 'maxTokens' | 'modelAlias' | 'temperature'
+> {
   capabilities: AgentCapabilityId[];
   createdAt: string;
+  inputMode: AgentInputMode | null;
   instructions: string;
+  maxTokens: number | null;
+  modelAlias: string | null;
   publishedAt: string | null;
   status: 'DRAFT' | 'PUBLISHED';
+  temperature: number | null;
   updatedAt: string;
 }
 
@@ -193,11 +202,15 @@ export interface SaveAgentInput {
   description: string;
   glyph?: string;
   id?: string;
+  inputMode?: AgentInputMode;
   instructions: string;
+  maxTokens?: number;
+  modelAlias?: string;
   name: string;
   opening: string;
   starterPrompts: string[];
   tags: string[];
+  temperature?: number;
 }
 
 export interface CanvasWorkflowRecord {
@@ -1005,6 +1018,7 @@ export async function streamChat(
     content: string;
     conversationId?: string;
     fileIds?: string[];
+    maxTokens?: number;
     modelAlias?: string;
     reasoningEffort?: ReasoningEffort;
     systemPrompt?: string;
